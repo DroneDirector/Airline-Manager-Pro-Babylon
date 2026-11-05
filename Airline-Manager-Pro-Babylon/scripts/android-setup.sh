@@ -18,7 +18,7 @@ grep -q 'android.hardware.gamepad' "$MAN" || sed -i 's|</manifest>|    <uses-fea
 JDIR="android/app/src/main/java/$(echo "$APPID" | tr '.' '/')"
 mkdir -p "$JDIR"
 sed "s/__PACKAGE__/${APPID}/" scripts/android/MainActivity.java > "$JDIR/MainActivity.java"
-for J in AppExitPlugin AppUpdatePlugin UpdatedReceiver; do sed "s/__PACKAGE__/${APPID}/" "scripts/android/$J.java" > "$JDIR/$J.java"; done
+for J in AppExitPlugin AppUpdatePlugin PhotoSavePlugin UpdatedReceiver; do sed "s/__PACKAGE__/${APPID}/" "scripts/android/$J.java" > "$JDIR/$J.java"; done
 # updates from inside the game: permission to install them, and opening again by itself after one has installed
 for P in REQUEST_INSTALL_PACKAGES UPDATE_PACKAGES_WITHOUT_USER_ACTION; do grep -q "permission.$P" "$MAN" || sed -i "s|</manifest>|    <uses-permission android:name=\"android.permission.$P\" />\n</manifest>|" "$MAN"; done
 grep -q 'UpdatedReceiver' "$MAN" || sed -i 's|</application>|    <receiver android:name=".UpdatedReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter></receiver>\n    </application>|' "$MAN"

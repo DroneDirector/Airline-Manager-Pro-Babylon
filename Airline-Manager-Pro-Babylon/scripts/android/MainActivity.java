@@ -20,6 +20,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(AppExitPlugin.class);
         registerPlugin(AppUpdatePlugin.class);
+        registerPlugin(PhotoSavePlugin.class);
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         immersive();

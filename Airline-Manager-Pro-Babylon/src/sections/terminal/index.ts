@@ -17,6 +17,7 @@ import { buildDoors, stepDoors, doorPassable, DoorObj } from './doors';
 import { furnish } from './furnish';
 import { buildFixtures, Fixtures } from './fixtures';
 import { buildRental } from './rental';
+import { makeWeather, Weather } from './weather';
 import { ROOMS, STAIRS, OUTSIDE, SPAWN, F2Y, Fl, Stair, inRoom, roomAt } from './plan';
 import { museumBlocked } from '../building/museum';
 
@@ -80,6 +81,9 @@ const Terminal$: Section = {
     const hud = document.createElement('div'); hud.className = 'hud tm-hud'; O.hud = hud;
     hud.innerHTML = `<div class="tm-where"><small></small><b></b></div><div class="aim" hidden></div><div class="of-hint" hidden></div>`;
     ui.appendChild(hud); perfAttach(engine, sc, hud); perfShow();
+    // the sky, the clouds and the weather, the time of day and its time-lapse, the drone and the photo button
+    const wx: Weather = makeWeather({ sc, engine, cam, sun, hemi, glow: O.glow, hud, canvas: ctx.canvas, centre: new Vector3(110, 0, 30),
+      indoors: () => { if (!wx.drone) return !!F.stair || !!roomAt(F.f, F.x, F.z); const p = cam.position, f: Fl = p.y > F2Y ? 2 : 1; return p.y < 12.2 && !!roomAt(f, p.x, p.z); } }); O.wx = wx;
     toast(IS_TOUCH ? 'Left thumb: walk · Right: drag to look · tap a lift to use it' : 'W A S D to walk · click to look with the mouse · E or click a lift to change floor · a controller works too');
     let down: any = null; const cv = ctx.canvas;
     O.pd = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; };
@@ -90,6 +94,8 @@ const Terminal$: Section = {
     runLoop(() => {
       perfBegin();
       const dt = Math.min(0.05, engine.getDeltaTime() / 1000), now = performance.now() / 1000, inp = inputFrame(dt);
+      const flying = wx.droneStep(dt, inp);
+      if (!flying) {
       F.yaw += inp.lx; F.pitch = Math.max(-1.2, Math.min(1.0, F.pitch - inp.ly));
       const vmax = inp.run ? 3.0 : 1.5, mag = Math.min(1, Math.hypot(inp.mx, inp.my)); F.v += ((mag > 0.05 ? vmax * mag : 0) - F.v) * Math.min(1, dt * 6);
       if (mag > 0.05) { const fx = Math.sin(F.yaw), fz = Math.cos(F.yaw), rx = Math.cos(F.yaw), rz = -Math.sin(F.yaw);
@@ -99,6 +105,8 @@ const Terminal$: Section = {
       if (F.f === 2 && !F.stair) for (const w of O.walkways) if (Math.abs(F.z - w.z) < 0.68 && F.x > w.x0 && F.x < w.x1) { const nx = F.x + w.dir * 0.95 * dt; if (walkable(2, nx, F.z)) F.x = nx; break; }
       cam.position.set(F.x, F.y + EYE + Math.sin(F.bob / 0.65 * Math.PI) * 0.015 * Math.min(1, F.v / 1.1), F.z);
       const cp = Math.cos(F.pitch); cam.setTarget(cam.position.add(new Vector3(Math.sin(F.yaw) * cp, Math.sin(F.pitch), Math.cos(F.yaw) * cp)));
+      }
+      wx.frame(dt, now);
       stepDoors(O.doors, F.x, F.z, F.stair ? 0 : F.f, dt, now);
       // the museum's sliding doors
       if (O.fx.museum) { const Md = O.fx.museumDoor, want = F.f === 1 && Math.hypot(F.x - 36, F.z - 15) < 3 ? 1 : 0; if (Math.abs(Md.k - want) > 0.001) { Md.k += Math.sign(want - Md.k) * Math.min(Math.abs(want - Md.k), dt * 1.8); const e = Md.k * Md.k * (3 - 2 * Md.k); O.fx.museum.doors.forEach((m: AbstractMesh, i: number) => { const b = Md.base[i]; m.position.x = b.x + Math.sign(b.x || 1) * e * 1.12; }); } }
@@ -112,7 +120,7 @@ const Terminal$: Section = {
   close() {
     const sc: Scene = O.scene; if (!sc) return;
     try { O.ctx.canvas.removeEventListener('pointerdown', O.pd); O.ctx.canvas.removeEventListener('pointerup', O.pu); } catch (e) { /* gone */ }
-    perfDetach(); if (O.hud) O.hud.remove(); sc.dispose(); try { O.engine.useReverseDepthBuffer = false; } catch (e) { /* gone */ } O.scene = null; O.K = null; O.doors = []; O.fx = null;
+    try { if (O.wx) O.wx.dispose(); } catch (e) { /* gone */ } O.wx = null; perfDetach(); if (O.hud) O.hud.remove(); sc.dispose(); try { O.engine.useReverseDepthBuffer = false; } catch (e) { /* gone */ } O.scene = null; O.K = null; O.doors = []; O.fx = null;
   },
   onSettings(what: string) { apply(what === 'preset' ? 'all' : what); },
 };

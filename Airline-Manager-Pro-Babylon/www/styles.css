@@ -293,3 +293,21 @@ body.game-on .gear, body.game-on .exit, body.game-on .to-title, body.game-on .pl
 .tm-hud .tm-where { position: absolute; left: max(16px, env(safe-area-inset-left)); top: max(14px, env(safe-area-inset-top)); padding: 8px 13px; border-radius: 12px; background: rgba(10, 16, 30, .72); border: 1px solid rgba(63, 211, 230, .35); color: #F2F4F7; pointer-events: none; max-width: min(520px, 60vw); }
 .tm-hud .tm-where small { display: block; color: #3FD3E6; font: 600 11.5px Inter, sans-serif; letter-spacing: .06em; text-transform: uppercase; }
 .tm-hud .tm-where b { font: 600 14.5px/1.3 Inter, sans-serif; }
+/* the Terminal demo's weather, time, drone and photo controls */
+.wx-tools { position: absolute; right: max(12px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
+.wx-b { pointer-events: auto; border: 1px solid rgba(140, 170, 255, .32); background: rgba(10, 8, 26, .6); backdrop-filter: blur(8px); color: #F1F4FA; border-radius: 12px; padding: 8px 12px; font: 600 12.5px 'Inter', sans-serif; display: inline-flex; align-items: center; gap: 7px; transition: border-color .2s, background .2s; cursor: pointer; }
+.wx-b .ic { width: 18px; height: 18px; }
+.wx-b:hover { border-color: var(--neo2, #35F0FF); }
+.wx-b.on, .wx-o.on { background: linear-gradient(90deg, rgba(255, 63, 184, .55), rgba(53, 240, 255, .3)); border-color: rgba(255, 140, 220, .7); }
+.wx-shot { border-color: rgba(53, 240, 255, .6); }
+.wx-panel { position: absolute; right: calc(max(12px, env(safe-area-inset-right)) + 128px); top: 50%; transform: translateY(-50%); width: min(560px, 64vw); max-height: 80vh; overflow: auto; padding: 14px 16px; border-radius: 16px; background: rgba(10, 8, 26, .78); border: 1px solid rgba(140, 170, 255, .3); backdrop-filter: blur(12px); pointer-events: auto; display: flex; flex-direction: column; gap: 12px; color: #F1F4FA; }
+.wx-panel[hidden], .wx-updown[hidden], .wx-dronehint[hidden] { display: none; }
+.wx-row small { display: block; font: 700 11px 'Inter', sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9FB0D6; margin-bottom: 6px; }
+.wx-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.wx-o { pointer-events: auto; border: 1px solid rgba(140, 170, 255, .28); background: rgba(255, 255, 255, .06); color: #F1F4FA; border-radius: 9px; padding: 6px 10px; font: 600 12px 'Inter', sans-serif; cursor: pointer; }
+.wx-time { display: flex; align-items: center; gap: 12px; }
+.wx-clock { font: 700 18px 'Inter', sans-serif; min-width: 56px; }
+.wx-slider { flex: 1; pointer-events: auto; accent-color: #35F0FF; }
+.wx-updown { position: absolute; right: calc(max(12px, env(safe-area-inset-right)) + 128px); bottom: 24%; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
+.wx-updown .wx-b { width: 58px; height: 58px; justify-content: center; font-size: 20px; touch-action: none; }
+.wx-dronehint { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 6px 14px; border-radius: 12px; background: rgba(10, 8, 26, .6); font: 600 12px 'Inter', sans-serif; color: #DDE6F7; white-space: nowrap; pointer-events: none; }
