@@ -1,0 +1,22 @@
+{
+  "_comment": "The airline game's interface inside the Babylon.js edition (its name and version are set from the edition's app.config.json by the edition's build).",
+  "appName": "Airline Manager Pro Babylon",
+  "shortName": "AMP Babylon",
+  "appId": "com.dronedirector.airlinemanagerpro.babylon",
+  "publisher": "DroneDirector",
+  "version": "0.2.2",
+  "versionCode": 7,
+  "updates": null,
+  "services": {
+    "_comment": "Online services that need the provider's permission before the app is sold with them. Set one to true once its permission is in writing. VATSIM: its user agreement forbids use of its data in commercial software without written consent. IVAO, SimBrief's flight plan API and Hoppie ACARS publish no terms for commercial apps: ask first.",
+    "vatsim": false,
+    "ivao": false,
+    "simbriefApi": false,
+    "hoppie": false
+  },
+  "online": {
+    "_comment": "The online register for registration keys and co-op (Supabase). Only the project URL and the public anon key go here, never the secret service_role key.",
+    "supabaseUrl": "https://tdtjrkafdwxlpljiwxqe.supabase.co",
+    "supabaseKey": "sb_publishable_OprK1Q6M0yOEGK9uUgQP8w_f4LCWaSV"
+  }
+}

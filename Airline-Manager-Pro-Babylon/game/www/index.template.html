@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#071322">
+  <title>%APP_NAME%</title>
+  <link rel="stylesheet" href="vendor/maplibre-gl.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app"></div>
+  <div id="overlay-root"></div>
+  <div id="rotate-hint">Turn your device sideways. This app runs in landscape.</div>
+  <script>
+    // Catches errors from the very start. If the app can't start at all, the error is shown
+    // here with Copy and Share, instead of a blank screen.
+    (function () {
+      var errs = window.__bootErrors = [];
+      function note(msg, stack) { errs.push({ message: String(msg || 'Unknown error'), detail: String(stack || ''), time: new Date().toISOString().slice(0, 19).replace('T', ' ') }); }
+      window.addEventListener('error', function (e) { if (e.message && e.message !== 'Script error.') note(e.message, e.error && e.error.stack || (e.filename + ':' + e.lineno)); });
+      window.addEventListener('unhandledrejection', function (e) { var r = e.reason; note(r && r.message || r, r && r.stack); });
+      setTimeout(function () {
+        var app = document.getElementById('app');
+        if (app && app.children.length) return;
+        var text = '%APP_NAME% %APP_VERSION% could not start\n' + navigator.userAgent + '\n\n' + (errs.length ? errs.map(function (x) { return '[' + x.time + '] ' + x.message + '\n' + x.detail; }).join('\n\n') : 'No error message was given.');
+        var box = document.createElement('div');
+        box.setAttribute('style', 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;background:#06111F;color:#E6EEF7;font:14px system-ui,sans-serif');
+        box.innerHTML = '<div style="max-width:720px;width:100%;background:#0D1E33;border:1px solid #1B3452;border-radius:18px;padding:18px 20px">'
+          + '<b style="font-size:17px;color:#FF5A5F">The app couldn\'t start</b><p style="color:#93A9C1;margin:6px 0 10px">Copy or share these details so the problem can be looked at.</p>'
+          + '<pre id="boot-err" style="margin:0;max-height:52vh;overflow:auto;padding:12px;border-radius:12px;background:#06111F;border:1px solid #1B3452;color:#93A9C1;font:12px/1.5 monospace;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text"></pre>'
+          + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button id="boot-copy" style="padding:9px 16px;border-radius:10px;border:1px solid #27486E;background:#12273F;color:#E6EEF7;font:inherit">Copy</button><button id="boot-share" style="padding:9px 16px;border-radius:10px;border:0;background:#3FD0E8;color:#06111F;font:inherit;font-weight:600">Share</button></div></div>';
+        document.body.appendChild(box);
+        document.getElementById('boot-err').textContent = text;
+        var tools = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppTools;
+        function copy() { if (tools) return tools.copy({ text: text }); return navigator.clipboard.writeText(text); }
+        document.getElementById('boot-copy').onclick = function () { Promise.resolve().then(copy).then(function () { document.getElementById('boot-copy').textContent = 'Copied'; }, function () {}); };
+        document.getElementById('boot-share').onclick = function () {
+          if (tools) tools.share({ text: text, title: '%APP_NAME% error' });
+          else if (navigator.share) navigator.share({ text: text }).catch(function () {});
+          else document.getElementById('boot-copy').click();
+        };
+      }, 4000);
+    })();
+  </script>
+  <script src="vendor/maplibre-gl.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

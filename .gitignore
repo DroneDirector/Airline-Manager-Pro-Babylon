@@ -6,3 +6,13 @@ Airline-Manager-Pro-Babylon/capacitor.config.json
 Airline-Manager-Pro-Babylon/pc/build/
 *.apk
 *.zip
+Airline-Manager-Pro-Babylon/www/game/
+Airline-Manager-Pro-Babylon/game/build/
+Airline-Manager-Pro-Babylon/game/src/generated/
+Airline-Manager-Pro-Babylon/game/www/app.js
+Airline-Manager-Pro-Babylon/game/www/index.html
+Airline-Manager-Pro-Babylon/game/www/vendor/
+Airline-Manager-Pro-Babylon/game/www/humans.bin
+Airline-Manager-Pro-Babylon/game/www/*-world.json
+Airline-Manager-Pro-Babylon/game/www/navdata/
+Airline-Manager-Pro-Babylon/game/capacitor.config.json

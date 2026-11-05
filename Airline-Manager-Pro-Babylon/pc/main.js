@@ -31,7 +31,7 @@ async function startUpdate(url, version) {
     setTimeout(() => app.quit(), 900);
   } catch (e) { UPD.state = 'failed'; UPD.error = 'The update couldn\'t be installed: ' + ((e && e.message) || e); }
 }
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.png': 'image/png', '.mp3': 'audio/mpeg', '.woff': 'font/woff', '.woff2': 'font/woff2', '.txt': 'text/plain' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.png': 'image/png', '.mp3': 'audio/mpeg', '.woff': 'font/woff', '.woff2': 'font/woff2', '.txt': 'text/plain', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.wasm': 'application/wasm', '.mjs': 'text/javascript', '.glb': 'model/gltf-binary', '.bin': 'application/octet-stream', '.md': 'text/markdown; charset=utf-8', '.onnx': 'application/octet-stream' };
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');

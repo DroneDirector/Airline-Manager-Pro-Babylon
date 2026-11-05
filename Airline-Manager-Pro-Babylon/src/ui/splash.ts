@@ -31,23 +31,30 @@ const TitleScreen: any = {
   on: false, root: null as any, cv: null as any, cx: null as any, raf: 0, img: {} as any, blur: {} as any, ready: false,
   audio: null as any, env: null as any, kick: null as any, clock0: 0, lastShot: -1, flash: 0, glitch: 0, grain: null as any, tmp: null as any,
 };
-let _enter: ((id: string) => void) | null = null, _pick = 'viewer3d';
+let _enter: ((id: string) => void) | null = null, _pick = 'game:continue';
 /** Open the start screen; enter(id) runs when you choose a place: the 3D viewer (a flight above the clouds) or the lounge. */
 export function splashOpen(enter: (id: string) => void) {
-  const T = TitleScreen; if (T.on) return; T.on = true; _enter = enter;
+  const T = TitleScreen; if (T.on) return; T.on = true; _enter = enter; _pick = 'game:continue';
   const r = document.createElement('div'); r.className = 'ts'; r.setAttribute('aria-label', 'Start screen');
   r.innerHTML = `<canvas class="ts-cv" aria-hidden="true"></canvas><div class="ts-fx" aria-hidden="true"></div>
     <div class="ts-left">
       <div class="ts-logo" aria-label="${esc(APP.name)}"><span class="ts-l1">Airline</span><span class="ts-l2">Manager</span><span class="ts-l3">Pro</span></div>
       <div class="ts-engine">Babylon.js edition · a first look</div>
-      <nav class="ts-nav"><button class="ts-btn on" data-a="enter" data-id="viewer3d"><span class="ts-bi">${icon('plane')}</span><span class="ts-bt"><b>3D viewer</b><small>Fly above the clouds at flight level 300</small></span><i class="ts-sheen"></i></button><button class="ts-btn" data-a="enter" data-id="lounge"><span class="ts-bi">${icon('play')}</span><span class="ts-bt"><b>Enter the lounge</b><small>Walk round the Business lounge</small></span><i class="ts-sheen"></i></button></nav>
+      <nav class="ts-nav">${[
+        ['game:continue', 'play', 'Continue game', 'Back to your airline, at the Overview'],
+        ['game:new', 'plus', 'New game', 'Create your pilot and found your airline'],
+        ['game:load', 'folder', 'Load game', 'Pick a saved game or a backup'],
+        ['game:save', 'save', 'Save game', 'Save your airline in a slot'],
+        ['game:ui', 'grid', 'UI', 'Straight into the game\'s menus and screens'],
+      ].map(([id, ic, t, s], i) => `<button class="ts-btn ${i === 0 ? 'on' : ''}" data-a="enter" data-id="${id}"><span class="ts-bi">${icon(ic)}</span><span class="ts-bt"><b>${t}</b><small>${s}</small></span><i class="ts-sheen"></i></button>`).join('')}
+        <div class="ts-demos"><small>Demos</small>${[['viewer3d', 'plane', '3D viewer'], ['lounge', 'star', 'Lounge']].map(([id, ic, t]) => `<button class="ts-btn ts-demo" data-a="enter" data-id="${id}"><span class="ts-bi">${icon(ic)}</span><span class="ts-bt"><b>${t}</b></span><i class="ts-sheen"></i></button>`).join('')}</div></nav>
     </div>
     <div class="ts-cap" aria-hidden="true"><small></small><b></b></div>
     <small class="ts-ver">v${esc(APP.version)} · Babylon.js ${esc(APP.babylon)}</small>
     <button class="ts-mute ${S.music ? '' : 'off'}" data-a="mute" aria-label="Music on or off"><span class="ts-eq"><i></i><i></i><i></i><i></i></span><span class="ts-ml">${S.music ? 'Music on' : 'Music off'}</span></button>
     <div class="ts-tap" hidden>Tap anywhere for sound</div>`;
   (document.getElementById('ui') as HTMLElement).appendChild(r); T.root = r;
-  r.addEventListener('click', (e: Event) => { const b = (e.target as HTMLElement).closest('[data-a]') as HTMLElement; if (!b) return; const a = b.getAttribute('data-a'); if (a === 'enter') { _pick = b.getAttribute('data-id') || 'viewer3d'; splashEnter(); } else if (a === 'mute') splashMute(); });
+  r.addEventListener('click', (e: Event) => { const b = (e.target as HTMLElement).closest('[data-a]') as HTMLElement; if (!b) return; const a = b.getAttribute('data-a'); if (a === 'enter') { _pick = b.getAttribute('data-id') || 'game:continue'; splashEnter(); } else if (a === 'mute') splashMute(); });
   T.cv = r.querySelector('.ts-cv'); T.cx = T.cv.getContext('2d');
   T.fit = () => { const w = r.clientWidth, h = r.clientHeight, k = Math.min(1.5, window.devicePixelRatio || 1, 2200 / Math.max(1, w)); T.cv.width = Math.round(w * k); T.cv.height = Math.round(h * k); };
   T.fit(); window.addEventListener('resize', T.fit);
@@ -62,7 +69,7 @@ export function splashIsOpen(): boolean { return !!TitleScreen.on; }
 export function splashNav(dir: number) {
   const T = TitleScreen; if (!T.on || !T.root) return; const bs = Array.from(T.root.querySelectorAll('.ts-btn')) as HTMLElement[]; if (!bs.length) return;
   let i = bs.findIndex(b => b.classList.contains('on')); i = (i + dir + bs.length) % bs.length;
-  bs.forEach((b, k) => b.classList.toggle('on', k === i)); _pick = bs[i].getAttribute('data-id') || 'viewer3d';
+  bs.forEach((b, k) => b.classList.toggle('on', k === i)); _pick = bs[i].getAttribute('data-id') || 'game:continue';
 }
 /** Into the lounge: the music fades, the picture goes dark. */
 export function splashEnter() {

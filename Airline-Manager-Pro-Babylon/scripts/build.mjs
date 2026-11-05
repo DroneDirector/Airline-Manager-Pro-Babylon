@@ -1,7 +1,8 @@
 // Builds the app: src/ bundled into www/app.js (esbuild, with Babylon.js), the app's name and version put in, and
 // the Capacitor config (Android) written from app.config.json.
 import { build } from 'esbuild';
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync, rmSync, cpSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,3 +23,15 @@ writeFileSync(join(root, 'capacitor.config.json'), JSON.stringify({ appId: cfg.a
 const html = readFileSync(join(root, 'www/index.template.html'), 'utf8').replace(/%APP_NAME%/g, cfg.appName).replace(/%APP_VERSION%/g, cfg.version);
 writeFileSync(join(root, 'www/index.html'), html);
 console.log(`Built ${cfg.appName} ${cfg.version} (Babylon.js ${babylon})`);
+
+// The airline game's interface (game/: the Overview, the crew, every menu and screen), built and put in www/game,
+// opened from the title screen (New game, Continue game, Load game, Save game, UI). Its name and version are this
+// edition's.
+const gd = join(root, 'game'), gc = JSON.parse(readFileSync(join(gd, 'app.config.json'), 'utf8'));
+gc.appName = cfg.appName; gc.shortName = cfg.shortName; gc.version = cfg.version; gc.versionCode = cfg.versionCode;
+writeFileSync(join(gd, 'app.config.json'), JSON.stringify(gc, null, 2) + '\n');
+if (!existsSync(join(gd, 'node_modules', '.bin'))) execSync('npm install --no-audit --no-fund', { cwd: gd, stdio: 'inherit' });
+execSync('node scripts/build.mjs', { cwd: gd, stdio: 'inherit' });
+rmSync(join(root, 'www/game'), { recursive: true, force: true });
+cpSync(join(gd, 'www'), join(root, 'www/game'), { recursive: true, filter: s => !/index\.template\.html$/.test(s) });
+console.log('Built the game\'s interface into www/game');

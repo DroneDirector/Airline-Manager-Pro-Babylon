@@ -1,0 +1,15 @@
+{
+  "name": "airline-manager-pro-babylon-game",
+  "private": true,
+  "description": "The airline game's interface inside Airline Manager Pro Babylon",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "maplibre-gl": "^5.0.0",
+    "onnxruntime-web": "1.20.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

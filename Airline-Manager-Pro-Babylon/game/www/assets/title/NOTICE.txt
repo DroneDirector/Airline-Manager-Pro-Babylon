@@ -1,0 +1,6 @@
+Start screen
+- Music (title.mp3): supplied by the owner of Airline Manager Pro for the start screen.
+- Pictures (t1-t5 webp): supplied by the owner; graded, layered and cut out with tools/title/make_title.py.
+  Other airlines' tails, brand names and signs in the backgrounds are blurred out.
+- Fonts: Audiowide (SIL Open Font License 1.1, Astigmatic), Yellowtail (Apache License 2.0, Astigmatic),
+  in www/fonts, from the Fontsource packages.

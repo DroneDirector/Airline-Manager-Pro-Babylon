@@ -10,6 +10,7 @@ import { settingsShow, settingsHide, settingsOpen, settingsButton } from './ui/s
 import { loadingShow, loadingProgress, loadingHide } from './ui/loading';
 import { icon, toast } from './ui/icons';
 import { exitGame } from './core/exit';
+import { gameOpen, gameIsOpen } from './ui/game-frame';
 import { APP } from './core/app';
 import { updateInit } from './core/update';
 import { whatsNewOnStart, whatsNewIsOpen, whatsNewClose } from './ui/whats-new';
@@ -40,6 +41,7 @@ onSettings(what => {
   const s = currentSection(); if (s && s.onSettings) s.onSettings(what);
 });
 onButton(b => {
+  if (gameIsOpen()) return;   // the game's interface has its own controls
   if (whatsNewIsOpen()) { if (b === 'back' || b === 'confirm' || b === 'menu') whatsNewClose(); return; }
   if (settingsOpen()) { settingsButton(b); return; }
   if (b === 'menu') { toggleSettings(); return; }
@@ -62,10 +64,18 @@ async function enter(id: string, title: string) {
 function backToTitle() {
   if (!inPlace) return; inPlace = false; titleB.hidden = true; verB.hidden = true; document.body.classList.remove('in-viewer'); setPlay(false); if (settingsOpen()) settingsHide();
   canvas.classList.remove('on'); const e = getEngine(); if (e) e.stopRenderLoop();
-  closeSection(); splashOpen(id => enter(id, TITLES[id] || id));
+  closeSection(); splashOpen(pickPlace);
 }
 const TITLES: { [id: string]: string } = { viewer3d: '3D viewer · above the clouds', lounge: 'Business lounge' };
-splashOpen(id => enter(id, TITLES[id] || id));
+/** What was chosen on the title screen: the game (New, Continue, Load, Save, UI) or one of the demos. */
+function pickPlace(id: string) {
+  if (id.indexOf('game:') === 0) {
+    gameOpen(id.slice(5) as any, { title: () => splashOpen(pickPlace), exit: () => exitGame(), viewer: () => enter('viewer3d', TITLES.viewer3d) });
+    return;
+  }
+  enter(id, TITLES[id] || id);
+}
+splashOpen(pickPlace);
 // after an update: what's new, once; and a quiet look for a newer version now and then
 whatsNewOnStart();
 updateInit(v => toast(`Version ${v} is ready: Settings → Updates`));
