@@ -47,10 +47,23 @@ if (EMBED) {
   ACTIONS['title-open'] = () => leaveAsk('title', () => { closeAll(); try { saveNow(true); } catch (e) { /* saved already */ } embedTell('title'); });
   // the 3D places: coming on Babylon.js
   const soon = (name: string) => () => { try { Sound.tick(); } catch (e) { /* muted */ } toast(`${name}: coming to the Babylon.js edition`, 'info'); return false; };
-  const rooms: [any, string][] = [[OfficeRoom, 'Your office'], [OpsRoom, 'The Operations office'], [HangarRoom, 'The hangar'], [LoungeRoom, 'The lounge'], [CourtRoom, 'The courtroom'],
+  // your office: on Babylon.js, with the airline's own details on its laptop, monitor, route map and nameplate
+  OfficeRoom.open = () => {
+    try { saveNow(true); } catch (e) { /* saved */ }
+    try {
+      const c: any = company(), me: any = myPilot(), routes: number[][][] = [];
+      for (const r of (State as any).routes || []) { if (r.companyId !== State.companyId) continue; const legs: string[] = r.legs || []; for (let i = 0; i + 1 < legs.length; i++) { const A = apt(legs[i]), B = apt(legs[i + 1]); if (A && B) routes.push([A.pos, B.pos]); } if (routes.length > 300) break; }
+      embedTell('room', { room: 'office', data: { airline: c.name, icao: c.icao, color: c.color, color2: c.color2, hub: c.hub, pilot: me ? me.name : '', balance: money(c.balance, { compact: true }), flying: liveOf().length, fleet: fleetOf().length, routes,
+        reports: (((State as any).incidents || []) as any[]).filter(x => x && x.status !== 'closed').length } });
+    } catch (e) { embedTell('room', { room: 'office', data: {} }); }
+  };
+  // the lounges: the Business lounge on Babylon.js (its doors lead back here)
+  LoungeRoom.open = () => { try { saveNow(true); } catch (e) { /* saved */ } embedTell('room', { room: 'lounge', data: {} }); };
+  ACTIONS['lounge-visit'] = () => LoungeRoom.open();
+  const rooms: [any, string][] = [[OpsRoom, 'The Operations office'], [HangarRoom, 'The hangar'], [CourtRoom, 'The courtroom'],
     [Museum, 'The museum'], [Salute, 'The water salute'], [TestRooms, 'The test rooms']];
   for (const [R, name] of rooms) if (R) R.open = soon(name);
-  for (const a of ['photo-mode', 'hangar-visit', 'lounge-visit']) if (typeof (ACTIONS as any)[a] === 'function') (ACTIONS as any)[a] = soon('This 3D place');
+  for (const a of ['photo-mode', 'hangar-visit']) if (typeof (ACTIONS as any)[a] === 'function') (ACTIONS as any)[a] = soon('This 3D place');
   // the 3D view of a flight: the edition's 3D viewer follows it, live. This page keeps running behind it (the airline,
   // its schedules and the other airlines' flights go on) and sends where the flight is, several times a second.
   W.v3dOpen = (id: string) => {
@@ -85,6 +98,7 @@ if (EMBED) {
   window.addEventListener('message', (e: MessageEvent) => {
     const d: any = e.data; if (!d || !d.ampb) return;
     if (d.ampb === 'save') { try { saveNow(true); } catch (err) { /* saved */ } embedTell('saved'); }
+    else if (d.ampb === 'go' && d.screen) { try { closeAll(); go(d.screen); } catch (err) { /* stays */ } }
     else if (d.ampb === 'follow') { follow = d.id || ''; clearInterval(timer); if (follow) { send(); timer = setInterval(send, 250); } }
     else if (d.ampb === 'stop') { follow = ''; clearInterval(timer); }
     else if (d.ampb === 'airport' && d.icao) {

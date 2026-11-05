@@ -264,3 +264,6 @@ body.game-on .gear, body.game-on .exit, body.game-on .to-title, body.game-on .pl
 
 .v3d-credit { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(4px, env(safe-area-inset-bottom)); font-size: 9.5px; color: rgba(235, 240, 250, .55); max-width: 46vw; text-align: right; pointer-events: none; }
 .v3d-credit[hidden] { display: none; }
+
+.of-hint { position: absolute; left: 50%; top: calc(50% + 26px); transform: translateX(-50%); padding: 6px 12px; border-radius: 10px; background: rgba(10, 8, 26, .7); font: 600 13px 'Inter', sans-serif; color: #F1F4FA; white-space: nowrap; }
+.of-hint[hidden] { display: none; }

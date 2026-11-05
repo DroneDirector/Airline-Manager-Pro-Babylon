@@ -75,7 +75,7 @@ function makeFire() {
 const Lounge$: Section = {
   id: 'lounge', title: 'Business lounge',
   async open(ctx: SectionCtx) {
-    const { engine, ui, progress } = ctx; L.ui = ui;
+    const { engine, ui, progress } = ctx; L.ui = ui; L.ctx = ctx;
     progress(8, 'Building the room…');
     await new Promise(r => setTimeout(r, 30));
     const sc = new Scene(engine); L.scene = sc; sc.clearColor = new Color4(0.02, 0.03, 0.05, 1); sc.skipPointerMovePicking = true;
@@ -137,7 +137,7 @@ function use(px?: number, py?: number) {
   const sc: Scene = L.scene, cv = ctxCanvas(); if (!sc) return;
   const x = px != null ? px * (sc.getEngine().getRenderWidth() / cv.clientWidth) : sc.getEngine().getRenderWidth() / 2, y = py != null ? py * (sc.getEngine().getRenderHeight() / cv.clientHeight) : sc.getEngine().getRenderHeight() / 2;
   const hit = sc.pick(x, y, (m: any) => !!(m.metadata && m.metadata.act));
-  if (hit && hit.hit && hit.distance < 4 && hit.pickedMesh && (hit.pickedMesh as Mesh).metadata.act === 'door') { toast('This is the lounge only for now: the doors stay shut'); vibrate(120, 0.3, 0.5); }
+  if (hit && hit.hit && hit.distance < 4 && hit.pickedMesh && (hit.pickedMesh as Mesh).metadata.act === 'door') { if (L.ctx && L.ctx.toGame) { L.ctx.toGame(); return; } toast('This is the lounge only for now: the doors stay shut'); vibrate(120, 0.3, 0.5); }
 }
 registerSection(Lounge$);
 export {};

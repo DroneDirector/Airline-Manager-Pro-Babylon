@@ -10,12 +10,13 @@ import { settingsShow, settingsHide, settingsOpen, settingsButton } from './ui/s
 import { loadingShow, loadingProgress, loadingHide } from './ui/loading';
 import { icon, toast } from './ui/icons';
 import { exitGame } from './core/exit';
-import { gameOpen, gameIsOpen, gameClose, gameShow, gameExists } from './ui/game-frame';
+import { gameOpen, gameIsOpen, gameClose, gameShow, gameExists, gameSend, onGameRoom } from './ui/game-frame';
 import { APP } from './core/app';
 import { updateInit } from './core/update';
 import { whatsNewOnStart, whatsNewIsOpen, whatsNewClose } from './ui/whats-new';
 import './sections/lounge/index';
 import './sections/viewer3d/index';
+import './sections/office/index';
 
 const canvas = document.getElementById('bjs') as HTMLCanvasElement, ui = document.getElementById('ui') as HTMLElement;
 let inPlace = false;
@@ -55,7 +56,7 @@ onPad(name => toast(name ? `${name} connected` : 'Controller disconnected'));
 async function enter(id: string, title: string, opts?: any) {
   loadingShow(title);
   const engine = makeEngine(canvas);
-  const ctx: SectionCtx = { engine, canvas, ui, progress: (p, s) => loadingProgress(p, s), back: backToTitle, opts, toGame: opts && opts.live && gameExists() ? backToGame : undefined };
+  const ctx: SectionCtx = { engine, canvas, ui, progress: (p, s) => loadingProgress(p, s), back: backToTitle, opts, toGame: opts && gameExists() ? backToGame : undefined };
   try { await openSection(id, ctx); } catch (e) { console.error(e); loadingProgress(100, 'This place could not be opened on this device'); return; }
   loadingProgress(100, 'Welcome'); canvas.classList.add('on');
   setTimeout(() => { loadingHide(); inPlace = true; titleB.hidden = false; verB.hidden = false; document.body.classList.toggle('in-viewer', id === 'viewer3d'); if (!settingsOpen()) setPlay(true); }, 350);
@@ -67,10 +68,10 @@ function backToTitle() {
   closeSection(); gameClose(); splashOpen(pickPlace);
 }
 /** Back from the 3D viewer to the game's interface (it kept running behind). */
-function backToGame() {
+function backToGame(screen?: string) {
   if (!inPlace) return; inPlace = false; titleB.hidden = true; verB.hidden = true; document.body.classList.remove('in-viewer'); setPlay(false); if (settingsOpen()) settingsHide();
   canvas.classList.remove('on'); const e = getEngine(); if (e) e.stopRenderLoop();
-  closeSection(); gameShow();
+  closeSection(); gameShow(); if (screen) gameSend({ ampb: 'go', screen });
 }
 const TITLES: { [id: string]: string } = { viewer3d: '3D viewer · above the clouds', lounge: 'Business lounge' };
 /** What was chosen on the title screen: the game (New, Continue, Load, Save, UI) or one of the demos. */
@@ -82,6 +83,8 @@ function pickPlace(id: string) {
   enter(id, TITLES[id] || id);
 }
 splashOpen(pickPlace);
+// a 3D place opened from the game (your office…): the game waits behind it
+onGameRoom(d => { if (d.room === 'office') enter('office', 'Your office', { data: d.data || {} }); else if (d.room === 'lounge') enter('lounge', 'Business lounge', { data: d.data || {} }); });
 // after an update: what's new, once; and a quiet look for a newer version now and then
 whatsNewOnStart();
 updateInit(v => toast(`Version ${v} is ready: Settings → Updates`));
