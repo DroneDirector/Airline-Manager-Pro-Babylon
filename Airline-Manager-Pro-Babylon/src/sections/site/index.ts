@@ -160,7 +160,7 @@ function flatK(site: any) { const h = site.hdg * D2R, ue = Math.sin(h), un = Mat
 
 /** The ready-made views: where (in the airport's frame: u, height, v) and what it looks at. */
 const VIEWS: { id: string; name: string; at: [number, number, number]; look: [number, number, number] }[] = [
-  { id: 'gate', name: 'From a gate', at: [PX(MOD[1] + 30), 7.85, PV(PN - 1.5)], look: [PX(MOD[1] + 40), 30, 2600] },
+  { id: 'gate', name: 'Gate 4', at: [PX(MOD[3] + 20), 7.85, PV(PN - 1.5)], look: [PX(MOD[3] + 30), 30, 2600] },
   { id: 'apron', name: 'On the apron', at: [PX(MOD[2] + 40), 1.7, PV(PN + 45)], look: [-600, 120, 3000] },
   { id: 'runway', name: 'Runway threshold', at: [-RWY.len / 2 - 20, 3, RWY.vA - 20], look: [RWY.len / 2, 80, RWY.vA + 1600] },
   { id: 'between', name: 'Between the runways', at: [400, 2, 0], look: [-400, 150, 4000] },
@@ -220,7 +220,7 @@ const Site$: Section = {
       if (b.hasAttribute('data-site')) { const other = SITES.find(s => s !== site)!; if (ctx.back) { /* open again at the other site */ } O.reopen = other.id; Site$.close(); Site$.open(Object.assign({}, ctx, { opts: Object.assign({}, ctx.opts || {}, { site: other.id }) })); } });
     for (const k of ['up', 'down'] as const) { const b = hud.querySelector(`[data-ud="${k}"]`) as HTMLElement; b.addEventListener('pointerdown', e => { e.stopPropagation(); CAM[k] = 1; }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { CAM[k] = 0; }); }
     const keys = new Set<string>(); O.kd = (e: KeyboardEvent) => keys.add(e.key.toLowerCase()); O.ku = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase()); window.addEventListener('keydown', O.kd); window.addEventListener('keyup', O.ku);
-    place('gate');
+    place((ctx.opts && ctx.opts.view) || 'gate');
     perfAttach(engine, sc, hud); perfShow();
     toast(IS_TOUCH ? 'Pick a view · left thumb: fly · right: look · ▲ ▼ up and down' : 'Pick a view · W A S D fly · mouse look · Space / R up · C / F down · Shift faster · P photo');
     progress(100, 'Ready');

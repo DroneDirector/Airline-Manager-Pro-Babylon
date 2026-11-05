@@ -63,10 +63,15 @@ onPad(name => toast(name ? `${name} connected` : 'Controller disconnected'));
 async function enter(id: string, title: string, opts?: any) {
   loadingShow(title);
   const engine = makeEngine(canvas);
-  const ctx: SectionCtx = { engine, canvas, ui, progress: (p, s) => loadingProgress(p, s), back: backToTitle, opts, toGame: opts && gameExists() ? backToGame : undefined };
+  const ctx: SectionCtx = { engine, canvas, ui, progress: (p, s) => loadingProgress(p, s), back: backToTitle, opts, toGame: opts && gameExists() ? backToGame : undefined, goTo: goToPlace };
   try { await openSection(id, ctx); } catch (e) { console.error(e); loadingProgress(100, 'This place could not be opened on this device'); return; }
   loadingProgress(100, 'Welcome'); canvas.classList.add('on');
   setTimeout(() => { loadingHide(); inPlace = true; titleB.hidden = false; verB.hidden = false; document.body.classList.toggle('in-viewer', id === 'viewer3d'); if (!settingsOpen()) setPlay(true); }, 350);
+}
+/** From one place straight to another (the 3D viewer's Airport button): this one is closed and its memory given back. */
+function goToPlace(id: string, opts?: any) {
+  if (!inPlace) return; inPlace = false; setPlay(false); if (settingsOpen()) settingsHide();
+  canvas.classList.remove('on'); const e = getEngine(); if (e) e.stopRenderLoop(); closeSection(); enter(id, TITLES[id] || id, opts);
 }
 /** Back to the start screen from a place: it is closed and its memory given back, then the film starts again. */
 function backToTitle() {

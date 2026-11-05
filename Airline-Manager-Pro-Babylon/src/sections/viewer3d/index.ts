@@ -172,6 +172,7 @@ function hudHtml(): string {
   return `<div class="v3d ${V.live ? 'live' : ''}">
     <div class="v3d-top">
       ${V.live ? `<button class="v3d-b v3d-game" data-v="game" aria-label="Back to the game">${icon('back')}<span>Back to the game</span></button>` : ''}
+      <button class="v3d-b v3d-site" data-v="site" aria-label="To the airport: your gate, gate 4">${icon('mountain')}<span>Airport</span></button>
       <div class="v3d-info"><div class="v3d-csr">${V.live ? `<button class="v3d-b v3d-pk" data-v="prev" aria-label="The previous flight">‹</button>` : ''}<b class="v3d-cs">${V.live ? 'Waiting for the flight…' : `AMP 214 · ${esc(FROM.name)} → ${esc(TO.name)}`}</b>${V.live ? `<button class="v3d-b v3d-pk" data-v="next" aria-label="The next flight">›</button>` : ''}</div><small class="v3d-al"></small><div class="v3d-rows"></div></div>
     </div>
     <div class="v3d-views" role="toolbar" aria-label="Camera">${VIEWS.map((v, i) => `<button class="v3d-b ${i === 0 ? 'on' : ''}" data-view="${v.id}">${esc(v.label)}</button>`).join('')}</div>
@@ -235,6 +236,7 @@ const Viewer: Section = {
       if (b.hasAttribute('data-view')) setView(b.getAttribute('data-view') as string);
       else if (b.hasAttribute('data-speed')) setSpeed(Number(b.getAttribute('data-speed')));
       else if (b.getAttribute('data-v') === 'game' && ctx.toGame) ctx.toGame();
+      else if (b.getAttribute('data-v') === 'site' && ctx.goTo) ctx.goTo('site', { site: 'myrdalssandur', view: 'gate' });
       else if ((b.getAttribute('data-v') === 'prev' || b.getAttribute('data-v') === 'next') && V.live) { const l = V.live.list || [], i = l.findIndex((x: any) => x.id === V.live.id); if (l.length) follow(l[(i + (b.getAttribute('data-v') === 'next' ? 1 : l.length - 1) + l.length) % l.length].id); }
     });
     const sl = hud.querySelector('.v3d-slider') as HTMLInputElement; V.slider = sl;
