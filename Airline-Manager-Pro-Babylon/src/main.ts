@@ -10,6 +10,7 @@ import { settingsShow, settingsHide, settingsOpen, settingsButton } from './ui/s
 import { loadingShow, loadingProgress, loadingHide } from './ui/loading';
 import { icon, toast } from './ui/icons';
 import { exitGame } from './core/exit';
+import { APP } from './core/app';
 import { updateInit } from './core/update';
 import { whatsNewOnStart, whatsNewIsOpen, whatsNewClose } from './ui/whats-new';
 import './sections/lounge/index';
@@ -28,6 +29,8 @@ exitB.addEventListener('click', () => exitGame());
 // Title screen, beside Exit, in every place of the game (the 3D viewer, the lounge): back to the start screen
 const titleB = document.createElement('button'); titleB.className = 'to-title'; titleB.hidden = true; titleB.setAttribute('aria-label', 'Back to the title screen'); titleB.innerHTML = `${icon('back')}<span>Title screen</span>`; ui.appendChild(titleB);
 titleB.addEventListener('click', () => backToTitle());
+// the version number at the bottom of the screen in every place (the start screen has its own)
+const verB = document.createElement('small'); verB.className = 'place-ver'; verB.hidden = true; verB.textContent = `v${APP.version} · Babylon.js ${APP.babylon}`; ui.appendChild(verB);
 function toggleSettings() {
   if (settingsOpen()) { settingsHide(); return; }
   setPlay(false); settingsShow(() => { if (inPlace) setPlay(true); });
@@ -53,11 +56,11 @@ async function enter(id: string, title: string) {
   const ctx: SectionCtx = { engine, canvas, ui, progress: (p, s) => loadingProgress(p, s), back: backToTitle };
   try { await openSection(id, ctx); } catch (e) { console.error(e); loadingProgress(100, 'This place could not be opened on this device'); return; }
   loadingProgress(100, 'Welcome'); canvas.classList.add('on');
-  setTimeout(() => { loadingHide(); inPlace = true; titleB.hidden = false; if (!settingsOpen()) setPlay(true); }, 350);
+  setTimeout(() => { loadingHide(); inPlace = true; titleB.hidden = false; verB.hidden = false; document.body.classList.toggle('in-viewer', id === 'viewer3d'); if (!settingsOpen()) setPlay(true); }, 350);
 }
 /** Back to the start screen from a place: it is closed and its memory given back, then the film starts again. */
 function backToTitle() {
-  if (!inPlace) return; inPlace = false; titleB.hidden = true; setPlay(false); if (settingsOpen()) settingsHide();
+  if (!inPlace) return; inPlace = false; titleB.hidden = true; verB.hidden = true; document.body.classList.remove('in-viewer'); setPlay(false); if (settingsOpen()) settingsHide();
   canvas.classList.remove('on'); const e = getEngine(); if (e) e.stopRenderLoop();
   closeSection(); splashOpen(id => enter(id, TITLES[id] || id));
 }
