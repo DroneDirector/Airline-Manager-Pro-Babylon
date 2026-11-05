@@ -142,7 +142,7 @@ const Building: Section = {
       ops: swingDoor(doorOf(ops.root), new Vector3(COR.x1, 0, OPS_DOOR.z1), 1),
       staff: swingDoor([halls.staffDoor], new Vector3(STAFF_DOOR.x1, 0, CON.z1), -1),
       lounge: { meshes: lounge.leaves, dir: 1, k: 0, to: 0, base: lounge.leaves.map(m => m.position.clone()) },
-      museum: { k: 0, to: 0, leaves: museum.doors.map((m, i) => { const sgn = i === 0 ? -1 : 1, h = Vector3.TransformCoordinates(new Vector3(sgn * MUSEUM_DOOR.w / 2, 0, museum.D / 2), museum.root.getWorldMatrix()); m.computeWorldMatrix(true); m.setPivotPoint(h, Space.WORLD); return { m, sgn }; }) },
+      museum: { k: 0, to: 0, near: false, leaves: museum.doors.map((m, i) => ({ m, x0: museum.doorBase[i].x, sgn: Math.sign(museum.doorBase[i].x) || 1 })) },   // the portal's glass leaves slide apart
     };
     for (const m of doorOf(office.root).concat(doorOf(ops.root))) m.metadata = { act: m.parent === ops.root ? 'opsdoor' : 'officedoor' };
     halls.staffDoor.metadata = { act: 'staffdoor' };
@@ -195,7 +195,9 @@ const Building: Section = {
       const cp = Math.cos(F.pitch); cam.setTarget(cam.position.add(new Vector3(Math.sin(F.yaw) * cp, Math.sin(F.pitch), Math.cos(F.yaw) * cp)));
       // the lounge's doors slide open as you come up to them, and shut behind you
       const Lg = B.doors.lounge, near = Math.hypot(F.x - CON.x1, F.z - LOUNGE_DOOR.z) < 2.6; Lg.to = near ? 1 : Lg.to === 1 && !near ? 0 : Lg.to;
-      { const Md = B.doors.museum; if (Math.abs(Md.k - Md.to) > 0.001) { Md.k += Math.sign(Md.to - Md.k) * Math.min(Math.abs(Md.to - Md.k), dt * 1.6); const e = Md.k * Md.k * (3 - 2 * Md.k); for (const L of Md.leaves) L.m.rotation.y = L.sgn * e * 1.45; } }
+      // the Vortex Gallery's glass doors slide apart as you come up to them (either side), and shut behind you
+      { const Md = B.doors.museum, nr = Math.hypot(F.x - CON.x0, F.z - MUSEUM_DOOR.z) < 2.8; if (nr !== Md.near) { Md.near = nr; Md.to = nr ? 1 : 0; }
+        if (Math.abs(Md.k - Md.to) > 0.001) { Md.k += Math.sign(Md.to - Md.k) * Math.min(Math.abs(Md.to - Md.k), dt * 1.8); const e = Md.k * Md.k * (3 - 2 * Md.k); for (const L of Md.leaves) L.m.position.x = L.x0 + L.sgn * e * (MUSEUM_DOOR.w / 2 - 0.08); } }
       // a piece in your hands: it turns slowly
       if (B.hold) B.hold.node.rotation.y += dt * 0.6;
       for (const k of ['office', 'ops', 'staff', 'lounge']) { const d = B.doors[k]; if (Math.abs(d.k - d.to) > 0.001) { d.k += Math.sign(d.to - d.k) * Math.min(Math.abs(d.to - d.k), dt * (k === 'lounge' ? 2.2 : 1.6)); const e = d.k * d.k * (3 - 2 * d.k);

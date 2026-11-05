@@ -11,7 +11,7 @@ export const COR = { x0: -5.6, x1: -3.2, z0: -6, z1: 18.5, h: 3.0 };
 export const CON = { x0: -9, x1: 30, z0: -18, z1: -6, h: 5.2 };
 export const STAFF_DOOR = { x0: -5.05, x1: -4.05 };       // in the concourse's north wall (z = CON.z1)
 export const LOUNGE_DOOR = { z: -12, w: 1.9, h: 2.4 };    // in the concourse's east wall (x = CON.x1)
-export const MUSEUM_DOOR = { z: -12, w: 1.8, h: 2.6 };    // in the concourse's west wall (x = CON.x0)
+export const MUSEUM_DOOR = { z: -12, w: 2.4, h: 3.0 };    // in the concourse's west wall (x = CON.x0): the Vortex Gallery's portal
 export const OFFICE_DOOR = { z0: -3.1, z1: -2.1 };        // in the corridor's east wall (x = COR.x1)
 export const OPS_AT = { x: -0.2, z: 14 };                 // the Operations office's middle
 export const OPS_DOOR = { z0: 11.36, z1: 12.34 };         // its door in the corridor's east wall
@@ -69,12 +69,9 @@ export function buildHalls(sc: Scene, progress: (p: number, s: string) => void, 
     const c = MeshBuilder.CreatePlane(nm('conC'), { width: W, height: D }, sc); c.rotation.x = -Math.PI / 2; c.position.set(cx, h, cz); c.material = pbr({ col: '#F0EFEA', rough: 0.9 }); c.parent = root; }
   // the north wall with the staff door and the shopfronts; the west wall; the east wall round the lounge's doors
   { const sd0 = STAFF_DOOR.x0, sd1 = STAFF_DOOR.x1; flat(sd0 - x0, h, wallM, (x0 + sd0) / 2, h / 2, z1, 0); flat(sd1 - sd0, h - 2.15, wallM, (sd0 + sd1) / 2, 2.15 + (h - 2.15) / 2, z1, 0); flat(x1 - sd1, h, wallM, (sd1 + x1) / 2, h / 2, z1, 0);
-    // the west wall, round the museum's double doors, with its sign over them
+    // the west wall, round the Vortex Gallery's portal (its frame, arch and name come with the museum)
     { const mz0 = MUSEUM_DOOR.z - MUSEUM_DOOR.w / 2, mz1 = MUSEUM_DOOR.z + MUSEUM_DOOR.w / 2;
-      flat(mz0 - z0, h, wallM, x0, h / 2, (z0 + mz0) / 2, -Math.PI / 2); flat(z1 - mz1, h, wallM, x0, h / 2, (mz1 + z1) / 2, -Math.PI / 2); flat(MUSEUM_DOOR.w, h - MUSEUM_DOOR.h, wallM, x0, MUSEUM_DOOR.h + (h - MUSEUM_DOOR.h) / 2, MUSEUM_DOOR.z, -Math.PI / 2);
-      flat(2.4, 0.5, picMat(P.sign('Museum', '#14161B', '#E2C27A', 768, 160, '700 84px Georgia, serif'), 0.7), x0 + 0.02, MUSEUM_DOOR.h + 0.5, MUSEUM_DOOR.z, -Math.PI / 2);
-      flat(1.4, 0.32, picMat(P.sign('Your collection', '#14202E', '#F2C230', 512, 128, '700 44px Arial, sans-serif'), 0.6), x0 + 0.02, 1.7, mz1 + 1.0, -Math.PI / 2);
-      box(0.12, MUSEUM_DOOR.h + 0.1, 0.12, steel, x0 + 0.06, (MUSEUM_DOOR.h + 0.1) / 2, mz0 - 0.06); box(0.12, MUSEUM_DOOR.h + 0.1, 0.12, steel, x0 + 0.06, (MUSEUM_DOOR.h + 0.1) / 2, mz1 + 0.06); }
+      flat(mz0 - z0, h, wallM, x0, h / 2, (z0 + mz0) / 2, -Math.PI / 2); flat(z1 - mz1, h, wallM, x0, h / 2, (mz1 + z1) / 2, -Math.PI / 2); flat(MUSEUM_DOOR.w, h - MUSEUM_DOOR.h, wallM, x0, MUSEUM_DOOR.h + (h - MUSEUM_DOOR.h) / 2, MUSEUM_DOOR.z, -Math.PI / 2); }
     const lz0 = LOUNGE_DOOR.z - LOUNGE_DOOR.w / 2 - 0.15, lz1 = LOUNGE_DOOR.z + LOUNGE_DOOR.w / 2 + 0.15;
     flat(lz0 - z0, h, wallM, x1, h / 2, (z0 + lz0) / 2, Math.PI / 2); flat(z1 - lz1, h, wallM, x1, h / 2, (lz1 + z1) / 2, Math.PI / 2); flat(lz1 - lz0, h - LOUNGE_DOOR.h - 0.1, wallM, x1, LOUNGE_DOOR.h + 0.1 + (h - LOUNGE_DOOR.h - 0.1) / 2, LOUNGE_DOOR.z, Math.PI / 2);
     // the lounge's name over its doors
