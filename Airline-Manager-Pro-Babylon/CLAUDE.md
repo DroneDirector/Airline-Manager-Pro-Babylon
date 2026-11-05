@@ -16,3 +16,8 @@
 - The gear is always on screen; its settings are graphics and controls only, until more is brought over.
 - Controls from day one: touchscreen (stick and look), keyboard and mouse, PlayStation (and other) controllers, with
   their settings under Controls.
+- Exit (beside the gear) shuts the game down completely and gives back all its memory (the scene and engine released,
+  then the process ends on Android and the program quits on the PC).
+- When the airline itself is brought over (your crew, the aircraft, the other airlines and everything the game tracks),
+  that tracking keeps going while the game is closed: what happened while it was shut is worked out (and on Android
+  kept up in the background), as in the main game. The 3D places themselves never run while closed.
