@@ -277,13 +277,15 @@ const Site$: Section = {
       const dt = Math.min(0.05, engine.getDeltaTime() / 1000), now = performance.now() / 1000, inp = inputFrame(dt);
       CAM.yaw += inp.lx; CAM.pitch = Math.max(-1.55, Math.min(1.55, CAM.pitch - inp.ly));
       if (walkMode) {
-        const st = STANCE[W.stance], sprinting = (inp.run || keys.has('shift') || W.sprint) && inp.my > 0.1;
+        const st = STANCE[W.stance], sprinting = (inp.run || keys.has('shift') || W.sprint) && Math.hypot(inp.mx, inp.my) > 0.1;
         const cp0 = Math.cos(CAM.pitch), fw = new Vector3(Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw)), rt = new Vector3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw)), spd = (sprinting ? st.sprint : st.walk) * (W.ground ? 1 : 0.85) * dt;
         // a jump: up at 4.4 m/s (about a metre), from standing or crouching, only from the ground; landing from a crouch or prone stands you up first
         if (W.jump) { W.jump = false; if (W.ground) { if (W.stance !== 'stand') setStance(W.stance); else W.vy = 4.4, W.ground = false; } }
         W.vy = W.ground ? -0.5 : Math.max(-30, W.vy - 9.81 * dt);
-        const want = fw.scale(inp.my * spd).add(rt.scale(inp.mx * spd)); want.y = W.vy * dt; const y0 = body.position.y;
-        body.moveWithCollisions(want); W.ground = body.position.y > y0 + want.y + 0.001; if (W.ground) W.vy = 0;
+        // the step along the floor and the fall (or the jump) are moved separately, so touching the floor doesn't eat the step
+        const len = Math.min(1, Math.hypot(inp.mx, inp.my)), dir = fw.scale(inp.my).add(rt.scale(inp.mx)); if (dir.lengthSquared() > 1e-6) dir.normalize();
+        body.moveWithCollisions(dir.scale(len * spd));
+        const y0 = body.position.y, dy = W.vy * dt; body.moveWithCollisions(new Vector3(0, dy, 0)); W.ground = dy < 0 && body.position.y > y0 + dy + 0.001; if (body.position.y < y0 + dy - 0.001 || (dy > 0 && body.position.y < y0 + dy - 0.001)) W.vy = 0; if (W.ground) W.vy = 0;
         if (body.position.y < elev - 40) { body.position.copyFrom(toWorld(75, 0.5, -21.5)); W.vy = 0; }
         W.eye += (st.eye - W.eye) * Math.min(1, dt * 9); cam.position.set(body.position.x, body.position.y + W.eye, body.position.z); cam.setTarget(cam.position.add(new Vector3(Math.sin(CAM.yaw) * cp0, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp0)));
         // the doors open as you come to them
