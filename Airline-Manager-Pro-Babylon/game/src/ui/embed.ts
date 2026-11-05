@@ -60,10 +60,26 @@ if (EMBED) {
   // the lounges: the Business lounge on Babylon.js (its doors lead back here)
   LoungeRoom.open = () => { try { saveNow(true); } catch (e) { /* saved */ } embedTell('room', { room: 'lounge', data: {} }); };
   ACTIONS['lounge-visit'] = () => LoungeRoom.open();
-  const rooms: [any, string][] = [[OpsRoom, 'The Operations office'], [HangarRoom, 'The hangar'], [CourtRoom, 'The courtroom'],
+  // the Operations office: on Babylon.js; its monitor shows the schedule as this page draws it
+  OpsRoom.open = () => { try { saveNow(true); } catch (e) { /* saved */ } let col = '#2C8CFF'; try { col = company().color; } catch (e) { /* default */ } embedTell('room', { room: 'ops', data: { color: col } }); };
+  ACTIONS['ops-room'] = () => { closeAll(); OpsRoom.open(); };
+  let monT: any = 0; const monCv = document.createElement('canvas'); monCv.width = 2048; monCv.height = Math.round(2048 * 0.32 / 1.08);
+  const monSend = () => { try { opsMonitorDraw({ monCv, monTex: {} }); embedTell('monitor', { url: monCv.toDataURL('image/jpeg', 0.88) }); } catch (e) { /* the next time */ } };
+  // the hangars: on Babylon.js, with the aircraft in for work, what is being fixed, how far it is and who is on it
+  HangarRoom.open = (reg?: string, base?: string, size?: string) => {
+    try { saveNow(true); } catch (e) { /* saved */ }
+    try {
+      const a: any = reg ? plane(reg) : null, c: any = company(), sh: any = a ? shapeOf(a.typeId) : null, t: any = a ? acType(a.typeId) : null;
+      let sz = size || ''; try { if (a) sz = hgSizeFor(a.typeId).name; } catch (e) { /* as given */ }
+      embedTell('room', { room: 'hangar', data: { reg: a ? a.reg : '', type: t ? `${t.maker} ${t.model}` : '', L: sh ? sh.L : 0, span: sh ? sh.span : 0, H: sh ? sh.H : 0, color: c.color, color2: c.color2,
+        base: a ? hgWhere(a) : base || '', size: sz, fixes: a ? hgFixList(a.reg).map((i: any) => i.title) : [], progress: a ? hgProgress(a.reg) : 0, crew: a ? hgCrewFor(a.reg).map((p: any) => p.name) : [] } });
+    } catch (e) { embedTell('room', { room: 'hangar', data: {} }); }
+  };
+  ACTIONS['hangar-visit'] = (el: HTMLElement) => { const g = (k: string) => el && el.getAttribute ? el.getAttribute(k) || '' : ''; closeAll(); HangarRoom.open(g('data-reg'), g('data-base'), g('data-size')); };
+  const rooms: [any, string][] = [[CourtRoom, 'The courtroom'],
     [Museum, 'The museum'], [Salute, 'The water salute'], [TestRooms, 'The test rooms']];
   for (const [R, name] of rooms) if (R) R.open = soon(name);
-  for (const a of ['photo-mode', 'hangar-visit']) if (typeof (ACTIONS as any)[a] === 'function') (ACTIONS as any)[a] = soon('This 3D place');
+  for (const a of ['photo-mode']) if (typeof (ACTIONS as any)[a] === 'function') (ACTIONS as any)[a] = soon('This 3D place');
   // the 3D view of a flight: the edition's 3D viewer follows it, live. This page keeps running behind it (the airline,
   // its schedules and the other airlines' flights go on) and sends where the flight is, several times a second.
   W.v3dOpen = (id: string) => {
@@ -98,6 +114,7 @@ if (EMBED) {
   window.addEventListener('message', (e: MessageEvent) => {
     const d: any = e.data; if (!d || !d.ampb) return;
     if (d.ampb === 'save') { try { saveNow(true); } catch (err) { /* saved */ } embedTell('saved'); }
+    else if (d.ampb === 'monitor') { clearInterval(monT); if (d.on) { monSend(); monT = setInterval(monSend, 5000); } }
     else if (d.ampb === 'go' && d.screen) { try { closeAll(); go(d.screen); } catch (err) { /* stays */ } }
     else if (d.ampb === 'follow') { follow = d.id || ''; clearInterval(timer); if (follow) { send(); timer = setInterval(send, 250); } }
     else if (d.ampb === 'stop') { follow = ''; clearInterval(timer); }

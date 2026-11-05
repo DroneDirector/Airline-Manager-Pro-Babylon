@@ -5,7 +5,9 @@
 let frame: HTMLIFrameElement | null = null;
 let handlers: { title: () => void; exit: () => void; viewer: (id: string) => void } | null = null;
 const flightSubs: ((d: any) => void)[] = [], airportSubs: ((d: any) => void)[] = [];
-const roomSubs: ((d: any) => void)[] = [];
+const roomSubs: ((d: any) => void)[] = [], monSubs: ((d: any) => void)[] = [];
+/** The Operations monitor's picture, drawn by the game every few seconds. */
+export function onGameMonitor(f: (d: any) => void) { monSubs.push(f); }
 /** A 3D place the game asks for (your office…): the game goes out of sight and waits behind it. */
 export function onGameRoom(f: (d: any) => void) { roomSubs.push(f); }
 /** An airport's layout, as the game sends it when the 3D viewer asks. */
@@ -42,6 +44,7 @@ window.addEventListener('message', (e: MessageEvent) => {
   else if (d.amp === 'exit') h.exit();
   else if (d.amp === 'viewer3d') { if (d.id) { gameHide(); h.viewer(d.id); } else { gameClose(); h.viewer(''); } }
   else if (d.amp === 'room') { gameHide(); for (const f of roomSubs) { try { f(d); } catch (err) { console.error(err); } } }
+  else if (d.amp === 'monitor') { for (const f of monSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'airport') { for (const f of airportSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'flight') { for (const f of flightSubs) { try { f(d); } catch (err) { console.error(err); } } }
 });
