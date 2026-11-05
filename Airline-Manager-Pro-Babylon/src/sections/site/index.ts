@@ -256,7 +256,8 @@ const Site$: Section = {
     const setStance = (k: string) => { if (k === W.stance) k = 'stand'; if (!roomFor(k)) { toast('No room to stand up here'); return; } W.stance = k; const st = STANCE[k];
       body.ellipsoid = new Vector3(st.r, st.half, st.r); body.ellipsoidOffset = new Vector3(0, st.half, 0); hud.querySelectorAll('[data-mv]').forEach(b => b.classList.toggle('on', b.getAttribute('data-mv') === k)); };
     O.setStance = setStance;
-    if (walkMode) { const p = toWorld(79, 0.3, -9); body.position.copyFrom(p); const f = toWorld(79, 0.3, 20).subtract(p).normalize(); CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = 0; }
+    // airport mode starts at the kerb's edge, square on to the main entrance under its DEPARTURES sign
+    if (walkMode) { const p = toWorld(75, 0.3, -21.5); body.position.copyFrom(p); const f = toWorld(75, 0.3, 20).subtract(p).normalize(); CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = 0; }
     const place = (id: string) => { const v = VIEWS.find(q => q.id === id) || VIEWS[0], at = Vector3.TransformCoordinates(new Vector3(v.at[0], v.at[1], v.at[2]), ap.computeWorldMatrix(true)), lk = Vector3.TransformCoordinates(new Vector3(v.look[0], v.look[1], v.look[2]), ap.getWorldMatrix());
       const d = lk.subtract(at).normalize(); CAM.x = at.x; CAM.y = at.y; CAM.z = at.z; CAM.yaw = Math.atan2(d.x, d.z); CAM.pitch = Math.asin(d.y); CAM.speed = id === 'air' || id === 'flyby' ? 220 : id === 'gate' ? 8 : 40;
       hud.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.getAttribute('data-view') === id)); hud.querySelectorAll('[data-sp2]').forEach(b => b.classList.toggle('on', Number(b.getAttribute('data-sp2')) === CAM.speed)); };
@@ -283,7 +284,7 @@ const Site$: Section = {
         W.vy = W.ground ? -0.5 : Math.max(-30, W.vy - 9.81 * dt);
         const want = fw.scale(inp.my * spd).add(rt.scale(inp.mx * spd)); want.y = W.vy * dt; const y0 = body.position.y;
         body.moveWithCollisions(want); W.ground = body.position.y > y0 + want.y + 0.001; if (W.ground) W.vy = 0;
-        if (body.position.y < elev - 40) { body.position.copyFrom(toWorld(79, 0.5, -9)); W.vy = 0; }
+        if (body.position.y < elev - 40) { body.position.copyFrom(toWorld(75, 0.5, -21.5)); W.vy = 0; }
         W.eye += (st.eye - W.eye) * Math.min(1, dt * 9); cam.position.set(body.position.x, body.position.y + W.eye, body.position.z); cam.setTarget(cam.position.add(new Vector3(Math.sin(CAM.yaw) * cp0, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp0)));
         // the doors open as you come to them
         const lp = Vector3.TransformCoordinates(body.position, K.root.getWorldMatrix().clone().invert()); try { stepDoors(doors, lp.x, lp.z, lp.y > 3 ? 2 : 1, dt, now); } catch (e) { /* still */ }
