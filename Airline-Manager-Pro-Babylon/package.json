@@ -1,0 +1,19 @@
+{
+  "name": "airline-manager-pro-babylon",
+  "private": true,
+  "description": "Airline Manager Pro on the Babylon.js engine: the lounge, as a demonstration",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@babylonjs/core": "9.30.0",
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "esbuild": "0.24.2",
+    "typescript": "^5.6.0"
+  }
+}

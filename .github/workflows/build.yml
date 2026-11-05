@@ -1,0 +1,100 @@
+name: Airline Manager Pro Babylon – build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Airline-Manager-Pro-Babylon/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: amp-babylon-build
+  cancel-in-progress: true
+
+jobs:
+  pc:
+    name: PC app (Windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: Airline-Manager-Pro-Babylon
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the app
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Package for Windows
+        working-directory: Airline-Manager-Pro-Babylon/pc
+        run: |
+          npm install --no-audit --no-fund
+          node package.mjs
+      - name: Zip
+        id: zip
+        shell: pwsh
+        working-directory: Airline-Manager-Pro-Babylon/pc
+        run: |
+          $v = (Get-Content ../app.config.json | ConvertFrom-Json).version
+          $f = "AirlineManagerProBabylon-PC-$v.zip"
+          Compress-Archive -Path "build/Airline Manager Pro Babylon PC" -DestinationPath $f
+          "file=$f" >> $env:GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: amp-babylon-pc
+          path: Airline-Manager-Pro-Babylon/pc/${{ steps.zip.outputs.file }}
+
+  apk:
+    name: Android app
+    needs: pc
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Airline-Manager-Pro-Babylon
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Build the app
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Prepare the Android project
+        run: bash scripts/android-setup.sh
+      - name: Build the APK
+        working-directory: Airline-Manager-Pro-Babylon/android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Name the APK
+        id: apk
+        run: |
+          V=$(node -p "require('./app.config.json').version")
+          F="AirlineManagerProBabylon-${V}.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$F"
+          echo "file=Airline-Manager-Pro-Babylon/$F" >> "$GITHUB_OUTPUT"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: amp-babylon-pc
+          path: pc
+      - name: Publish pre-release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: airline-manager-pro-babylon-v${{ steps.apk.outputs.version }}
+          name: Airline Manager Pro Babylon ${{ steps.apk.outputs.version }}
+          prerelease: true
+          body_path: Airline-Manager-Pro-Babylon/release-notes/${{ steps.apk.outputs.version }}.md
+          files: |
+            ${{ steps.apk.outputs.file }}
+            pc/*.zip

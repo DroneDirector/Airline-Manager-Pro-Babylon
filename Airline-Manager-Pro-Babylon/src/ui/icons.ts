@@ -1,0 +1,16 @@
+// The app's few icons, drawn inline (our own).
+export const ICONS: { [k: string]: string } = {
+  gear: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="m19.4 13.4.1-1.4-.1-1.4 2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2.4-1.4L14.2 2.6h-4l-.4 2.6a7.6 7.6 0 0 0-2.4 1.4l-2.4-1-2 3.4 2 1.6-.1 1.4.1 1.4-2 1.6 2 3.4 2.4-1c.7.6 1.5 1 2.4 1.4l.4 2.6h4l.4-2.6c.9-.4 1.7-.8 2.4-1.4l2.4 1 2-3.4-2-1.6Z"/></svg>',
+  close: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  play: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5L8 5.5Z" fill="currentColor"/></svg>',
+  pad: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M7.5 7h9a4.5 4.5 0 0 1 4.4 3.6l.9 4.6a2.6 2.6 0 0 1-4.5 2.2L15.6 15H8.4l-1.7 2.4a2.6 2.6 0 0 1-4.5-2.2l.9-4.6A4.5 4.5 0 0 1 7.5 7Z"/><path d="M7 10v3M5.5 11.5h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="16.5" cy="10.3" r=".9" fill="currentColor"/><circle cx="18.3" cy="12.1" r=".9" fill="currentColor"/></svg>',
+  monitor: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9 20h6M12 16.5V20" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+};
+export function icon(k: string): string { return ICONS[k] || ''; }
+export function esc(s: any): string { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[c]); }
+/** A short message at the bottom of the screen. */
+export function toast(msg: string) {
+  const ui = document.getElementById('ui'); if (!ui) return;
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; ui.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('in')); setTimeout(() => { t.classList.remove('in'); setTimeout(() => t.remove(), 400); }, 2600);
+}

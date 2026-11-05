@@ -1,0 +1,8 @@
+node_modules/
+Airline-Manager-Pro-Babylon/android/
+Airline-Manager-Pro-Babylon/www/app.js
+Airline-Manager-Pro-Babylon/www/index.html
+Airline-Manager-Pro-Babylon/capacitor.config.json
+Airline-Manager-Pro-Babylon/pc/build/
+*.apk
+*.zip
