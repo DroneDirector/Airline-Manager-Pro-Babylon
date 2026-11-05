@@ -72,7 +72,7 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
     const p = MeshBuilder.CreatePlane(K.nm('sg'), { width: w, height: h }, sc); p.material = K.picture(signC(text, bg, fg, 1024, Math.round(1024 * h / w), `700 ${Math.round(1024 * h / w * 0.55)}px Arial, sans-serif`), 1); p.parent = o; p.rotation.y = Math.PI; p.metadata = o.metadata; return o; };
   // ---- the lights of every room: panels in the ceiling, each its own object ----
   const lamps = (r: Room, step = 4.2) => {
-    if (r.kind === 'hall' || r.kind === 'museum' || r.kind === 'lounge' || r.kind === 'bar') return;
+    if (r.kind === 'hall' || r.kind === 'museum' || r.kind === 'lounge' || r.kind === 'bar' || r.kind === 'walk') return; // the walkway's lights come with its ceiling
     const top = (r.f === 2 ? F2Y : 0) + (r.h != null ? r.h : r.kind === 'vestibule' ? 3.4 : 5.4) - 0.07, nx = Math.max(1, Math.round((r.x1 - r.x0) / step)), nz = Math.max(1, Math.round((r.z1 - r.z0) / step));
     for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) { const x = r.x0 + (r.x1 - r.x0) * (i + 0.5) / nx, z = r.z0 + (r.z1 - r.z0) * (j + 0.5) / nz;
       if (STAIRS.some(s => x > s.x0 - 0.5 && x < s.x1 + 0.5 && z > s.z0 - 0.5 && z < s.z1 + 0.5)) continue;

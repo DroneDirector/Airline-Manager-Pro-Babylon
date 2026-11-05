@@ -7,6 +7,7 @@ import { MeshBuilder, Mesh, Vector3, VertexData, TransformNode } from '@babylonj
 import { Kit, signC } from './kit';
 import { ROOMS, DOORS, STAIRS, Room, Fl, F2Y, F1CEIL, F2CEIL, ROOF, doorH, WAVE, waveSouth, waveH, COLUMNS, STANDS, inRoom, PN } from './plan';
 import { IS_PC } from '../../core/app';
+import { buildWalkCeiling } from './ceilings';
 
 type R4 = { x0: number; z0: number; x1: number; z1: number };
 /** A rectangle less the holes in it (as smaller rectangles). */
@@ -63,8 +64,8 @@ export function buildShell(K: Kit, progress: (p: number, s: string) => void) {
       const g = MeshBuilder.CreateGround(K.nm('fl'), { width: c.x1 - c.x0, height: c.z1 - c.z0 }, sc); g.position.set((c.x0 + c.x1) / 2, b + (r.f === 1 ? 0.012 : 0.008), (c.z0 + c.z1) / 2); K.struct(r.id, g, fm);
       if (r.f === 2) { const s = MeshBuilder.CreateBox(K.nm('slab'), { width: c.x1 - c.x0, height: 0.36, depth: c.z1 - c.z0 }, sc); s.position.set((c.x0 + c.x1) / 2, F2Y - 0.19, (c.z0 + c.z1) / 2); K.struct(r.id, s, M.concrete); }
     }
-    // the ceiling; the roof slab where nothing is built over it
-    if (!isHall) {
+    // the ceiling; the roof slab where nothing is built over it (the walkway's is its own design, in ceilings.ts)
+    if (!isHall && r.kind !== 'walk') {
       const ct = top(r), cm = r.kind === 'baghall' || r.kind === 'plant' || r.kind === 'ramp' ? M.concrete : M.offwhite;
       for (const c of rectMinus(r, holes)) { const p = MeshBuilder.CreatePlane(K.nm('ce'), { width: c.x1 - c.x0, height: c.z1 - c.z0 }, sc); p.rotation.x = -Math.PI / 2; p.position.set((c.x0 + c.x1) / 2, ct - 0.04, (c.z0 + c.z1) / 2); K.struct(r.id, p, cm); }
       if (r.f === 1) { const open = rectMinus(r, F2R); for (const c of open) { const s = MeshBuilder.CreateBox(K.nm('rf'), { width: c.x1 - c.x0, height: 0.4, depth: c.z1 - c.z0 }, sc); s.position.set((c.x0 + c.x1) / 2, (r.kind === 'vestibule' ? ct : F1CEIL) + 0.2, (c.z0 + c.z1) / 2); K.struct(r.id, s, M.white); } }
@@ -102,6 +103,7 @@ export function buildShell(K: Kit, progress: (p: number, s: string) => void) {
       runOf(s0, a1, c0);
     }
   }
+  buildWalkCeiling(K);
   progress(26, 'Raising the wave roof…');
   buildWaveRoof(K);
   progress(32, 'The site: the kerb, the road, the car park, the apron…');
@@ -173,6 +175,6 @@ function buildSite(K: Kit) {
     K.box(o, 0.12, 3.2, 0.12, M.steel, -6, 1.6, -4.9); }
   // the pier's roof: rows of solar panels
   const sol = K.obj('ROOF', 'SOLAR-PANELS', 0, ROOF + 0.15, 0, 0, 'ROOF/SOLAR-PANELS');
-  for (let x = -76; x < 238; x += 4.2) for (const z of [54, 57.5, 61, 64.5, 70, 73.5, 77, 80.5]) { const p = K.box(sol, 3.8, 0.08, 2.6, M.solar, x, 0, z); p.rotation.x = -0.12; }
+  for (let x = -76; x < 238; x += 4.2) for (const z of [53.4, 66.6, 70, 73.5, 77, 80.5]) { const p = K.box(sol, 3.8, 0.08, 2.6, M.solar, x, 0, z); p.rotation.x = -0.12; }
   for (const [x, z] of [[20, 40], [60, 36], [118, 46], [140, 22]]) { const u = K.obj('ROOF', 'ROOF-UNIT', x, ROOF, z); K.box(u, 5, 1.6, 3.2, M.offwhite, 0, 0.8, 0); K.box(u, 4.4, 0.1, 2.6, M.steel, 0, 1.65, 0); }
 }
