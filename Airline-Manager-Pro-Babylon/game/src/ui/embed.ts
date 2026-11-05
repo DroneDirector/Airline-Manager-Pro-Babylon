@@ -73,6 +73,13 @@ if (EMBED) {
   ACTIONS['lounge-visit'] = () => { closeAll(); building('lounge'); };
   ACTIONS['airport-open'] = () => { closeAll(); building('concourse'); };
   ACTIONS['mus-open'] = () => { closeAll(); building('museum'); };
+  // the water salute, on Babylon.js: the airline's aircraft taxiing under the fire trucks' arch at that airport, now
+  W.saluteOpen = (o: any) => {
+    try { saveNow(true); } catch (e) { /* saved */ }
+    try { const c: any = company(o.cid || State.companyId) || company(), A: any = apt(o.icao) || { name: o.icao, city: '', pos: [0, 60] };
+      embedTell('room', { room: 'salute', data: { airline: c ? c.name : '', reg: o.reg, color: c ? c.color : '#1C2A4A', color2: c ? c.color2 : '#3FD3E6', airport: A.name, city: A.city || o.icao, lat: A.pos ? A.pos[1] : 60, lon: A.pos ? A.pos[0] : 0 } }); }
+    catch (e) { embedTell('room', { room: 'salute', data: {} }); }
+  };
   W.museumOpen = () => building('museum');
   // the Operations monitor: drawn here, shown there
   let monT: any = 0; const monCv = document.createElement('canvas'); monCv.width = 2048; monCv.height = Math.round(2048 * 0.32 / 1.08);
@@ -89,7 +96,7 @@ if (EMBED) {
   };
   ACTIONS['hangar-visit'] = (el: HTMLElement) => { const g = (k: string) => el && el.getAttribute ? el.getAttribute(k) || '' : ''; closeAll(); HangarRoom.open(g('data-reg'), g('data-base'), g('data-size')); };
   const rooms: [any, string][] = [[CourtRoom, 'The courtroom'],
-    [Salute, 'The water salute'], [TestRooms, 'The test rooms']];
+    [TestRooms, 'The test rooms']];
   for (const [R, name] of rooms) if (R) R.open = soon(name);
   for (const a of ['photo-mode']) if (typeof (ACTIONS as any)[a] === 'function') (ACTIONS as any)[a] = soon('This 3D place');
   // the 3D view of a flight: the edition's 3D viewer follows it, live. This page keeps running behind it (the airline,
