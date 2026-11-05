@@ -35,7 +35,7 @@ function groundLight(altDeg: number): [number, number, number] {
   return [Math.exp(-m * 0.035) * fade, Math.exp(-m * 0.095) * fade, Math.exp(-m * 0.24) * fade];
 }
 
-export interface WxHooks { sc: Scene; engine: AbstractEngine; cam: UniversalCamera; sun: DirectionalLight; hemi: HemisphericLight; glow: GlowLayer; hud: HTMLElement; canvas: HTMLCanvasElement; indoors: () => boolean; centre: Vector3 }
+export interface WxHooks { baseFog?: number; sc: Scene; engine: AbstractEngine; cam: UniversalCamera; sun: DirectionalLight; hemi: HemisphericLight; glow: GlowLayer; hud: HTMLElement; canvas: HTMLCanvasElement; indoors: () => boolean; centre: Vector3 }
 export function makeWeather(h: WxHooks) {
   const { sc, cam, sun, hemi } = h;
   const sky: Sky = makeSky(sc); sky.dome.scaling.setAll(1700 / 30000); h.glow.addExcludedMesh(sky.dome);
@@ -149,7 +149,8 @@ export function makeWeather(h: WxHooks) {
       hemi.intensity = 0.18 + 0.8 * day + moonK * 2 + fl * 1.6;
       // the haze, darker and closer in a storm
       const fogC = Color3.Lerp(new Color3(0.06, 0.07, 0.1), new Color3(0.68, 0.73, 0.8).scale(1 - c.dark * 0.45), day).add(new Color3(fl * 0.4, fl * 0.42, fl * 0.5));
-      if (c.fog + c.rain * 0.0008 + c.snow * 0.002 > 0.0002) { sc.fogMode = Scene.FOGMODE_EXP2; sc.fogDensity = c.fog + c.rain * 0.0008 + c.snow * 0.002; sc.fogColor = fogC; } else sc.fogMode = Scene.FOGMODE_NONE;
+      const fogD = Math.max(h.baseFog || 0, c.fog + c.rain * 0.0008 + c.snow * 0.002);
+      if (fogD > 0.0002 || h.baseFog) { if (sc.fogMode !== Scene.FOGMODE_EXP2) sc.fogMode = Scene.FOGMODE_EXP2; sc.fogDensity = fogD; sc.fogColor = fogC; } else if (sc.fogMode !== Scene.FOGMODE_NONE) sc.fogMode = Scene.FOGMODE_NONE;
       // rain and snow round the camera, outside only
       const inside = h.indoors();
       (rain.emitter as Vector3).set(cam.position.x, cam.position.y + 14, cam.position.z); (snow.emitter as Vector3).set(cam.position.x, cam.position.y + 16, cam.position.z);

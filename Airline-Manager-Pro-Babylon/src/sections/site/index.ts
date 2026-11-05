@@ -11,6 +11,7 @@ import { registerSection, Section, SectionCtx } from '../../core/sections';
 import { runLoop } from '../../core/engine';
 import { inputFrame } from '../../core/input';
 import { IS_PC, IS_TOUCH } from '../../core/app';
+import { S } from '../../core/settings';
 import { toast } from '../../ui/icons';
 import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core/perf-meter';
 import { buildAirliner, setGear } from '../viewer3d/airliner';
@@ -177,9 +178,9 @@ const Site$: Section = {
     { const c = at(0, (FENCE.v0 + FENCE.v1) / 2); addFlatZone({ id: 'SITE/AIRPORT', lat: c.lat, lon: c.lon, hdg: site.hdg, hu: FENCE.u1 + 150, hv: (FENCE.v1 - FENCE.v0) / 2 + 150, elev, blend: 700 }); }
     { const c = at(0, FENCE.v0 - 225); addFlatZone({ id: 'SITE/ROAD', lat: c.lat, lon: c.lon, hdg: site.hdg, hu: 30, hv: 260, elev, blend: 120 }); }
     O.zoneForModel = zoneForModel;
-    const inner = groundMesh(sc, site, 9000, IS_PC ? 720 : 420, 13, detail);
+    const inner = groundMesh(sc, site, 9000, IS_PC ? 560 : 380, 13, detail);
     // the outer ground goes down under the inner, so only the fine one shows there
-    const outer = groundMesh(sc, site, 36000, IS_PC ? 360 : 220, 11, detail, 60, 8800);
+    const outer = groundMesh(sc, site, 36000, IS_PC ? 300 : 200, 11, detail, 60, 8800);
     // a model placed later with its own zone: the ground is laid out again under it
     let relay = 0; O.offFlat = onFlatChange(() => { clearTimeout(relay); relay = window.setTimeout(() => { inner.layout(); outer.layout(); }, 50); });
     // the sea
@@ -202,12 +203,12 @@ const Site$: Section = {
     const hemi = new HemisphericLight('hemi', new Vector3(0, 1, 0), sc); hemi.intensity = 0.8;
     const sun = new DirectionalLight('sun', new Vector3(-0.4, -1, 0.3), sc); sun.intensity = 2.2; sun.shadowMinZ = 1; sun.shadowMaxZ = 9000;
     const cam = new UniversalCamera('cam', new Vector3(0, 10, 0), sc); cam.minZ = 0.5; cam.maxZ = 120000; cam.fov = 0.9; cam.inertia = 0; O.cam = cam; sc.activeCamera = cam;
-    const glow = new GlowLayer('glow', sc, { mainTextureRatio: 0.4 }); glow.intensity = 0.3;
-    const sg = new ShadowGenerator(IS_PC ? 4096 : 2048, sun); sg.usePercentageCloserFiltering = true; sg.bias = 0.0006; sg.normalBias = 0.02; for (const m of casters) sg.addShadowCaster(m, false);
+    const glow = new GlowLayer('glow', sc, { mainTextureRatio: 0.4 }); glow.intensity = 0.3; glow.isEnabled = S.gfx.glow !== false; for (const g of [inner.m, outer.m, sea]) glow.addExcludedMesh(g);
+    if (S.gfx.shadows !== 'off') { const sg = new ShadowGenerator(S.gfx.shadows === 'high' ? (IS_PC ? 4096 : 2048) : 1024, sun); sg.usePercentageCloserFiltering = true; sg.bias = 0.0006; sg.normalBias = 0.02; for (const m of casters) sg.addShadowCaster(m, false); }
     const dp = new DefaultRenderingPipeline('dp', true, sc, [cam]); dp.fxaaEnabled = true; dp.imageProcessingEnabled = true; dp.imageProcessing.toneMappingEnabled = true; dp.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES; dp.imageProcessing.exposure = 1.05; dp.imageProcessing.contrast = 1.08;
     dp.bloomEnabled = true; dp.bloomThreshold = 0.9; dp.bloomWeight = 0.15;
     const hud = document.createElement('div'); hud.className = 'hud site-hud'; O.hud = hud; ui.appendChild(hud);
-    const wx: Weather = makeWeather({ sc, engine, cam, sun, hemi, glow, hud, canvas: ctx.canvas, centre: ap.position.clone(), indoors: () => false }); O.wx = wx;
+    const wx: Weather = makeWeather({ baseFog: 0.000022, sc, engine, cam, sun, hemi, glow, hud, canvas: ctx.canvas, centre: ap.position.clone(), indoors: () => false }); O.wx = wx;
     for (const ps of sc.particleSystems) ps.renderingGroupId = 1;
     // what the panel shows: the site, its numbers, the views, the drone's speed
     const kx = 111320 * Math.cos(site.lat * D2R);
@@ -239,8 +240,6 @@ const Site$: Section = {
       CAM.x += mv.x * sp; CAM.z += mv.z * sp; CAM.y = Math.max(elev + 0.6, Math.min(12000, CAM.y + mv.y * sp + vert * sp));
       cam.position.set(CAM.x, CAM.y, CAM.z); cam.setTarget(cam.position.add(f));
       wx.frame(dt, now);
-      // a light haze over the distance, so the far mountains stand back (unless the weather brings its own)
-      if (sc.fogMode === Scene.FOGMODE_NONE) { sc.fogMode = Scene.FOGMODE_EXP2; sc.fogDensity = 0.000022; sc.fogColor = Color3.Lerp(new Color3(0.07, 0.08, 0.11), new Color3(0.72, 0.78, 0.86), Math.min(1, hemi.intensity / 0.95)); }
       sc.render(); perfEnd();
     });
     void kx; void Mesh; void StandardMaterial;
