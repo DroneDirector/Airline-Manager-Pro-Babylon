@@ -29,6 +29,7 @@ const GFX: Row[] = [
   { k: 'tog', key: 'gfx.bloom', label: 'Bloom', sub: 'Bright light spills softly' },
   { k: 'tog', key: 'gfx.ssao', label: 'Ambient occlusion', sub: 'Soft shade where things meet (heavy)' },
   { k: 'seg', key: 'gfx.particles', label: 'Fire and contrails', opts: [['low', 'Simple'], ['high', 'Full']] },
+  { k: 'tog', key: 'gfx.terrain', label: 'Real terrain', sub: 'Mountains, coasts and the sea where they are, with satellite pictures, under flights below 33,000 ft (loaded over the internet)' },
   { k: 'seg', key: 'gfx.clouds', label: 'Volumetric clouds', sub: 'How finely the clouds in the 3D viewer are drawn (higher is heavier)', opts: [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']] },
   { k: 'tog', key: 'gfx.aces', label: 'Film tone mapping', sub: 'ACES, like a camera' },
   { k: 'range', key: 'gfx.exposure', label: 'Brightness', min: 0.5, max: 1.8, step: 0.05, fmt: pct },

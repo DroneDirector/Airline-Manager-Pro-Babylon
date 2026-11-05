@@ -16,8 +16,10 @@ import { IS_PC, IS_TOUCH } from '../../core/app';
 import { icon, esc, toast } from '../../ui/icons';
 import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core/perf-meter';
 import { makeSky, skyFrame, Sky } from './sky';
-import { buildAirliner, Airliner, repaint } from './airliner';
-import { gameSend, onGameFlight } from '../../ui/game-frame';
+import { buildAirliner, Airliner, repaint, setGear } from './airliner';
+import { buildAirport, placeAirport, Airport } from './airport';
+import { buildTerrain, placeTerrain, terrainStale, Terrain } from './terrain';
+import { gameSend, onGameFlight, onGameAirport } from '../../ui/game-frame';
 import { sunAt, moonAt, dirOf, sunlight, lst } from './astro';
 import { FROM, TO, ROUTE_M, gcAt, gcBrg, gcDist, D2R } from './route';
 
@@ -45,9 +47,30 @@ onGameFlight((d: any) => {
   if (d.gone) { if (!L.goneSaid) { L.goneSaid = true; toast('This flight has ended'); const nx = (L.list || []).filter((x: any) => x.id !== L.id)[0]; if (nx) follow(nx.id); } return; }
   const me: Sample = Object.assign({}, d.me, { at: performance.now() });
   if (me.id !== L.id) return;
-  L.s0 = L.s1 || me; L.s1 = me; L.list = d.list || []; L.near = d.near || []; L.goneSaid = false;
+  L.s0 = L.s1 || me; L.s1 = me; wantAirports(me); L.list = d.list || []; L.near = d.near || []; L.goneSaid = false;
   const key = me.color + me.color2; if (L.painted !== key) { L.painted = key; try { repaint(V.ac, me.color, me.color2); } catch (e) { /* its own colours */ } }
 });
+/** The airports of the flight followed: asked of the game once each, built when their layout comes. */
+function wantAirports(me: Sample) { const A = V.apts || (V.apts = {}); for (const k of [me.from, me.to]) if (k && !(k in A)) { A[k] = null; gameSend({ ampb: 'airport', icao: k }); } }
+onGameAirport((d: any) => {
+  if (!V.scene || !V.apts || !d.L || !(d.icao in V.apts)) return;
+  try { const old: Airport = V.apts[d.icao]; if (old) old.dispose(); const A = buildAirport(V.scene, d.L); V.apts[d.icao] = A; farDiscs(); for (const l of A.lights) V.glow.addIncludedOnlyMesh(l); if (V.sg) A.root.getChildMeshes().forEach(m => m.receiveShadows = true); } catch (e) { console.error(e); }
+});
+/** The real ground under the flight (below 33,000 ft, when Real terrain is on): laid out again as the aircraft flies on. */
+function terrainStep(lat: number, lon: number, alt: number) {
+  const want = S.gfx.terrain && alt < 10000;
+  if (!want) { if (V.ter) { V.ter.dispose(); V.ter = null; farDiscs(); } return; }
+  if (!V.ter || terrainStale(V.ter, lat, lon)) { if (V.ter) V.ter.dispose(); V.ter = buildTerrain(V.scene, lat, lon); farDiscs(); const c = V.hud && V.hud.querySelector('.v3d-credit'); if (c) c.hidden = false; }
+  placeTerrain(V.ter, lat, lon, alt);
+}
+/** The airports' wide grass round them only where there is no real terrain. */
+function farDiscs() { for (const k in V.apts || {}) { const A: Airport = V.apts[k]; if (A) A.root.getChildMeshes().forEach(m => { if (m.name === 'aptFar') m.setEnabled(!V.ter); }); } }
+/** The nearest airport built (within 40 km), for the ground's height under the aircraft. */
+function nearAirport(lat: number, lon: number): Airport | null {
+  let best: Airport | null = null, bd = 40000;
+  for (const k in V.apts || {}) { const A: Airport = V.apts[k]; if (!A) continue; const d = Math.hypot((A.lon - lon) * 111320 * Math.cos(lat * D2R), (A.lat - lat) * 110540); if (d < bd) { bd = d; best = A; } }
+  return best;
+}
 /** Follow another flight. */
 function follow(id: string) { const L = V.live; if (!L) return; L.id = id; L.s0 = null; L.s1 = null; L.painted = ''; L.prev = null; gameSend({ ampb: 'follow', id }); }
 /** Where the followed flight is now: between the last two positions the game sent (a quarter of a second behind, so
@@ -87,6 +110,7 @@ function apply(what: string) {
   if (all || what === 'aces' || what === 'exposure') { dp.imageProcessingEnabled = true; const ip = dp.imageProcessing; ip.toneMappingEnabled = g.aces; ip.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES; ip.exposure = g.exposure * 1.15; ip.contrast = 1.06; }
   if (all || what === 'sharpen') { dp.sharpenEnabled = g.sharpen; dp.sharpen.edgeAmount = 0.2; }
   if (all || what === 'particles') makeTrails();
+  if (what === 'terrain' && !S.gfx.terrain && V.ter) { V.ter.dispose(); V.ter = null; farDiscs(); }
   if (all || what === 'clouds') { const q = CLOUDQ[g.clouds] || CLOUDQ.medium; V.steps = q[0]; V.lsteps = q[1]; }
   if (all || /^show(Fps|Cpu|Gpu|Mem)$/.test(what)) perfShow();
   V.envDirty = true;
@@ -117,7 +141,7 @@ function sky(now: number) {
   V.sunAlt = s.alt;
   const q = CLOUDQ[S.gfx.clouds] || CLOUDQ.medium;
   skyFrame(V.sky, { sun: sd, sunCol: sc, moon: md, lit, litCol: lc, alt: (V.alt || FL) + V.cam.position.y, drift: V.drift, time: now, cover: 0.82, steps: V.steps || q[0], lsteps: V.lsteps || q[1],
-    lat: pos[0] * D2R, lst: lst(V.t, pos[1]) * D2R, starK: Math.min(1.4, nightK * 1.4), nightK });
+    lat: pos[0] * D2R, lst: lst(V.t, pos[1]) * D2R, starK: Math.min(1.4, nightK * 1.4), nightK, gnd: V.gnd || 0, landK: V.land || 0 });
   // the sun (or the moon) on the aircraft, its shadows, the sky's light from above and the clouds' from below
   const L: DirectionalLight = V.sun, ld = new Vector3(-lit[0], -lit[1], -lit[2]), mx = Math.max(lc[0], lc[1], lc[2], 1e-4);
   L.direction = ld; L.position = new Vector3(lit[0] * 120, lit[1] * 120, lit[2] * 120);
@@ -158,6 +182,7 @@ function hudHtml(): string {
       <small class="v3d-demo">Demo: drag the slider to move the sun</small>
     </div>
     <div class="v3d-perf"></div>
+    <small class="v3d-credit" hidden>Terrain: Terrain Tiles on AWS (SRTM, GMTED2010, ETOPO1, 3DEP, EU-DEM) · imagery: Sentinel-2 cloudless 2016 by EOX (CC BY 4.0)</small>
   </div>`;
 }
 function setView(id: string) {
@@ -178,6 +203,7 @@ const Viewer: Section = {
     const { engine, ui, progress } = ctx; V.ctx = ctx;
     const liveId = ctx.opts && ctx.opts.live; V.live = liveId ? { id: liveId, s0: null, s1: null, list: [], near: [], painted: '', prev: null } : null; V.others = {}; V.turn = 0; V.cur = null;
     if (liveId) gameSend({ ampb: 'follow', id: liveId });
+    V.apts = {}; V.gnd = 0; V.land = 0; V.ter = null;
     progress(10, 'Filling the sky…'); await new Promise(r => setTimeout(r, 30));
     const sc = new Scene(engine); V.scene = sc; V.sc = sc; sc.clearColor = new Color4(0, 0, 0, 1); sc.skipPointerMovePicking = true;
     V.frac = 0.14; V.pos = gcAt([FROM.lat, FROM.lon], [TO.lat, TO.lon], V.frac); V.hdg = gcBrg(V.pos, [TO.lat, TO.lon]); V.drift = [0, 0];
@@ -189,6 +215,9 @@ const Viewer: Section = {
     V.hemi = new HemisphericLight('hemi', new Vector3(0, 1, 0), sc);
     V.sun = new DirectionalLight('sun', new Vector3(0, -1, 0), sc); V.sun.autoUpdateExtends = true; V.sun.shadowMinZ = 1; V.sun.shadowMaxZ = 260;
     const ll = new SpotLight('logo', new Vector3(0, 1.0, -15.6), new Vector3(0, 0.75, 0.66).normalize(), 1.1, 2, sc); ll.diffuse = Color3.FromHexString('#FFF1D6'); ll.range = 14; ll.parent = ac.root; V.logoLight = ll;
+    // the landing and taxi lights, ahead of the nose
+    const tl = new SpotLight('taxiL', new Vector3(0, -1.7, 13.5), new Vector3(0, -0.1, 1).normalize(), 0.7, 6, sc); tl.intensity = 90; tl.range = 900; tl.diffuse = Color3.FromHexString('#FFF6E6'); tl.parent = ac.root; tl.setEnabled(false); V.taxiL = tl;
+    setGear(ac, 0);
     const cam = new UniversalCamera('cam', new Vector3(0, 8, -64), sc); cam.minZ = 0.3; cam.maxZ = 20000; cam.inertia = 0; V.cam = cam; sc.activeCamera = cam;
     progress(70, 'Lighting the clouds…');
     // reflections of the sky on the paint: the dome seen from the aircraft, refreshed as the light changes
@@ -243,7 +272,14 @@ const Viewer: Section = {
         // the real flight: where the game says it is
         const st = liveState(performance.now()); V.cur = st;
         if (st) {
-          const L = V.live, pv = L.prev; V.pos = [st.lat, st.lon]; V.alt = st.altM + (st.onGround ? 3.9 : 0); V.spd = Math.max(0, st.gs || 0) * 0.5144;
+          const L = V.live, pv = L.prev, na = nearAirport(st.lat, st.lon); V.pos = [st.lat, st.lon];
+          const th = V.ter ? V.ter.heightAt(st.lat, st.lon) : null; V.gnd = na ? na.elev : th != null ? th : 0; V.land = na || (th != null && th > 1) ? 1 : 0;
+          V.alt = st.onGround ? V.gnd + 3.9 : Math.max(st.altM, V.gnd + 3.9); V.spd = Math.max(0, st.gs || 0) * 0.5144;
+          // the gear: down on the ground and low on the way in or out, up in the climb and the cruise (8 seconds)
+          const agl = V.alt - V.gnd, want = st.onGround || agl < 750 ? 1 : 0; setGear(ac, Math.max(0, Math.min(1, ac.gearK + Math.sign(want - ac.gearK) * dt / 8)));
+          for (const k in V.apts) if (V.apts[k]) placeAirport(V.apts[k], st.lat, st.lon, V.alt, V.sunAlt < 2);
+          if (V.taxiL) V.taxiL.setEnabled(V.sunAlt < 4 && agl < 1500);
+          terrainStep(st.lat, st.lon, V.alt);
           if (pv) { V.drift[0] += (st.lon - pv.lon) * 111320 * Math.cos(st.lat * D2R); V.drift[1] += (st.lat - pv.lat) * 110540; const dh = ((st.hdg - pv.hdg + 540) % 360) - 180; V.turn = V.turn * 0.9 + (dt > 0 ? dh / dt : 0) * 0.1; }
           L.prev = { lat: st.lat, lon: st.lon, hdg: st.hdg };
           hdg = st.hdg; bank = st.onGround ? 0 : Math.max(-0.45, Math.min(0.45, (V.turn || 0) / 3 * 0.44));
@@ -307,7 +343,7 @@ const Viewer: Section = {
     const sc: Scene = V.scene; if (!sc) return;
     try { V.ctx.canvas.removeEventListener('wheel', V.wheel); } catch (e) { /* gone */ }
     window.removeEventListener('keydown', V.key);
-    if (V.live) { gameSend({ ampb: 'stop' }); V.live = null; } V.others = {};
+    if (V.live) { gameSend({ ampb: 'stop' }); V.live = null; } V.others = {}; V.apts = {}; if (V.ter) { V.ter.dispose(); V.ter = null; }
     perfDetach(); if (V.hud) V.hud.remove(); V.trails = []; V.trailTex = null; sc.dispose(); V.scene = null;
   },
   onSettings(what: string) { apply(what === 'preset' ? 'all' : what); },

@@ -9,7 +9,7 @@ import {
 } from '@babylonjs/core';
 
 const L = 37.57, RX = 1.98, RY = 2.07, NOSE = 5.2, TAIL = 11.6;
-export interface Airliner { root: TransformNode; fans: Mesh[]; strobes: Mesh[]; beacons: Mesh[]; navs: Mesh[]; logo: Mesh[]; casters: Mesh[]; exhausts: Vector3[]; paint: PBRMaterial[] }
+export interface Airliner { gear: TransformNode[]; gearK: number; taxiLight?: any; root: TransformNode; fans: Mesh[]; strobes: Mesh[]; beacons: Mesh[]; navs: Mesh[]; logo: Mesh[]; casters: Mesh[]; exhausts: Vector3[]; paint: PBRMaterial[] }
 
 /** The fuselage's cross-section at s metres from the nose: half-width, half-height and the height of its middle. */
 function section(s: number): { rx: number; ry: number; cy: number } {
@@ -105,6 +105,11 @@ export function repaint(ac: Airliner, c1: string, c2: string) {
   const ob = paint.albedoTexture, of = fin.albedoTexture; paint.albedoTexture = paintBody(sc, c1, c2); fin.albedoTexture = paintFin(sc, c1, c2); if (ob) ob.dispose(); if (of) of.dispose();
   navy.albedoColor = Color3.FromHexString(c1);
 }
+/** The gear down (1), up (0) or on its way: the nose leg folds forward, the main legs in towards the middle. */
+export function setGear(ac: Airliner, k: number) {
+  ac.gearK = k; const up = 1 - k;
+  for (const g of ac.gear) { const f = (g as any).metadata.fold; g.setEnabled(k > 0.02); if (f === 0) g.rotation.set(-up * Math.PI / 2, 0, 0); else g.rotation.set(0, 0, f * up * Math.PI / 2); }
+}
 export function buildAirliner(sc: Scene): Airliner {
   const root = new TransformNode('aircraft', sc);
   const paint = new PBRMaterial('paint', sc); paint.albedoTexture = paintBody(sc); paint.metallic = 0.15; paint.roughness = 0.34;
@@ -161,7 +166,22 @@ export function buildAirliner(sc: Scene): Airliner {
   const strobes = [bulb(mirror(wt).add(new Vector3(-0.08, 0, -0.9)), '#FFFFFF', 0.13), bulb(wt.add(new Vector3(0.08, 0, -0.9)), '#FFFFFF', 0.13), bulb(new Vector3(0, 1.0, -L / 2 + 0.02), '#FFFFFF', 0.12)];
   const beacons = [bulb(new Vector3(0, RY + 0.05, 1.2), '#FF2A10', 0.13), bulb(new Vector3(0, -RY - 0.25, 3.0), '#FF2A10', 0.13)];
   const logo = [bulb(st.add(new Vector3(0, 0.14, -0.2)), '#FFF4D8', 0.08), bulb(mirror(st).add(new Vector3(0, 0.14, -0.2)), '#FFF4D8', 0.08)];
-  return { root, fans, strobes, beacons, navs, logo, casters, exhausts, paint: [paint, wingMat, finMat, navy, white] };
+  // the landing gear: the nose leg (two wheels) and the two main legs (two wheels each), folding into their wells
+  const gear: TransformNode[] = [], tyre = new PBRMaterial('tyre', sc); tyre.albedoColor = Color3.FromHexString('#1A1B1D'); tyre.metallic = 0; tyre.roughness = 0.85;
+  const hub = new PBRMaterial('hub', sc); hub.albedoColor = Color3.FromHexString('#C8CCD2'); hub.metallic = 0.9; hub.roughness = 0.35;
+  const leg = (name: string, at: Vector3, len: number, wheelD: number, gapX: number, foldSide: number) => {
+    const pivot = new TransformNode(name, sc); pivot.parent = root; pivot.position.copyFrom(at); (pivot as any).metadata = { fold: foldSide };
+    const strut = MeshBuilder.CreateCylinder('strut', { diameter: 0.24, height: len, tessellation: 12 }, sc); strut.position.y = -len / 2; strut.parent = pivot; strut.material = metal; casters.push(strut as Mesh);
+    for (const sx of [-gapX, gapX]) {
+      const w = MeshBuilder.CreateCylinder('wheel', { diameter: wheelD, height: wheelD * 0.36, tessellation: 22 }, sc); w.rotation.z = Math.PI / 2; w.position.set(sx, -len, 0); w.parent = pivot; w.material = tyre; casters.push(w as Mesh);
+      const hb = MeshBuilder.CreateCylinder('hub', { diameter: wheelD * 0.55, height: wheelD * 0.38, tessellation: 16 }, sc); hb.rotation.z = Math.PI / 2; hb.position.set(sx, -len, 0); hb.parent = pivot; hb.material = hub;
+    }
+    gear.push(pivot);
+  };
+  // the fuselage's middle stands 3.9 m above the ground on its wheels
+  leg('noseGear', new Vector3(0, -RY + 0.1, L / 2 - 5.1), 3.9 - RY - 0.1 - 0.38, 0.76, 0.24, 0);
+  for (const side of [1, -1]) leg('mainGear', new Vector3(side * 3.8, -1.55, -1.6), 3.9 - 1.55 - 0.57, 1.14, 0.42, side);
+  return { root, fans, strobes, beacons, navs, logo, casters, exhausts, paint: [paint, wingMat, finMat, navy, white], gear, gearK: 0 };
 }
 /** The fan's blades seen from the front: 24 wide-chord blades, painted once and turned. */
 function bladeTexture(sc: Scene): DynamicTexture {

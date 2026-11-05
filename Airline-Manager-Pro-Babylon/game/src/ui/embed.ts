@@ -87,5 +87,11 @@ if (EMBED) {
     if (d.ampb === 'save') { try { saveNow(true); } catch (err) { /* saved */ } embedTell('saved'); }
     else if (d.ampb === 'follow') { follow = d.id || ''; clearInterval(timer); if (follow) { send(); timer = setInterval(send, 250); } }
     else if (d.ampb === 'stop') { follow = ''; clearInterval(timer); }
+    else if (d.ampb === 'airport' && d.icao) {
+      // an airport's layout for the 3D viewer: what is known now, and again if a better one arrives
+      const A: any = apt(d.icao), elev = A && A.elev ? A.elev * 0.3048 : 0;
+      const out = (L: any) => { if (L) embedTell('airport', { icao: d.icao, L: Object.assign({}, L, { alt: L.alt || elev }) }); };
+      try { AirportLayouts.get(d.icao, out).then(out).catch(() => embedTell('airport', { icao: d.icao, L: null })); } catch (e) { embedTell('airport', { icao: d.icao, L: null }); }
+    }
   });
 }

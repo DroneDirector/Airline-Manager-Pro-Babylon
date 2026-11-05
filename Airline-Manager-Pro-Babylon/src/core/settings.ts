@@ -5,7 +5,7 @@ export type Preset = 'low' | 'medium' | 'high' | 'ultra' | 'custom';
 export interface Gfx {
   preset: Preset; scale: number; fps: number; aa: 'off' | 'fxaa' | 'msaa'; shadows: 'off' | 'low' | 'high';
   mirror: 'off' | 'low' | 'high'; probe: boolean; glow: boolean; bloom: boolean; ssao: boolean; aces: boolean; exposure: number;
-  sharpen: boolean; fov: number; clouds: 'low' | 'medium' | 'high' | 'ultra'; showFps: boolean; showCpu: boolean; showGpu: boolean; showMem: boolean; particles: 'low' | 'high';
+  sharpen: boolean; fov: number; clouds: 'low' | 'medium' | 'high' | 'ultra'; terrain: boolean; showFps: boolean; showCpu: boolean; showGpu: boolean; showMem: boolean; particles: 'low' | 'high';
 }
 export interface Controls {
   padLook: number; padDead: number; padInvert: boolean; padSwap: boolean; padVibrate: boolean;
@@ -20,7 +20,7 @@ export const PRESETS: { [k: string]: Partial<Gfx> } = {
   ultra: { scale: IS_PC ? 1.25 : 1, aa: 'msaa', shadows: 'high', mirror: 'high', probe: true, glow: true, bloom: true, ssao: true, sharpen: true, particles: 'high', clouds: 'ultra' },
 };
 const DEF: Settings = {
-  gfx: Object.assign({ preset: (IS_PC ? 'high' : 'medium') as Preset, fps: IS_PC ? 0 : 60, aces: true, exposure: 1, fov: 70, showFps: false, showCpu: false, showGpu: false, showMem: false } as any, PRESETS[IS_PC ? 'high' : 'medium']),
+  gfx: Object.assign({ preset: (IS_PC ? 'high' : 'medium') as Preset, fps: IS_PC ? 0 : 60, terrain: true, aces: true, exposure: 1, fov: 70, showFps: false, showCpu: false, showGpu: false, showMem: false } as any, PRESETS[IS_PC ? 'high' : 'medium']),
   ctl: { padLook: 1, padDead: 0.15, padInvert: false, padSwap: false, padVibrate: true, touchLook: 1, touchStick: 1, mouseLook: 1, mouseInvert: false },
   music: true,
 };

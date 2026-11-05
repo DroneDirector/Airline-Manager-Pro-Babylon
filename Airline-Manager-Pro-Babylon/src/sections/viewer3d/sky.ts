@@ -20,7 +20,7 @@ Effect.ShadersStore['amSkyFragmentShader'] = `precision highp float;
 varying vec3 vDir;
 uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 moonDir; uniform vec3 litDir; uniform vec3 litCol;
 uniform float alt; uniform vec2 drift; uniform float time; uniform float cover; uniform float steps; uniform float lsteps;
-uniform float lat; uniform float lst; uniform float starK; uniform float nightK;
+uniform float lat; uniform float lst; uniform float starK; uniform float nightK; uniform float gnd; uniform float landK;
 uniform sampler2D stars;
 const float R = 6371000.0, BASE = 2100.0, TOP = 5600.0, PI = 3.14159265;
 
@@ -85,8 +85,16 @@ vec3 skyCol(vec3 d) {
 void main(void) {
   vec3 d = normalize(vDir), o = vec3(0.0), C = vec3(0.0, -(R + alt), 0.0);
   vec3 bg; float far = 1e9;
-  vec2 e = sphere(o, d, C, R);
-  if (e.x > 0.0) {
+  vec2 e = sphere(o, d, C, R + gnd);
+  if (e.x > 0.0 && landK > 0.5) {
+    // land round an airport: fields, woods and towns, in the light of the hour
+    vec3 p = d * e.x; vec2 g = p.xz + drift;
+    float f1 = noise(vec3(g * 0.0009, 1.3)), f2 = noise(vec3(g * 0.004, 7.1)), f3 = noise(vec3(g * 0.00015, 3.3));
+    vec3 lc = mix(vec3(0.20, 0.27, 0.13), vec3(0.33, 0.35, 0.18), f1); lc = mix(lc, vec3(0.12, 0.18, 0.09), smoothstep(0.62, 0.75, f2)); lc = mix(lc, vec3(0.32, 0.31, 0.29), smoothstep(0.7, 0.85, f3) * 0.7);
+    float sunk = max(sunDir.y, 0.0) * 0.9 + 0.1 * smoothstep(-0.1, 0.2, sunDir.y);
+    bg = lc * (sunCol * sunk * 1.1 + skyCol(vec3(0.0, 1.0, 0.0)) * 0.5);
+    far = e.x; bg = mix(bg, skyCol(vec3(d.x, 0.0, d.z)), 1.0 - exp(-far / 90000.0));
+  } else if (e.x > 0.0) {
     // the sea, on the curve of the Earth
     vec3 p = d * e.x, n = normalize(p - C), r = reflect(d, n);
     float fr = 0.02 + 0.98 * pow(1.0 - max(dot(-d, n), 0.0), 5.0);
@@ -136,7 +144,7 @@ export function makeSky(sc: Scene): Sky {
   dome.infiniteDistance = false; dome.isPickable = false; dome.renderingGroupId = 0;
   const mat = new ShaderMaterial('skyMat', sc, { vertex: 'amSky', fragment: 'amSky' }, {
     attributes: ['position'],
-    uniforms: ['worldViewProjection', 'sunDir', 'sunCol', 'moonDir', 'litDir', 'litCol', 'alt', 'drift', 'time', 'cover', 'steps', 'lsteps', 'lat', 'lst', 'starK', 'nightK'],
+    uniforms: ['worldViewProjection', 'sunDir', 'sunCol', 'moonDir', 'litDir', 'litCol', 'alt', 'drift', 'time', 'cover', 'steps', 'lsteps', 'lat', 'lst', 'starK', 'nightK', 'gnd', 'landK'],
     samplers: ['stars'],
   });
   mat.backFaceCulling = false; mat.disableDepthWrite = true;
@@ -176,12 +184,12 @@ function bvColour(bv: number): string {
   return `${r},${Math.max(140, Math.min(255, g))},${Math.max(90, b)}`;
 }
 /** Each frame: the sun, the moon, the light on the clouds, the camera's height, how far the ground has moved. */
-export function skyFrame(s: Sky, o: { sun: number[]; sunCol: number[]; moon: number[]; lit: number[]; litCol: number[]; alt: number; drift: number[]; time: number; cover: number; steps: number; lsteps: number; lat: number; lst: number; starK: number; nightK: number }) {
+export function skyFrame(s: Sky, o: { sun: number[]; sunCol: number[]; moon: number[]; lit: number[]; litCol: number[]; alt: number; drift: number[]; time: number; cover: number; steps: number; lsteps: number; lat: number; lst: number; starK: number; nightK: number; gnd?: number; landK?: number }) {
   const m = s.mat;
   m.setVector3('sunDir', new Vector3(o.sun[0], o.sun[1], o.sun[2])); m.setColor3('sunCol', new Color3(o.sunCol[0], o.sunCol[1], o.sunCol[2]));
   m.setVector3('moonDir', new Vector3(o.moon[0], o.moon[1], o.moon[2])); m.setVector3('litDir', new Vector3(o.lit[0], o.lit[1], o.lit[2]));
   m.setColor3('litCol', new Color3(o.litCol[0], o.litCol[1], o.litCol[2]));
   m.setFloat('alt', o.alt); m.setVector2('drift', new Vector2(o.drift[0], o.drift[1]));
   m.setFloat('time', o.time); m.setFloat('cover', o.cover); m.setFloat('steps', o.steps); m.setFloat('lsteps', o.lsteps);
-  m.setFloat('lat', o.lat); m.setFloat('lst', o.lst); m.setFloat('starK', o.starK); m.setFloat('nightK', o.nightK);
+  m.setFloat('lat', o.lat); m.setFloat('lst', o.lst); m.setFloat('starK', o.starK); m.setFloat('nightK', o.nightK); m.setFloat('gnd', o.gnd || 0); m.setFloat('landK', o.landK || 0);
 }

@@ -4,7 +4,9 @@
 // completely, so its memory goes back.
 let frame: HTMLIFrameElement | null = null;
 let handlers: { title: () => void; exit: () => void; viewer: (id: string) => void } | null = null;
-const flightSubs: ((d: any) => void)[] = [];
+const flightSubs: ((d: any) => void)[] = [], airportSubs: ((d: any) => void)[] = [];
+/** An airport's layout, as the game sends it when the 3D viewer asks. */
+export function onGameAirport(f: (d: any) => void) { airportSubs.push(f); }
 /** The flight the 3D viewer follows, as the game sends it (several times a second). */
 export function onGameFlight(f: (d: any) => void) { flightSubs.push(f); }
 /** A message to the game (follow a flight, stop, save). */
@@ -36,5 +38,6 @@ window.addEventListener('message', (e: MessageEvent) => {
   if (d.amp === 'title') { gameClose(); h.title(); }
   else if (d.amp === 'exit') h.exit();
   else if (d.amp === 'viewer3d') { if (d.id) { gameHide(); h.viewer(d.id); } else { gameClose(); h.viewer(''); } }
+  else if (d.amp === 'airport') { for (const f of airportSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'flight') { for (const f of flightSubs) { try { f(d); } catch (err) { console.error(err); } } }
 });
