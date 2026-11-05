@@ -335,16 +335,18 @@ function cabinIsFus(o: any): boolean {
 }
 /** A cabin surface: lit by the cabin's own lights in its own colour (people, seats, walls keep their colours),
  *  with a little shading from the light outside on top. */
-const CabinLight: any = { self: { value: 0.8 }, warm: { value: typeof THREE !== 'undefined' ? new THREE.Color(1, 1, 1) : null },
+// (the Babylon.js edition has no other 3D library: these are only made where one is there)
+const _cl3 = typeof THREE !== 'undefined', _clV = (x = 0, y = 0, z = 0) => _cl3 ? new THREE.Vector3(x, y, z) : null, _clC = (r = 0, g = 0, b = 0) => _cl3 ? new THREE.Color(r, g, b) : null;
+const CabinLight: any = { self: { value: 0.8 }, warm: { value: _clC(1, 1, 1) },
   // the blue mood lights: real light sources (lines of light) that light the surfaces around them: the side walls
   // below the bins, the ceiling above them and, from the lit ceiling, the bins' doors. Each line: its two ends and
   // the way it shines (in view space, set every frame), its colour and strength, its reach and its fixture spacing.
-  la: { value: Array.from({ length: 6 }, () => new THREE.Vector3()) }, lb: { value: Array.from({ length: 6 }, () => new THREE.Vector3()) },
-  ld: { value: Array.from({ length: 6 }, () => new THREE.Vector3(0, -1, 0)) }, lc: { value: Array.from({ length: 6 }, () => new THREE.Color(0, 0, 0)) },
+  la: { value: Array.from({ length: 6 }, () => _clV()) }, lb: { value: Array.from({ length: 6 }, () => _clV()) },
+  ld: { value: Array.from({ length: 6 }, () => _clV(0, -1, 0)) }, lc: { value: Array.from({ length: 6 }, () => _clC(0, 0, 0)) },
   lr: { value: [0.4, 0.4, 0.4, 0.4, 0.4, 0.4] }, ls: { value: [0, 0, 0, 0, 0, 0] }, ln: { value: 0 },
   // which way is up in the cabin (view space): surfaces facing up catch a little more of the ceiling light, those
   // facing down a little less, so padding, curves and folds show their depth
-  up: { value: new THREE.Vector3(0, 0, 0) } };
+  up: { value: _clV(0, 0, 0) } };
 const CABIN_LIGHT_GLSL = `
   { vec3 lp = -vViewPosition; vec3 lsum = vec3(0.0);
     for (int i = 0; i < 6; i++) { if (i >= uLN) break;
