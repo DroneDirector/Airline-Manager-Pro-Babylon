@@ -14,14 +14,15 @@ import { S } from '../../core/settings';
 import { runLoop } from '../../core/engine';
 import { inputFrame, onButton, isPlay, vibrate } from '../../core/input';
 import { IS_PC, IS_TOUCH } from '../../core/app';
-import { icon, toast } from '../../ui/icons';
+import { icon, toast, esc } from '../../ui/icons';
 import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core/perf-meter';
 import { gameSend, onGameMonitor } from '../../ui/game-frame';
 import { buildOffice, officeBlocked, Office, OfficeData } from '../office/build';
 import { buildOps, opsBlocked, opsMonitor, opsClock, Ops } from '../ops/build';
 import { buildLounge, blockedAt, Lounge, DOOR_X, DOOR_W } from '../lounge/build';
 import * as P from '../lounge/pictures';
-import { buildHalls, Halls, COR, CON, STAFF_DOOR, LOUNGE_DOOR, OFFICE_DOOR, OPS_AT, OPS_DOOR } from './concourse';
+import { buildHalls, Halls, COR, CON, STAFF_DOOR, LOUNGE_DOOR, OFFICE_DOOR, OPS_AT, OPS_DOOR, MUSEUM_DOOR } from './concourse';
+import { buildMuseum, museumBlocked, Museum, Exhibit } from './museum';
 
 const EYE = 1.65, SIT = 1.2;
 const LG = { x: 37, z: -7.3 };   // the lounge's middle; turned a quarter so its doors face the concourse
@@ -29,12 +30,14 @@ const B: any = { scene: null as Scene | null };
 const HINTS: { [k: string]: string } = {
   laptop: 'Laptop: open the game at the Overview', planner: 'Monitor: the Flight planner', map: 'Route map: your routes', reports: 'Conduct reports: your crew', phone: 'The phone',
   globe: 'The globe', model: 'A model of one of your aircraft', poster: 'An aviation poster', window: 'The view', monitor: 'Monitor: your schedule', files: 'The archive',
+  piece: 'Take it in your hands', museumdoor: 'The museum',
   chair: 'A chair: sit down', door: 'The door', staffdoor: 'The staff door', shop: 'A shop', seat: 'A seat by the window', board: 'The flight boards',
 };
 onGameMonitor((d: any) => { if (B.scene && B.ops && d.url) opsMonitor(B.ops, d.url); });
 
 /** Where you are: which room, the corridor or the concourse. */
-function where(x: number, z: number): 'office' | 'ops' | 'corridor' | 'concourse' | 'lounge' | '' {
+function where(x: number, z: number): 'office' | 'ops' | 'corridor' | 'concourse' | 'lounge' | 'museum' | '' {
+  const M: Museum = B.museum; if (M && x < CON.x0 && x > CON.x0 - M.D && Math.abs(z - MUSEUM_DOOR.z) < M.W / 2) return 'museum';
   if (x > -3.2 && x < 3.2 && z > -3.2 && z < 3.2) return 'office';
   if (x > OPS_AT.x - 3.0 && x < OPS_AT.x + 3.0 && z > OPS_AT.z - 2.7 && z < OPS_AT.z + 2.7) return 'ops';
   if (x > COR.x0 && x < COR.x1 && z > COR.z0 && z < COR.z1) return 'corridor';
@@ -44,6 +47,8 @@ function where(x: number, z: number): 'office' | 'ops' | 'corridor' | 'concourse
 }
 /** A point of the building in the lounge's own plan (the main game's coordinates: x east, z towards its back wall). */
 function loungeLocal(x: number, z: number): [number, number] { const xl = -(z - LG.z), zl = x - LG.x; return [xl, -zl]; }
+/** A point of the building in the museum's own plan. */
+function museumLocal(x: number, z: number): [number, number] { return [-(z - MUSEUM_DOOR.z), x - (CON.x0 - B.museum.D / 2)]; }
 /** Can you stand there: in a room, the corridor or the concourse, or in a doorway that is open. */
 function walkable(x: number, z: number): boolean {
   const D = B.doors, r = 0.25;
@@ -51,7 +56,9 @@ function walkable(x: number, z: number): boolean {
   if (D.ops.k > 0.6 && x > COR.x1 - 0.5 && x < COR.x1 + 0.6 && z > OPS_DOOR.z0 + 0.1 && z < OPS_DOOR.z1 - 0.1) return true;
   if (D.staff.k > 0.6 && x > STAFF_DOOR.x0 + 0.1 && x < STAFF_DOOR.x1 - 0.1 && z > CON.z1 - 0.6 && z < CON.z1 + 0.6) return true;
   if (D.lounge.k > 0.6 && x > CON.x1 - 0.6 && x < CON.x1 + 0.9 && z > LOUNGE_DOOR.z - DOOR_W / 2 + 0.15 && z < LOUNGE_DOOR.z + DOOR_W / 2 - 0.15) return true;
+  if (D.museum.k > 0.6 && x > CON.x0 - 0.9 && x < CON.x0 + 0.6 && z > MUSEUM_DOOR.z - MUSEUM_DOOR.w / 2 + 0.15 && z < MUSEUM_DOOR.z + MUSEUM_DOOR.w / 2 - 0.15) return true;
   switch (where(x, z)) {
+    case 'museum': { const [mx, mz] = museumLocal(x, z); return !museumBlocked(B.museum, mx, mz); }
     case 'office': return !officeBlocked(B.office, x, z);
     case 'ops': return !opsBlocked(B.ops, x - OPS_AT.x, z - OPS_AT.z);
     case 'corridor': return x > COR.x0 + 0.3 && x < COR.x1 - 0.3 && z > COR.z0 + 0.3 && z < COR.z1 - 0.3;
@@ -120,7 +127,12 @@ const Building: Section = {
     l0 = sc.lights.length; const lounge = buildLounge(sc, (p, s) => progress(40 + p * 0.2, s)); lounge.root.rotation.y = Math.PI / 2; lounge.root.position.set(LG.x, 0, LG.z); B.lounge = lounge; keepLights(sc, l0, lounge.root);
     if (lounge.backdrop) lounge.backdrop.setEnabled(false);
     l0 = sc.lights.length; const halls = buildHalls(sc, (p, s) => progress(p, s), sunK); B.halls = halls; keepLights(sc, l0, halls.root);
-    B.casters = [...office.casters, ...ops.casters, ...lounge.casters, ...halls.casters]; B.metals = [...office.metals, ...ops.metals, ...lounge.metals, ...halls.metals];
+    // the museum, off the concourse's west wall (turned so its doors face the concourse)
+    progress(84, 'Dusting the museum…');
+    const items: Exhibit[] = ((ctx.opts && ctx.opts.data && ctx.opts.data.museum) || []) as Exhibit[]; B.items = items;
+    l0 = sc.lights.length; const museum = buildMuseum(sc, items, D.color, D.color2, D.airline); museum.root.rotation.y = Math.PI / 2; museum.root.position.set(CON.x0 - museum.D / 2, 0, MUSEUM_DOOR.z); B.museum = museum; keepLights(sc, l0, museum.root);
+    museum.root.computeWorldMatrix(true);
+    B.casters = [...office.casters, ...ops.casters, ...lounge.casters, ...halls.casters, ...museum.casters]; B.metals = [...office.metals, ...ops.metals, ...lounge.metals, ...halls.metals, ...museum.metals];
     // the doors
     progress(88, 'Opening the doors…');
     const doorOf = (root: TransformNode) => root.getChildMeshes().filter(m => m.metadata && m.metadata.act === 'door');
@@ -130,13 +142,15 @@ const Building: Section = {
       ops: swingDoor(doorOf(ops.root), new Vector3(COR.x1, 0, OPS_DOOR.z1), 1),
       staff: swingDoor([halls.staffDoor], new Vector3(STAFF_DOOR.x1, 0, CON.z1), -1),
       lounge: { meshes: lounge.leaves, dir: 1, k: 0, to: 0, base: lounge.leaves.map(m => m.position.clone()) },
+      museum: { k: 0, to: 0, leaves: museum.doors.map((m, i) => { const sgn = i === 0 ? -1 : 1, h = Vector3.TransformCoordinates(new Vector3(sgn * MUSEUM_DOOR.w / 2, 0, museum.D / 2), museum.root.getWorldMatrix()); m.computeWorldMatrix(true); m.setPivotPoint(h, Space.WORLD); return { m, sgn }; }) },
     };
     for (const m of doorOf(office.root).concat(doorOf(ops.root))) m.metadata = { act: m.parent === ops.root ? 'opsdoor' : 'officedoor' };
     halls.staffDoor.metadata = { act: 'staffdoor' };
     // where you arrive, always on open floor
-    const spots: { [k: string]: [number, number, number] } = { office: [office.spawn.x + 0.4, office.spawn.z + 0.2, office.spawn.yaw], ops: [OPS_AT.x + 0.7, OPS_AT.z - 1.2, 0], lounge: [CON.x1 + 2.6, LOUNGE_DOOR.z, Math.PI / 2], concourse: [8, -10.2, Math.PI / 2] };
+    const spots: { [k: string]: [number, number, number] } = { museum: [CON.x0 - 2.2, MUSEUM_DOOR.z, -Math.PI / 2], office: [office.spawn.x + 0.4, office.spawn.z + 0.2, office.spawn.yaw], ops: [OPS_AT.x + 0.7, OPS_AT.z - 1.2, 0], lounge: [CON.x1 + 2.6, LOUNGE_DOOR.z, Math.PI / 2], concourse: [8, -10.2, Math.PI / 2] };
     const sp = spots[at] || spots.concourse, [fx, fz] = freeNear(sp[0], sp[1]);
     if (at === 'lounge') B.doors.lounge.k = B.doors.lounge.to = 1;
+    B.hold = null;
     const F = { x: fx, z: fz, yaw: sp[2], pitch: -0.04, v: 0, bob: 0, sit: '' as string }; B.F = F;
     const cam = new UniversalCamera('eyes', new Vector3(F.x, EYE, F.z), sc); cam.minZ = 0.03; cam.maxZ = 260; cam.inertia = 0; B.cam = cam; sc.activeCamera = cam;
     B.glow = new GlowLayer('glow', sc, { mainTextureRatio: IS_PC ? 0.5 : 0.35, blurKernelSize: 40 }); B.glow.intensity = 0.55;
@@ -147,9 +161,16 @@ const Building: Section = {
     const hud = document.createElement('div'); hud.className = 'hud';
     hud.innerHTML = `<div class="aim" hidden></div><div class="of-hint" hidden></div>
       <div class="v3d-top"><button class="v3d-b" data-go="">${icon('back')}<span>Back to the game</span></button><div class="bd-where v3d-info"><b class="v3d-cs"></b></div></div>
+      <button class="v3d-b bd-coll" data-coll="1">${icon('star')}<span>Collection (${items.length})</span></button>
+      <div class="bd-list" hidden><div class="bd-lh"><b>Your collection</b><small>${items.length ? 'Everything you and your airline have been given or earned. Tap one to go to it and hold it.' : 'Nothing yet: gifts from the airports, awards and badges appear here.'}</small></div>
+        <div class="bd-items">${items.map((e, i) => `<button class="bd-it" data-piece="${i}"><b>${esc(e.title)}</b><small>${esc(e.sub)}</small></button>`).join('')}</div></div>
       <div class="ops-bar" hidden>${[['ops', 'Operations'], ['schedule', 'Schedule'], ['dispatch', 'Dispatch'], ['planner', 'Flight planner']].map(([k, l]) => `<button class="v3d-b" data-go="${k}">${l}</button>`).join('')}</div>`;
     ui.appendChild(hud); B.hud = hud; perfAttach(engine, sc, hud); perfShow();
-    hud.addEventListener('click', (e: Event) => { const b = (e.target as HTMLElement).closest('[data-go]') as HTMLElement; if (b && ctx.toGame) ctx.toGame(b.getAttribute('data-go') || ''); });
+    hud.addEventListener('click', (e: Event) => {
+      const t = e.target as HTMLElement, b = t.closest('[data-go]') as HTMLElement; if (b && ctx.toGame) { ctx.toGame(b.getAttribute('data-go') || ''); return; }
+      if (t.closest('[data-coll]')) { const l = hud.querySelector('.bd-list') as HTMLElement; l.hidden = !l.hidden; return; }
+      const pc = t.closest('[data-piece]') as HTMLElement; if (pc) { (hud.querySelector('.bd-list') as HTMLElement).hidden = true; goToPiece(Number(pc.getAttribute('data-piece'))); }
+    });
     toast(IS_TOUCH ? 'Left thumb: walk · Right: drag to look · tap a door to open it' : 'W A S D to walk · click to look with the mouse · E or click a door to open it');
     let down: any = null; const cv = ctx.canvas;
     B.pd = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; };
@@ -174,11 +195,14 @@ const Building: Section = {
       const cp = Math.cos(F.pitch); cam.setTarget(cam.position.add(new Vector3(Math.sin(F.yaw) * cp, Math.sin(F.pitch), Math.cos(F.yaw) * cp)));
       // the lounge's doors slide open as you come up to them, and shut behind you
       const Lg = B.doors.lounge, near = Math.hypot(F.x - CON.x1, F.z - LOUNGE_DOOR.z) < 2.6; Lg.to = near ? 1 : Lg.to === 1 && !near ? 0 : Lg.to;
+      { const Md = B.doors.museum; if (Math.abs(Md.k - Md.to) > 0.001) { Md.k += Math.sign(Md.to - Md.k) * Math.min(Math.abs(Md.to - Md.k), dt * 1.6); const e = Md.k * Md.k * (3 - 2 * Md.k); for (const L of Md.leaves) L.m.rotation.y = L.sgn * e * 1.45; } }
+      // a piece in your hands: it turns slowly
+      if (B.hold) B.hold.node.rotation.y += dt * 0.6;
       for (const k of ['office', 'ops', 'staff', 'lounge']) { const d = B.doors[k]; if (Math.abs(d.k - d.to) > 0.001) { d.k += Math.sign(d.to - d.k) * Math.min(Math.abs(d.to - d.k), dt * (k === 'lounge' ? 2.2 : 1.6)); const e = d.k * d.k * (3 - 2 * d.k);
         if (k === 'lounge') d.meshes.forEach((m: AbstractMesh, i: number) => { const b0: Vector3 = d.base[i], s = b0.x > DOOR_X ? 1 : -1; m.position.x = b0.x + s * e * (DOOR_W / 2 - 0.05); });
         else for (const m of d.meshes) m.rotation.y = d.dir * e * Math.PI * 0.55; } }
       // where you are
-      const w = where(F.x, F.z); if (w && w !== here) { here = w; (hud.querySelector('.bd-where .v3d-cs') as HTMLElement).textContent = ({ office: 'Your office', ops: 'The Operations office', corridor: 'The staff corridor', concourse: 'The concourse', lounge: 'The Business lounge' } as any)[w]; (hud.querySelector('.ops-bar') as HTMLElement).hidden = w !== 'ops'; }
+      const w = where(F.x, F.z); if (w && w !== here) { here = w; (hud.querySelector('.bd-where .v3d-cs') as HTMLElement).textContent = ({ office: 'Your office', ops: 'The Operations office', corridor: 'The staff corridor', concourse: 'The concourse', lounge: 'The Business lounge', museum: 'The museum' } as any)[w]; (hud.querySelector('.ops-bar') as HTMLElement).hidden = w !== 'ops'; }
       if (now > hintT) { hintT = now + 0.15; const h = pick(); const el = hud.querySelector('.of-hint') as HTMLElement; let t = h ? HINTS[h.replace(/^(office|ops)door$/, 'door').replace('loungedoor', 'door')] || '' : ''; if (h === 'chair' && F.sit) t = 'Stand up'; el.hidden = !t || IS_TOUCH; if (t) el.textContent = t; }
       if (now > clockT) { clockT = now + 10; opsClock(ops); }
       if (now > boardT) { boardT = now + 30; for (const b of [...lounge.boards, ...halls.boards]) { P.board(b.c, b.kind); (b.tex.getContext() as any).drawImage(b.c, 0, 0); b.tex.update(true); } }
@@ -195,20 +219,38 @@ const Building: Section = {
   },
   onSettings(what: string) { apply(what === 'preset' ? 'all' : what); },
 };
-function pick(px?: number, py?: number): string {
-  const sc: Scene = B.scene, cv = B.ctx.canvas as HTMLCanvasElement; if (!sc) return '';
+function pick(px?: number, py?: number): string { const m = pickMeta(px, py); return m ? m.act : ''; }
+function pickMeta(px?: number, py?: number): any {
+  const sc: Scene = B.scene, cv = B.ctx.canvas as HTMLCanvasElement; if (!sc) return null;
   const e = sc.getEngine(), x = px != null ? px * (e.getRenderWidth() / cv.clientWidth) : e.getRenderWidth() / 2, y = py != null ? py * (e.getRenderHeight() / cv.clientHeight) : e.getRenderHeight() / 2;
   const hit = sc.pick(x, y, (m: any) => !!(m.metadata && m.metadata.act) && m.isEnabled());
-  return hit && hit.hit && hit.distance < 3.4 && hit.pickedMesh ? (hit.pickedMesh as Mesh).metadata.act : '';
+  return hit && hit.hit && hit.distance < 3.4 && hit.pickedMesh ? (hit.pickedMesh as Mesh).metadata : null;
+}
+/** Take a piece in your hands (in front of you, turning slowly), or put it back on its plinth. */
+function holdPiece(i: number) {
+  const M: Museum = B.museum; if (B.hold) { const h = B.hold; h.node.parent = h.parent; h.node.position.copyFrom(h.pos); h.node.rotation.copyFrom(h.rot); B.hold = null; if (h.i === i) return; }
+  const pc = M && M.pieces[i]; if (!pc) return;
+  B.hold = { i, node: pc.node, parent: pc.node.parent, pos: pc.node.position.clone(), rot: pc.node.rotation.clone() };
+  pc.node.parent = B.cam; pc.node.position.set(0, -0.32, 0.85); pc.node.rotation.set(0.15, 0, 0);
+  toast(`${pc.e.title} · ${pc.e.sub}`);
+}
+/** From the Collection list: to the piece (into the museum if you are elsewhere), facing it, and into your hands. */
+function goToPiece(i: number) {
+  const M: Museum = B.museum, pc = M && M.pieces[i], F = B.F; if (!pc) return;
+  M.root.computeWorldMatrix(true); const w = Vector3.TransformCoordinates(pc.at, M.root.getWorldMatrix()), p = Vector3.TransformCoordinates(pc.node.position, M.root.getWorldMatrix());
+  F.sit = ''; const [x, z] = freeNear(w.x, w.z); F.x = x; F.z = z; F.yaw = Math.atan2(p.x - x, p.z - z); F.pitch = -0.25;
+  if (B.hold) holdPiece(B.hold.i); holdPiece(i);
 }
 function use(px?: number, py?: number) {
-  const a = pick(px, py), F = B.F, ctx: SectionCtx = B.ctx; if (!a) return;
+  const a = pick(px, py), F = B.F, ctx: SectionCtx = B.ctx; if (!a) { if (B.hold) holdPiece(B.hold.i); return; }
   const toGame = (screen: string) => { if (ctx.toGame) ctx.toGame(screen); };
   const door = (k: string) => { const d = B.doors[k]; d.to = d.to > 0.5 ? 0 : 1; vibrate(60, 0.2, 0.3); };
   if (a === 'officedoor') return door('office');
   if (a === 'opsdoor') return door('ops');
   if (a === 'staffdoor') return door('staff');
   if (a === 'loungedoor') return door('lounge');
+  if (a === 'museumdoor') { const d = B.doors.museum; d.to = d.to > 0.5 ? 0 : 1; vibrate(60, 0.2, 0.3); return; }
+  if (a === 'piece') { const m = pickMeta(px, py); if (m) holdPiece(m.i); return; }
   if (a === 'chair') { const w = where(F.x, F.z); if (F.sit) { F.sit = ''; if (w === 'office' || F.x < 3.2 && F.z < 3.2 && F.z > -3.2) { F.x = B.office.seat.x + 0.7; F.z = B.office.seat.z - 0.3; } else { F.x = OPS_AT.x + 0.7; F.z = OPS_AT.z + B.ops.seat.z - 0.4; } return; }
     F.sit = w === 'ops' ? 'ops' : 'office'; F.yaw = F.sit === 'office' ? B.office.seat.yaw : B.ops.seat.yaw; F.pitch = -0.2; return; }
   if (a === 'laptop') return toGame('ops');

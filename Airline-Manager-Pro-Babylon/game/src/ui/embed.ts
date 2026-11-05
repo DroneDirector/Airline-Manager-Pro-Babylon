@@ -57,7 +57,14 @@ if (EMBED) {
         reports: (((State as any).incidents || []) as any[]).filter(x => x && x.status !== 'closed').length };
     } catch (e) { return {}; }
   };
-  const building = (at: string) => { try { saveNow(true); } catch (e) { /* saved */ } embedTell('room', { room: 'building', at, data: officeData() }); };
+  // what stands in the museum: every gift and award received, and the best badges (as on the main game's museum)
+  const museumData = (): any[] => {
+    const out: any[] = [];
+    try { for (const ex of (giftsAll() as any[]).slice(0, 40)) { const A: any = apt(ex.icao) || { name: ex.icao }; for (const it of ex.received || []) out.push({ title: it.name, sub: ex.cat === 'career' ? 'Awarded ' + dateStr(new Date(ex.at)).slice(0, 10) : 'From ' + A.name, kind: it.kind || 'frame', color: it.color, lines: it.lines }); } } catch (e) { /* none */ }
+    try { const earned = ((State as any).badges || {}) as any; for (const b of badgeDefs().filter(b => earned[b.id]).sort((a, b) => b.tier - a.tier || earned[b.id] - earned[a.id]).slice(0, 12)) out.push({ title: b.title, sub: TIER_NAMES[b.tier] + ' badge', kind: 'badge', tier: b.tier }); } catch (e) { /* none */ }
+    return out.slice(0, 36);
+  };
+  const building = (at: string) => { try { saveNow(true); } catch (e) { /* saved */ } embedTell('room', { room: 'building', at, data: Object.assign(officeData(), { museum: museumData() }) }); };
   OfficeRoom.open = () => building('office');
   OpsRoom.open = () => building('ops');
   LoungeRoom.open = () => building('lounge');
@@ -65,6 +72,8 @@ if (EMBED) {
   ACTIONS['ops-room'] = () => { closeAll(); building('ops'); };
   ACTIONS['lounge-visit'] = () => { closeAll(); building('lounge'); };
   ACTIONS['airport-open'] = () => { closeAll(); building('concourse'); };
+  ACTIONS['mus-open'] = () => { closeAll(); building('museum'); };
+  W.museumOpen = () => building('museum');
   // the Operations monitor: drawn here, shown there
   let monT: any = 0; const monCv = document.createElement('canvas'); monCv.width = 2048; monCv.height = Math.round(2048 * 0.32 / 1.08);
   const monSend = () => { try { opsMonitorDraw({ monCv, monTex: {} }); embedTell('monitor', { url: monCv.toDataURL('image/jpeg', 0.88) }); } catch (e) { /* the next time */ } };
@@ -80,7 +89,7 @@ if (EMBED) {
   };
   ACTIONS['hangar-visit'] = (el: HTMLElement) => { const g = (k: string) => el && el.getAttribute ? el.getAttribute(k) || '' : ''; closeAll(); HangarRoom.open(g('data-reg'), g('data-base'), g('data-size')); };
   const rooms: [any, string][] = [[CourtRoom, 'The courtroom'],
-    [Museum, 'The museum'], [Salute, 'The water salute'], [TestRooms, 'The test rooms']];
+    [Salute, 'The water salute'], [TestRooms, 'The test rooms']];
   for (const [R, name] of rooms) if (R) R.open = soon(name);
   for (const a of ['photo-mode']) if (typeof (ACTIONS as any)[a] === 'function') (ACTIONS as any)[a] = soon('This 3D place');
   // the 3D view of a flight: the edition's 3D viewer follows it, live. This page keeps running behind it (the airline,
