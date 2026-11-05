@@ -4605,3 +4605,10 @@ body.scn-set-on .fg-mon { z-index: 1201; }
 .ts-panel-only .ts .ts-cv, .ts-panel-only .ts .ts-fx, .ts-panel-only .ts .ts-left, .ts-panel-only .ts .ts-cap, .ts-panel-only .ts .ts-ver, .ts-panel-only .ts .ts-mute, .ts-panel-only .ts .ts-tap, .ts-panel-only .ts .ts-nav { display: none !important; }
 .ts-panel-only .ts { background: radial-gradient(ellipse at 30% 20%, rgba(255, 63, 184, .16), transparent 60%), radial-gradient(ellipse at 80% 90%, rgba(53, 240, 255, .12), transparent 60%), #05030c !important; }
 .ts-panel-only .ts .ts-panel { left: 50%; right: auto; width: min(640px, 92vw); margin-left: calc(min(640px, 92vw) / -2); }
+
+/* the Babylon.js edition: a hearing drawn over the edition's own 3D hall (the page is see-through) */
+html.court-over, html.court-over body { background: transparent !important; }
+html.court-over #app { visibility: hidden !important; }
+.court3d.over { background: transparent; }
+.court3d.over .ct-drag { position: absolute; inset: 0; touch-action: none; cursor: grab; }
+.court3d.over .ct-drag:active { cursor: grabbing; }

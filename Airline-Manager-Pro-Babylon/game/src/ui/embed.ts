@@ -95,8 +95,8 @@ if (EMBED) {
     } catch (e) { embedTell('room', { room: 'hangar', data: {} }); }
   };
   ACTIONS['hangar-visit'] = (el: HTMLElement) => { const g = (k: string) => el && el.getAttribute ? el.getAttribute(k) || '' : ''; closeAll(); HangarRoom.open(g('data-reg'), g('data-base'), g('data-size')); };
-  const rooms: [any, string][] = [[CourtRoom, 'The courtroom'],
-    [TestRooms, 'The test rooms']];
+  const rooms: [any, string][] = [[TestRooms, 'The test rooms']];
+  courtEmbed(W);
   for (const [R, name] of rooms) if (R) R.open = soon(name);
   for (const a of ['photo-mode']) if (typeof (ACTIONS as any)[a] === 'function') (ACTIONS as any)[a] = soon('This 3D place');
   // the 3D view of a flight: the edition's 3D viewer follows it, live. This page keeps running behind it (the airline,
@@ -143,5 +143,107 @@ if (EMBED) {
       const out = (L: any) => { if (L) embedTell('airport', { icao: d.icao, L: Object.assign({}, L, { alt: L.alt || elev }) }); };
       try { AirportLayouts.get(d.icao, out).then(out).catch(() => embedTell('airport', { icao: d.icao, L: null })); } catch (e) { embedTell('airport', { icao: d.icao, L: null }); }
     }
+  });
+}
+
+/* ---------- the courtroom on Babylon.js ----------
+ * The empty courtroom is the edition's own: you walk about it there. In a hearing, this page keeps running it (every
+ * line, your answers, your lawyer's objections, the verdict) and its dialogue box, the exhibits and Leave court stay
+ * here, drawn over the edition's hall: the page goes see-through, and tells the edition who is speaking, who stands
+ * and who sits, who is in the witness box and what is on the court's screens. The edition draws the hall, the people
+ * and the camera on whoever speaks; dragging here looks round there. */
+/** The seats, as the edition has them (src/sections/court/seats.ts): every one with its id. */
+function courtSeatsData(judges: number): any {
+  const A: any = { seats: {} }, dais = 0.75, bw = judges > 3 ? 9.8 : 7.4, fz = -6.6 + 0.85, BAR = 1.6;
+  A.seats.judge = []; for (let i = 0; i < judges; i++) A.seats.judge.push({ id: 'judge' + i, x: (i - (judges - 1) / 2) * (bw / judges) * 0.95, y: dais, z: fz - 0.95, yaw: 0, sit: 1 });
+  A.seats.clerk = { id: 'clerk', x: 0, y: 0, z: fz + 1.25 - 0.55, yaw: 0, sit: 1 };
+  const wr = -0.55; A.seats.witness = { id: 'witness', x: 5.0 - 0.22 * Math.sin(wr), y: 0.3, z: -4.8 - 0.22 * Math.cos(wr), yaw: wr, sit: 1 };
+  A.seats.pros = [-4.2, -2.8].map((x, i) => ({ id: 'pros' + i, x, y: 0, z: -1.15 + 0.98, yaw: Math.PI, sit: 1 }));
+  A.seats.def = [2.8, 4.2].map((x, i) => ({ id: 'def' + i, x, y: 0, z: -1.15 + 0.98, yaw: Math.PI, sit: 1 }));
+  A.seats.fam = { id: 'fam', x: -6.3, y: 0, z: 0.9, yaw: Math.PI, sit: 1 };
+  A.police = [{ x: -2.1, z: 10.5 - 0.7, yaw: Math.PI }, { x: 2.1, z: 10.5 - 0.7, yaw: Math.PI }, { x: 6.9, z: -2.4, yaw: -Math.PI / 2 - 0.25 }].map((p, i) => Object.assign(p, { id: 'police' + i, y: 0, sit: 0 }));
+  A.seats.pub = [];
+  for (let r = 0; r < 7; r++) { const hz = BAR + 1.2 + r * 1.02; for (const s of [-1, 1]) { const xa = s * 1.0, len = 6.3, n = Math.floor(len / 0.62); for (let i = 0; i < n; i++) A.seats.pub.push({ id: 'pub' + A.seats.pub.length, x: xa + s * (0.42 + i * (len - 0.6) / (n - 1)), y: 0, z: hz, yaw: Math.PI, sit: 1, row: r, side: s, i }); } }
+  A.screens = { cv: [], tex: [] }; A.root = null; return A;
+}
+function courtEmbed(W: any) {
+  const R = CourtRoom; let snapT: any = 0, last = '', readyThen: (() => void) | null = null, casting = false;
+  // the people are data here (the edition draws them): while they come in, a person is just who and where
+  const HB = Human.build, hb = Object.getOwnPropertyDescriptor(Human, 'ready');
+  try { Object.defineProperty(Human, 'ready', { configurable: true, get: () => casting || !!(hb && hb.get ? hb.get.call(Human) : false) }); } catch (e) { /* as it is */ }
+  (Human as any).build = function (...a: any[]) { return casting ? { top: 1.7 } : (HB as any).apply(Human, a); };
+  W.ctPlace = (it: any, m: any) => {
+    const p = Object.assign(it, { m: m || { top: 1.7 }, pivot: { visible: !it.hidden }, holder: {}, sitK: it.seat.sit, wantSit: it.seat.sit, ph: 0, g: null, gazeYaw: 0 });
+    R.people[it.key] = p; if (it.crowd || /^relative|^press/.test(it.key)) R.crowd.push(p);
+  };
+  W.ctShotOf = (key: string) => { R.shotKey = key || ''; };
+  W.ctFrame = () => { /* drawn by the edition */ };
+  const ownEx = W.ctExhibit; W.ctExhibit = (ex: any) => { try { ownEx(ex); } catch (e) { /* the box */ } embedTell('court', { ex }); };
+  /** Everyone is in: the edition builds the hall with them in it, then the hearing starts. */
+  W.ctLoaded = (then?: () => void) => {
+    casting = false; if (!R.on) return; readyThen = then || null;
+    const people = Object.keys(R.people).map(k => { const p = R.people[k], L = p.look || {}; return { key: k, seat: p.seat.id, sex: p.sex || L.sex || 'm', name: p.name, title: p.title, vis: p.pivot.visible ? 1 : 0, sit: p.wantSit,
+      look: { skin: L.skin, hair: L.hair, hairColor: L.hairColor, top: L.top, uniform: L.uniform, glasses: L.glasses } }; });
+    const co: any = company(R.c.companyId);
+    embedTell('room', { room: 'court', data: { mode: 'hearing', judges: R.judges, courtName: R.courtName, title: R.title, people, color: co.color, color2: co.color2 } });
+  };
+  const send = () => {
+    if (!R.on || !R.people) return;
+    const now = (performance.now() - R.t0) / 1000, ps: any = {};
+    for (const k in R.people) { const p = R.people[k]; ps[k] = [p.pivot.visible ? 1 : 0, p.wantSit]; }
+    let talk = false; const sp = R.speaker ? R.people[R.speaker] : null;
+    if (sp) { try { talk = R.talkUntil > now || humanVoiceOn(R.speaker === 'you' ? 'me' : sp.name); } catch (e) { talk = R.talkUntil > now; } }
+    const st = { sp: R.speaker || '', shot: R.shotKey == null ? R.speaker || '' : R.shotKey, talk, ps, mourn: !!R.mourn };
+    const j = JSON.stringify(st); if (j !== last) { last = j; embedTell('court', { st }); }
+  };
+  CourtRoom.open = function (c: any, st: any) {
+    if (R.on) R.close(true);
+    try { saveNow(true); } catch (e) { /* saved */ }
+    const empty = !c, co: any = company(c ? c.companyId : State.companyId), hub: any = apt(co.hub), appeal = !!st && st.key === 'hearA', judges = appeal ? 5 : 3;
+    const courtName = c ? (appeal ? c.court.replace(/District Court|Crown Court/, 'Court of Appeal') : c.court) : `The District Court in ${hub ? hub.city : 'town'}`;
+    if (empty) { embedTell('room', { room: 'court', data: { mode: 'empty', courtName, color: co.color, color2: co.color2 } }); return; }
+    R.empty = false; R.keys = {}; R.stick = [0, 0]; R.on = true; R.c = c; R.st = st; R.key = st.key; R.lines = hearingScript(c, st.key); R.i = -1; R.answered = []; R.finished = false; R.objected = false;
+    R.judges = judges; R.courtName = courtName; R.title = co.name + ': ' + st.title; R.shotKey = null; R.speaker = null; R.mourn = false; R.look = { yaw: 0, pitch: 0 };
+    R.A = courtSeatsData(judges); R.people = {}; R.crowd = []; R.t0 = performance.now(); R.loadT0 = R.t0; last = '';
+    const root = document.createElement('div'); root.className = 'court3d over'; root.hidden = true; R.root = root;
+    root.innerHTML = `<div class="ct-drag"></div>
+      <div class="ct-top"><div><small>${esc(courtName)}</small><b>${esc(R.title)}</b></div></div>
+      <button class="ct-leave" data-ct="leave">${icon('close')}<span>Leave court</span><kbd>Esc</kbd></button>
+      <div class="ct-ex" hidden></div><div class="ct-rate" hidden></div>
+      <div class="ct-box" hidden><div class="box-grip" title="Drag to move the window (double-click to put it back)"><i></i></div><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
+      <div class="ct-modal" hidden></div>`;
+    document.body.appendChild(root);
+    root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-ct]') as HTMLElement; if (b) ctClick(b); });
+    try { roomBoxDrag(root, 'court'); } catch (e) { /* fixed */ }
+    // dragging the view looks round in the edition's hall
+    const dg = root.querySelector('.ct-drag') as HTMLElement; let drag: any = null;
+    dg.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY }; dg.setPointerCapture(e.pointerId); embedTell('court', { look: 'down' }); });
+    dg.addEventListener('pointermove', e => { if (!drag) return; embedTell('court', { look: [(e.clientX - drag.x) * 0.004, (e.clientY - drag.y) * 0.003] }); drag = { x: e.clientX, y: e.clientY }; });
+    const up = () => { if (drag) embedTell('court', { look: 'up' }); drag = null; }; dg.addEventListener('pointerup', up); dg.addEventListener('pointercancel', up);
+    R.key$ = (e: KeyboardEvent) => {
+      if (!R.on) return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); const m = root.querySelector('.ct-modal') as HTMLElement; if (!m.hidden) { m.hidden = true; return; } ctLeaveAsk(); }
+      else if ((e.key === 'Enter' || e.key === ' ') && (root.querySelector('.ct-modal') as HTMLElement).hidden) { const n = root.querySelector('.ct-ctl .btn.primary') as HTMLElement; if (n) { e.preventDefault(); n.click(); } }
+    };
+    window.addEventListener('keydown', R.key$, true);
+    casting = true; ctCast(c, st, judges, 1);
+  };
+  CourtRoom.close = function (quiet?: boolean) {
+    if (!R.on) return; R.on = false; casting = false; clearInterval(snapT); readyThen = null;
+    window.removeEventListener('keydown', R.key$, true);
+    try { Voice.stop(); } catch (e) { /* quiet */ }
+    if (R.root) R.root.remove(); R.people = {}; R.crowd = [];
+    document.documentElement.classList.remove('court-over');
+    embedTell('court', { end: true });
+    if (!quiet) { try { refresh(); if (R.c) courtPopup(R.c.id); } catch (e) { /* ignore */ } }
+  };
+  // the edition's hall is up: in we go
+  window.addEventListener('message', (e: MessageEvent) => {
+    const d: any = e.data; if (!d || d.ampb !== 'court' || !R.on) return;
+    if (d.ready) {
+      document.documentElement.classList.add('court-over'); R.root.hidden = false; try { (document.activeElement as any)?.blur?.(); window.focus(); } catch (x) { /* focus later */ }
+      clearInterval(snapT); snapT = setInterval(send, 120); send();
+      const t = readyThen; readyThen = null; if (t) setTimeout(t, 500);
+    } else if (d.leave) ctLeaveAsk();
   });
 }

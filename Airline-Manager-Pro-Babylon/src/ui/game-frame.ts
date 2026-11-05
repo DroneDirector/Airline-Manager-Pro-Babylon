@@ -5,7 +5,14 @@
 let frame: HTMLIFrameElement | null = null;
 let handlers: { title: () => void; exit: () => void; viewer: (id: string) => void } | null = null;
 const flightSubs: ((d: any) => void)[] = [], airportSubs: ((d: any) => void)[] = [];
-const roomSubs: ((d: any) => void)[] = [], monSubs: ((d: any) => void)[] = [];
+const roomSubs: ((d: any) => void)[] = [], monSubs: ((d: any) => void)[] = [], courtSubs: ((d: any) => void)[] = [];
+/** A hearing in the courtroom, as the game runs it: who speaks, who stands, the exhibits, looking round, the end. */
+export function onGameCourt(f: (d: any) => void) { courtSubs.push(f); }
+/** The game over the 3D place, see-through (a hearing: its dialogue box over the edition's hall), or not. */
+export function gameOverlay(on: boolean) {
+  if (!frame) return; frame.classList.toggle('over', on);
+  if (on) { frame.classList.remove('away'); document.body.classList.add('game-on'); setTimeout(() => { try { frame && frame.focus(); } catch (e) { /* later */ } }, 100); }
+}
 /** The Operations monitor's picture, drawn by the game every few seconds. */
 export function onGameMonitor(f: (d: any) => void) { monSubs.push(f); }
 /** A 3D place the game asks for (your office…): the game goes out of sight and waits behind it. */
@@ -18,7 +25,7 @@ export function onGameFlight(f: (d: any) => void) { flightSubs.push(f); }
 export function gameSend(m: any) { try { if (frame && frame.contentWindow) frame.contentWindow.postMessage(m, '*'); } catch (e) { /* gone */ } }
 /** The game out of sight, still running (its airline, schedules and flights go on): the 3D viewer is in front. */
 export function gameHide() { if (frame) { frame.classList.add('away'); document.body.classList.remove('game-on'); } }
-export function gameShow() { if (frame) { gameSend({ ampb: 'stop' }); frame.classList.remove('away'); document.body.classList.add('game-on'); setTimeout(() => { try { frame && frame.focus(); } catch (e) { /* later */ } }, 200); } }
+export function gameShow() { if (frame) { gameSend({ ampb: 'stop' }); frame.classList.remove('away', 'over'); document.body.classList.add('game-on'); setTimeout(() => { try { frame && frame.focus(); } catch (e) { /* later */ } }, 200); } }
 export function gameHidden(): boolean { return !!frame && frame.classList.contains('away'); }
 
 export function gameOpen(act: 'new' | 'continue' | 'load' | 'save' | 'ui', on: { title: () => void; exit: () => void; viewer: (id: string) => void }) {
@@ -44,6 +51,7 @@ window.addEventListener('message', (e: MessageEvent) => {
   else if (d.amp === 'exit') h.exit();
   else if (d.amp === 'viewer3d') { if (d.id) { gameHide(); h.viewer(d.id); } else { gameClose(); h.viewer(''); } }
   else if (d.amp === 'room') { gameHide(); for (const f of roomSubs) { try { f(d); } catch (err) { console.error(err); } } }
+  else if (d.amp === 'court') { for (const f of courtSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'monitor') { for (const f of monSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'airport') { for (const f of airportSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'flight') { for (const f of flightSubs) { try { f(d); } catch (err) { console.error(err); } } }
