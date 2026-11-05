@@ -5,6 +5,7 @@
 // the aircraft has flown on. Loaded over the internet as needed; without it the plain land and sea stay.
 import { Scene, Mesh, MeshBuilder, TransformNode, PBRMaterial, Texture, VertexBuffer, Color3 } from '@babylonjs/core';
 import { IS_PC } from '../../core/app';
+import { flatHeight } from '../../core/flatten';
 
 const HEIGHT_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/';
 const SAT_URL = 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/';
@@ -52,7 +53,9 @@ export function buildTerrain(sc: Scene, lat: number, lon: number, onReady?: () =
         const u = uv[v * 2], w = uv[v * 2 + 1], lo = lo0 + (lo1 - lo0) * u, la = la0 + (la1 - la0) * w;
         const e = (lo - lon) * kx, n = (la - lat) * kz;
         let h = 0; if (H) { const px = Math.min(255, Math.floor(u * 255.999)), py = Math.min(255, Math.floor(w * 255.999)); h = Math.max(-2, H[py * 256 + px]); }
-        p[v * 3] = e; p[v * 3 + 1] = h - (e * e + n * n) / (2 * R) - 1.2; p[v * 3 + 2] = n;
+        // levelled under anything placed in the world (core/flatten)
+        const fz = flatHeight(la, lo, h); h = fz.h;
+        p[v * 3] = e; p[v * 3 + 1] = h - (e * e + n * n) / (2 * R) * (1 - fz.k) - 1.2 * (1 - fz.k); p[v * 3 + 2] = n;
       }
       m.updateVerticesData(VertexBuffer.PositionKind, p); m.refreshBoundingInfo(); m.createNormals(true); m.setEnabled(true);
       // the picture from the satellites (EOX's tiles count rows from the top, as the heights do)

@@ -15,6 +15,7 @@ import { toast } from '../../ui/icons';
 import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core/perf-meter';
 import { buildAirliner, setGear } from '../viewer3d/airliner';
 import { makeWeather, Weather } from '../terminal/weather';
+import { addFlatZone, clearFlatZones, flatHeight, onFlatChange, zoneForModel } from '../../core/flatten';
 
 const D2R = Math.PI / 180, R = 6371000, HEIGHT_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/';
 /** The sites: the airport's reference point (the middle between the runways), the runways' true heading (the gates
@@ -56,11 +57,16 @@ async function loadArea(z: number, lat: number, lon: number, halfM: number, prog
 }
 
 // ---- the ground: a grid of heights, coloured by height and slope, with a fine detail texture ----
-function groundMesh(sc: Scene, site: any, half: number, n: number, z: number, elev: number, flat: (e: number, nn: number) => number, detail: Texture, sink = 0) {
+function groundMesh(sc: Scene, site: any, half: number, n: number, z: number, detail: Texture, sink = 0, hole = 0) {
   const lat0 = site.lat, lon0 = site.lon, kx = 111320 * Math.cos(lat0 * D2R), kz = 110540, step = half * 2 / n;
+  const raw = new Float32Array((n + 1) * (n + 1));
+  for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) { const e = -half + i * step, nn = -half + j * step; let h = hAt(z, lat0 + nn / kz, lon0 + e / kx); if (h == null) h = hAt(11, lat0 + nn / kz, lon0 + e / kx) ?? 0; raw[j * (n + 1) + i] = h; }
+  const m = new Mesh('ground', sc), mat = new PBRMaterial('groundM', sc); mat.albedoTexture = detail; mat.metallic = 0; mat.roughness = 0.95; mat.environmentIntensity = 0.35; m.useVertexColors = true; m.material = mat; m.isPickable = false; m.receiveShadows = true; m.renderingGroupId = 1;
+  /** Lay the ground out (again): its own heights, levelled under every flat zone (core/flatten), coloured by height and slope. */
+  const layout = () => {
   const pos: number[] = [], col: number[] = [], uv: number[] = [], idx: number[] = [], hs = new Float32Array((n + 1) * (n + 1)), fl = new Float32Array((n + 1) * (n + 1));
-  for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) { const e = -half + i * step, nn = -half + j * step; let h = hAt(z, lat0 + nn / kz, lon0 + e / kx); if (h == null) h = hAt(11, lat0 + nn / kz, lon0 + e / kx) ?? 0;
-    const f = flat(e, nn); h = h * (1 - f) + elev * f; hs[j * (n + 1) + i] = Math.max(-25, h); fl[j * (n + 1) + i] = f; }
+  for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) { const e = -half + i * step, nn = -half + j * step, q = j * (n + 1) + i, f = flatHeight(lat0 + nn / kz, lon0 + e / kx, raw[q]);
+    hs[q] = Math.max(-25, f.h); fl[q] = f.k; }
   let s = 17; const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
   const C = (hx: string) => Color3.FromHexString(hx), SAND = site.low === 'sand' ? C('#2E2D2E') : C('#5D6B3A'), MOSS = site.low === 'sand' ? C('#5E7238') : C('#3F5A2C'), GRASS = site.low === 'sand' ? C('#7C8A4A') : C('#4F6B33'),
     ROCK = C('#5B554E'), ROCK2 = C('#3F3B37'), SCREE = C('#7A746B'), SNOW = C('#F2F5F8'), ICE = C('#DCE6EE'), WET = C('#1E2A30');
@@ -68,7 +74,7 @@ function groundMesh(sc: Scene, site: any, half: number, n: number, z: number, el
     const e = -half + i * step, nn = -half + j * step, h = hs[j * (n + 1) + i], d2 = e * e + nn * nn;
     const hl = hs[j * (n + 1) + Math.max(0, i - 1)], hr = hs[j * (n + 1) + Math.min(n, i + 1)], hd = hs[Math.max(0, j - 1) * (n + 1) + i], hu = hs[Math.min(n, j + 1) * (n + 1) + i];
     const sl = Math.min(1, Math.hypot(hr - hl, hu - hd) / (2 * step)), nz = rnd();
-    pos.push(e, h - d2 / (2 * R) * (1 - fl[j * (n + 1) + i]) - sink, nn); uv.push(e / 40, nn / 40);
+    pos.push(e, h - d2 / (2 * R) * (1 - fl[j * (n + 1) + i]) - (hole && Math.abs(e) < hole && Math.abs(nn) < hole ? sink : 0), nn); uv.push(e / 40, nn / 40);
     let c: Color3;
     if (h < 0.6) c = WET; else {
       const low = site.low === 'sand' ? (h < 140 ? SAND : Color3.Lerp(SAND, MOSS, Math.min(1, (h - 140) / 200))) : Color3.Lerp(GRASS, MOSS, Math.min(1, h / 500));
@@ -82,9 +88,9 @@ function groundMesh(sc: Scene, site: any, half: number, n: number, z: number, el
   }
   // the triangles wound so their fronts face up (the top of the land is what is drawn)
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const a = j * (n + 1) + i, b = a + n + 1; idx.push(a, a + 1, b, a + 1, b + 1, b); }
-  const m = new Mesh('ground', sc), vd = new VertexData(), nr: number[] = []; VertexData.ComputeNormals(pos, idx, nr); vd.positions = pos; vd.indices = idx; vd.normals = nr; vd.colors = col; vd.uvs = uv; vd.applyToMesh(m);
-  const mat = new PBRMaterial('groundM', sc); mat.albedoTexture = detail; mat.metallic = 0; mat.roughness = 0.95; mat.environmentIntensity = 0.35; (mat as any).useVertexColors = true; m.useVertexColors = true;
-  m.material = mat; m.isPickable = false; m.receiveShadows = true; m.renderingGroupId = 1; return { m, hs };
+  const vd = new VertexData(), nr: number[] = []; VertexData.ComputeNormals(pos, idx, nr); vd.positions = pos; vd.indices = idx; vd.normals = nr; vd.colors = col; vd.uvs = uv; vd.applyToMesh(m, true); s = 17;
+  };
+  layout(); return { m, layout };
 }
 
 // ---- the airport ----
@@ -93,8 +99,8 @@ function airport(sc: Scene, site: any, elev: number, casters: AbstractMesh[]) {
   const mat = (hex: string, rough = 0.6, metal = 0) => { const m = new PBRMaterial('am', sc); m.albedoColor = Color3.FromHexString(hex); m.roughness = rough; m.metallic = metal; return m; };
   const tex = (draw: (x: CanvasRenderingContext2D, w: number, h: number) => void, w = 512, h = 512) => { const t = new DynamicTexture('at', { width: w, height: h }, sc, true); draw(t.getContext() as any, w, h); t.update(); t.wrapU = t.wrapV = Texture.WRAP_ADDRESSMODE; t.anisotropicFilteringLevel = 8; return t; };
   const noise = (base: string, amt: number) => tex((x, w, h) => { x.fillStyle = base; x.fillRect(0, 0, w, h); for (let i = 0; i < 26000; i++) { const v = Math.random() - 0.5; x.fillStyle = v > 0 ? `rgba(255,255,255,${v * amt})` : `rgba(0,0,0,${-v * amt})`; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); } });
-  const asphalt = new PBRMaterial('asphalt', sc); asphalt.albedoTexture = noise('#34373B', 0.3); asphalt.roughness = 0.85; const concrete = new PBRMaterial('concrete', sc); concrete.albedoTexture = noise('#A9A8A3', 0.18); concrete.roughness = 0.85;
-  const white = mat('#F2F3F5', 0.5), yellow = mat('#E7B92E', 0.5), glass = mat('#2E4252', 0.08, 0.5), roofW = mat('#F4F6F8', 0.2), timber = mat('#B87443', 0.6), steel = mat('#9AA2AC', 0.35, 0.6);
+  const asphalt = new PBRMaterial('asphalt', sc); asphalt.albedoTexture = noise('#34373B', 0.3); asphalt.roughness = 0.85; asphalt.zOffset = -2; const concrete = new PBRMaterial('concrete', sc); concrete.albedoTexture = noise('#A9A8A3', 0.18); concrete.roughness = 0.85; concrete.zOffset = -1;
+  const white = mat('#F2F3F5', 0.5), yellow = mat('#E7B92E', 0.5), glass = mat('#2E4252', 0.08, 0.5), roofW = mat('#F4F6F8', 0.2), timber = mat('#B87443', 0.6), steel = mat('#9AA2AC', 0.35, 0.6); yellow.zOffset = -4; const mark = mat('#F2F3F5', 0.5); mark.zOffset = -4;
   const part: Mesh[] = [];
   const box = (w: number, h: number, d: number, m: any, u: number, y: number, v: number, cast = false, ry = 0) => { const b = MeshBuilder.CreateBox('ab', { width: w, height: h, depth: d }, sc); b.position.set(u, y, v); b.rotation.y = ry; b.material = m; b.parent = root; b.receiveShadows = true; b.renderingGroupId = 1; b.isPickable = false; if (cast) casters.push(b); part.push(b); return b; };
   const pave = (u0: number, v0: number, u1: number, v1: number, m: any, y = 0.05, uvk = 30) => { const g = MeshBuilder.CreateGround('ap', { width: u1 - u0, height: v1 - v0 }, sc); g.position.set((u0 + u1) / 2, y, (v0 + v1) / 2); g.material = m; g.parent = root; g.receiveShadows = true; g.renderingGroupId = 1; g.isPickable = false;
@@ -103,12 +109,12 @@ function airport(sc: Scene, site: any, elev: number, casters: AbstractMesh[]) {
   const numTex = (t: string) => { const d = tex((x, w, h) => { x.clearRect(0, 0, w, h); x.fillStyle = '#F2F3F5'; x.font = '700 300px Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(t, w / 2, h / 2); }, 512, 512); d.hasAlpha = true; const m = new StandardMaterial('num', sc); m.diffuseTexture = d; m.useAlphaFromDiffuseTexture = true; m.specularColor = Color3.Black(); return m; };
   for (const [v, side] of [[RWY.vA, 'R'], [RWY.vB, 'L']] as [number, string][]) {
     pave(-RWY.len / 2 - 60, v - RWY.wid / 2 - 7, RWY.len / 2 + 60, v + RWY.wid / 2 + 7, asphalt, 0.06);
-    for (const s of [-1, 1]) box(RWY.len, 0.02, 0.9, white, 0, 0.08, v + s * (RWY.wid / 2 - 1));
-    for (let u = -RWY.len / 2 + 400; u < RWY.len / 2 - 400; u += 50) box(30, 0.02, 0.9, white, u, 0.08, v);
+    for (const s of [-1, 1]) box(RWY.len, 0.02, 0.9, mark, 0, 0.08, v + s * (RWY.wid / 2 - 1));
+    for (let u = -RWY.len / 2 + 400; u < RWY.len / 2 - 400; u += 50) box(30, 0.02, 0.9, mark, u, 0.08, v);
     for (const end of [-1, 1]) { const uE = end * (RWY.len / 2 - 12);
-      for (let k = 0; k < 16; k++) { const off = -RWY.wid / 2 + 3 + k * 3.6 + (k >= 8 ? 2.4 : 0); box(30, 0.02, 1.8, white, uE - end * 15, 0.08, v + off); }
-      for (const d of [150, 300, 450]) for (const s of [-1, 1]) box(22, 0.02, 3, white, uE - end * (d + 11), 0.08, v + s * 9);
-      for (const s of [-1, 1]) box(45, 0.02, 10, white, uE - end * 400, 0.08, v + s * 11);
+      for (let k = 0; k < 16; k++) { const off = -RWY.wid / 2 + 3 + k * 3.6 + (k >= 8 ? 2.4 : 0); box(30, 0.02, 1.8, mark, uE - end * 15, 0.08, v + off); }
+      for (const d of [150, 300, 450]) for (const s of [-1, 1]) box(22, 0.02, 3, mark, uE - end * (d + 11), 0.08, v + s * 9);
+      for (const s of [-1, 1]) box(45, 0.02, 10, mark, uE - end * 400, 0.08, v + s * 11);
       const nm = end < 0 ? site.rwy[0] : site.rwy[1], sd = end < 0 ? (side === 'L' ? 'L' : 'R') : (side === 'L' ? 'R' : 'L');
       const p = MeshBuilder.CreatePlane('rn', { width: 18, height: 36 }, sc); p.material = numTex(nm + sd); p.parent = root; p.rotation.x = Math.PI / 2; p.rotation.y = end < 0 ? Math.PI / 2 : -Math.PI / 2; p.position.set(uE - end * 70, 0.09, v); p.renderingGroupId = 1; }
   }
@@ -155,10 +161,6 @@ function airport(sc: Scene, site: any, elev: number, casters: AbstractMesh[]) {
   pave(-60, PV(-40), 60, PV(-8), asphalt, 0.05); pave(-14, FENCE.v0 - 400, 14, PV(-40), asphalt, 0.05);
   return root;
 }
-/** How much of the ground is levelled for the airport at (e, n) metres from the reference point. */
-function flatK(site: any) { const h = site.hdg * D2R, ue = Math.sin(h), un = Math.cos(h), ve = -Math.cos(h), vn = Math.sin(h);
-  return (e: number, n: number) => { const u = e * ue + n * un, v = e * ve + n * vn, du = Math.max(0, Math.abs(u) - (FENCE.u1 + 150)), dv = Math.max(0, v < 0 ? FENCE.v0 - 450 - v : v - FENCE.v1 - 150); const d = Math.hypot(du, dv); return d <= 0 ? 1 : Math.max(0, 1 - d / 700); }; }
-
 /** The ready-made views: where (in the airport's frame: u, height, v) and what it looks at. */
 const VIEWS: { id: string; name: string; at: [number, number, number]; look: [number, number, number] }[] = [
   { id: 'gate', name: 'Gate 4', at: [PX(MOD[3] + 20), 7.85, PV(PN - 1.5)], look: [PX(MOD[3] + 30), 30, 2600] },
@@ -174,7 +176,7 @@ const Site$: Section = {
   async open(ctx: SectionCtx) {
     const { engine, ui, progress } = ctx, site = SITES.find(s => s.id === (ctx.opts && ctx.opts.site)) || SITES[0]; O.ctx = ctx; O.site = site;
     progress(4, `Finding ${site.name}…`); await new Promise(r => setTimeout(r, 30));
-    const sc = new Scene(engine); O.scene = sc; sc.clearColor = new Color4(0.6, 0.72, 0.86, 1); sc.skipPointerMovePicking = true;
+    engine.useReverseDepthBuffer = true; O.engine = engine; const sc = new Scene(engine); O.scene = sc; sc.clearColor = new Color4(0.6, 0.72, 0.86, 1); sc.skipPointerMovePicking = true;
     // the real ground's heights: fine round the site, coarse further out
     await loadArea(13, site.lat, site.lon, 9500, k => progress(6 + Math.round(k * 44), 'Loading the terrain round the site…'));
     await loadArea(11, site.lat, site.lon, 36000, k => progress(50 + Math.round(k * 20), 'Loading the mountains further out…'));
@@ -183,13 +185,16 @@ const Site$: Section = {
     let sum = 0, cnt = 0; for (let a = -1500; a <= 1500; a += 300) for (let b = -1500; b <= 1500; b += 300) { const h = hAt(13, site.lat + b / 110540, site.lon + a / (111320 * Math.cos(site.lat * D2R))); if (h != null) { sum += h; cnt++; } }
     const elev = Math.max(2, cnt ? sum / cnt : 10); O.elev = elev;
     const detail = new DynamicTexture('detail', { width: 512, height: 512 }, sc, true); { const x = detail.getContext() as any; x.fillStyle = '#B8B8B8'; x.fillRect(0, 0, 512, 512); for (let i = 0; i < 60000; i++) { const v = Math.random(); x.fillStyle = `rgba(${v > 0.5 ? '255,255,255' : '0,0,0'},${0.08 + Math.random() * 0.18})`; x.fillRect(Math.random() * 512, Math.random() * 512, 1 + Math.random() * 3, 1 + Math.random() * 2); } detail.update(); detail.wrapU = detail.wrapV = Texture.WRAP_ADDRESSMODE; }
-    const fk = flatK(site);
-    const inner = groundMesh(sc, site, 9000, IS_PC ? 720 : 420, 13, elev, fk, detail);
-    const outerFlat = (e: number, n: number) => fk(e, n);
-    const outer = groundMesh(sc, site, 36000, IS_PC ? 360 : 220, 11, elev, outerFlat, detail, 0); outer.m.position.y = 0;
+    // the ground under the airport, levelled at its height: the fenced area (and a margin), the road in
+    clearFlatZones('SITE/'); const kx0 = 111320 * Math.cos(site.lat * D2R), hd = site.hdg * D2R, at = (u: number, v: number) => ({ lat: site.lat + (u * Math.cos(hd) + v * Math.sin(hd)) / 110540, lon: site.lon + (u * Math.sin(hd) - v * Math.cos(hd)) / kx0 });
+    { const c = at(0, (FENCE.v0 + FENCE.v1) / 2); addFlatZone({ id: 'SITE/AIRPORT', lat: c.lat, lon: c.lon, hdg: site.hdg, hu: FENCE.u1 + 150, hv: (FENCE.v1 - FENCE.v0) / 2 + 150, elev, blend: 700 }); }
+    { const c = at(0, FENCE.v0 - 225); addFlatZone({ id: 'SITE/ROAD', lat: c.lat, lon: c.lon, hdg: site.hdg, hu: 30, hv: 260, elev, blend: 120 }); }
+    O.zoneForModel = zoneForModel;
+    const inner = groundMesh(sc, site, 9000, IS_PC ? 720 : 420, 13, detail);
     // the outer ground goes down under the inner, so only the fine one shows there
-    { const p = outer.m.getVerticesData('position') as any; for (let i = 0; i < p.length; i += 3) if (Math.abs(p[i]) < 8800 && Math.abs(p[i + 2]) < 8800) p[i + 1] -= 60; outer.m.setVerticesData('position', p); }
-    void inner;
+    const outer = groundMesh(sc, site, 36000, IS_PC ? 360 : 220, 11, detail, 60, 8800);
+    // a model placed later with its own zone: the ground is laid out again under it
+    let relay = 0; O.offFlat = onFlatChange(() => { clearTimeout(relay); relay = window.setTimeout(() => { inner.layout(); outer.layout(); }, 50); });
     // the sea
     const sea = MeshBuilder.CreateGround('sea', { width: 160000, height: 160000 }, sc); sea.position.y = 0.3 - 0; const sm = new PBRMaterial('seaM', sc); sm.albedoColor = Color3.FromHexString('#1D3443'); sm.roughness = 0.12; sm.metallic = 0.1; sea.material = sm; sea.renderingGroupId = 1; sea.isPickable = false;
     progress(84, 'Laying out the airport…');
@@ -244,7 +249,7 @@ const Site$: Section = {
   close() {
     const sc: Scene = O.scene; if (!sc) return;
     try { if (O.wx) O.wx.dispose(); } catch (e) { /* gone */ } try { window.removeEventListener('keydown', O.kd); window.removeEventListener('keyup', O.ku); } catch (e) { /* gone */ }
-    perfDetach(); if (O.hud) O.hud.remove(); sc.dispose(); O.scene = null;
+    perfDetach(); if (O.hud) O.hud.remove(); try { if (O.offFlat) O.offFlat(); } catch (e) { /* gone */ } clearFlatZones('SITE/'); sc.dispose(); O.scene = null; try { O.engine.useReverseDepthBuffer = false; } catch (e) { /* gone */ }
   },
 };
 registerSection(Site$);
