@@ -150,7 +150,7 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
     for (const [x, z] of [[66, 2], [86, 2], [52, 12], [98, 28]]) bin(r, x, z);
     sign(r, 'SECURITY · ALL GATES', 70, 3.4, 29.75, Math.PI, 6.4, 0.7, '#1C2D52');
     // DEPARTURES over the main entrance, outside
-    { const o = K.obj('KERB', 'SIGN', 75, 7.6, -0.4, 0, 'KERB/DEPARTURES-SIGN'); const p = MeshBuilder.CreatePlane(K.nm('dep'), { width: 12, height: 1.6 }, sc); p.material = K.picture(signC('DEPARTURES', '#F2F4F7', '#14202E', 1536, 205, '700 150px Arial, sans-serif'), 0); p.parent = o; p.metadata = o.metadata; }
+    { const o = K.obj('KERB', 'SIGN', 75, 7.6, -0.4, 0, 'KERB/DEPARTURES-SIGN'); const p = MeshBuilder.CreatePlane(K.nm('dep'), { width: 12, height: 1.6 }, sc); p.material = K.picture(signC('DEPARTURES', '#F2F4F7', '#14202E', 1536, 205, '700 150px Arial, sans-serif'), 0); (p.material as any).backFaceCulling = true; p.parent = o; K.box(o, 12.2, 1.8, 0.12, M.whiteGloss, 0, 0, 0.08); p.metadata = o.metadata; }
     // the canopies over the three ways in
     for (const [x, w] of [[50, 13], [75, 17], [101, 13]]) { const o = K.obj('KERB', 'CANOPY', x, 3.8, -6, 0); K.box(o, w, 0.25, 4, M.whiteGloss, 0, 0, 0); K.box(o, w - 0.4, 0.02, 3.6, M.light, 0, -0.13, 0); for (const s of [-1, 1]) K.cyl(o, 0.1, 3.8, M.mullion, s * (w / 2 - 0.4), -1.9, -1.6); K.circle(1, x - (w / 2 - 0.4), -7.6, 0.2); K.circle(1, x + (w / 2 - 0.4), -7.6, 0.2); }
     for (const [x, z] of [[40, -12], [62, -14], [88, -14], [110, -12]]) { const o = K.obj('KERB', 'BENCH', x, 0, z); K.box(o, 2.4, 0.08, 0.6, M.oak, 0, 0.45, 0); K.box(o, 2.2, 0.42, 0.5, M.steel, 0, 0.21, 0); K.block(1, x - 1.2, z - 0.3, x + 1.2, z + 0.3); }

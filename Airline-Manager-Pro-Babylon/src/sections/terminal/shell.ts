@@ -44,9 +44,12 @@ export function buildShell(K: Kit, progress: (p: number, s: string) => void) {
     for (const dr of ds) { pieces.push([u, dr.c - dr.w / 2, y0]); pieces.push([dr.c - dr.w / 2, dr.c + dr.w / 2, dr.h]); u = dr.c + dr.w / 2; } pieces.push([u, a1, y0]);
     for (const [pa, pb, py] of pieces) {
       // tall walls under a sloping top (the wave roof) are cut into short pieces, each up to the roof above it
-      const step = y1(pa) === y1(pb) && y1((pa + pb) / 2) === y1(pa) ? pb - pa : 2;
-      for (let s = pa; s < pb - 0.001; s += step) { const e = Math.min(pb, s + step), yt = Math.min(y1(s), y1(e), y1((s + e) / 2));
-        if (glass && py === y0) { wallBox(rid, M.glass, ax, line, s, e, py, yt, off, 0.03); } else wallBox(rid, mat, ax, line, s, e, py, yt, off, th); }
+      const flat = y1(pa) === y1(pb) && y1((pa + pb) / 2) === y1(pa), step = flat ? pb - pa : 1;
+      for (let s = pa; s < pb - 0.001; s += step) { const e = Math.min(pb, s + step), m = glass && py === y0 ? M.glass : mat;
+        if (flat) { wallBox(rid, m, ax, line, s, e, py, y1(s), off, glass && py === y0 ? 0.03 : th); continue; }
+        // a sloping top: one flat panel from the bottom up to the roof at each end, so it meets the roof all along
+        const P = (u: number, yy: number) => ax === 'x' ? new Vector3(u, yy, line + off) : new Vector3(line + off, yy, u);
+        const q = MeshBuilder.CreateRibbon(K.nm('wq'), { pathArray: [[P(s, py), P(e, py)], [P(s, y1(s)), P(e, y1(e))]], sideOrientation: Mesh.DOUBLESIDE }, sc); K.struct(rid, q, m); }
       if (glass && py === y0) for (let s = pa; s <= pb + 0.001; s += (pb - pa) / Math.max(1, Math.round((pb - pa) / 1.8))) wallBox(rid, M.mullion, ax, line, s - 0.04, s + 0.04, y0, y1(s), off, 0.14);
     }
   };
@@ -76,7 +79,9 @@ export function buildShell(K: Kit, progress: (p: number, s: string) => void) {
         sideRun(r, side, 0, u => Math.min(F2Y, roofAt(u)), wm, glass, inward * 0.09);
         const a0 = ax === 'x' ? r.x0 : r.z0, a1 = ax === 'x' ? r.x1 : r.z1; let s0 = a0;
         const covered = (u: number) => { const px = ax === 'x' ? u : line - inward * 0.5, pz = ax === 'x' ? line - inward * 0.5 : u; return F2R.some(q => inRoom(q, px, pz)); };
-        for (let u = a0; u <= a1 + 0.5; u += 1) { const cv = u <= a1 && covered(Math.min(a1 - 0.01, u + 0.5)); if (cv || u > a1) { if (u > s0) { const sub = { ...r, x0: ax === 'x' ? s0 : r.x0, x1: ax === 'x' ? Math.min(u, a1) : r.x1, z0: ax === 'z' ? s0 : r.z0, z1: ax === 'z' ? Math.min(u, a1) : r.z1 } as Room; sideRun(sub, side, F2Y, u2 => Math.min(ROOF, roofAt(u2)), wm, glass, inward * 0.09); } s0 = u + 1; } }
+        const band = (p0: number, p1: number) => { if (p1 - p0 < 0.05) return; const sub = { ...r, x0: ax === 'x' ? p0 : r.x0, x1: ax === 'x' ? p1 : r.x1, z0: ax === 'z' ? p0 : r.z0, z1: ax === 'z' ? p1 : r.z1 } as Room; sideRun(sub, side, F2Y, u2 => Math.min(ROOF, roofAt(u2)), wm, glass, inward * 0.09); };
+        for (let u = a0; u < a1; u += 1) { if (covered(Math.min(a1 - 0.01, u + 0.5))) { band(s0, u); s0 = u + 1; } }
+        band(Math.min(s0, a1), a1);
         const sub2 = r; sideRun(sub2, side, ROOF, roofAt, wm, glass, inward * 0.09);
         continue;
       }
