@@ -36,7 +36,7 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           node package.mjs
-      - name: Zip
+      - name: Zip and the installer
         id: zip
         shell: pwsh
         working-directory: Airline-Manager-Pro-Babylon/pc
@@ -44,11 +44,20 @@ jobs:
           $v = (Get-Content ../app.config.json | ConvertFrom-Json).version
           $f = "AirlineManagerProBabylon-PC-$v.zip"
           Compress-Archive -Path "build/Airline Manager Pro Babylon PC" -DestinationPath $f
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          $env:AMPB_VERSION = $v
+          & $iscc setup.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Copy-Item "build/AirlineManagerProBabylon-PC-Setup-$v.exe" .
           "file=$f" >> $env:GITHUB_OUTPUT
+          "setup=AirlineManagerProBabylon-PC-Setup-$v.exe" >> $env:GITHUB_OUTPUT
       - uses: actions/upload-artifact@v4
         with:
           name: amp-babylon-pc
-          path: Airline-Manager-Pro-Babylon/pc/${{ steps.zip.outputs.file }}
+          path: |
+            Airline-Manager-Pro-Babylon/pc/${{ steps.zip.outputs.file }}
+            Airline-Manager-Pro-Babylon/pc/${{ steps.zip.outputs.setup }}
 
   apk:
     name: Android app
@@ -98,3 +107,4 @@ jobs:
           files: |
             ${{ steps.apk.outputs.file }}
             pc/*.zip
+            pc/*.exe

@@ -19,7 +19,9 @@ function serve() {
       if (!f.startsWith(ROOT)) { rsp.writeHead(403); rsp.end(); return; }
       fs.readFile(f, (err, data) => { if (err) { rsp.writeHead(404); rsp.end(); return; } rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache' }); rsp.end(data); });
     });
-    srv.listen(0, '127.0.0.1', () => res(srv.address().port));
+    // a fixed port, so the settings (kept by the page) are the same every time; another one if it is taken
+    srv.once('error', () => srv.listen(0, '127.0.0.1', () => res(srv.address().port)));
+    srv.listen(47631, '127.0.0.1', () => res(srv.address().port));
   });
 }
 
