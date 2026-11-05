@@ -10,6 +10,8 @@ import { settingsShow, settingsHide, settingsOpen, settingsButton } from './ui/s
 import { loadingShow, loadingProgress, loadingHide } from './ui/loading';
 import { icon, toast } from './ui/icons';
 import { exitGame } from './core/exit';
+import { updateInit } from './core/update';
+import { whatsNewOnStart, whatsNewIsOpen, whatsNewClose } from './ui/whats-new';
 import './sections/lounge/index';
 import './sections/viewer3d/index';
 
@@ -35,6 +37,7 @@ onSettings(what => {
   const s = currentSection(); if (s && s.onSettings) s.onSettings(what);
 });
 onButton(b => {
+  if (whatsNewIsOpen()) { if (b === 'back' || b === 'confirm' || b === 'menu') whatsNewClose(); return; }
   if (settingsOpen()) { settingsButton(b); return; }
   if (b === 'menu') { toggleSettings(); return; }
   if (b === 'back' && inPlace) { backToTitle(); return; }
@@ -60,3 +63,6 @@ function backToTitle() {
 }
 const TITLES: { [id: string]: string } = { viewer3d: '3D viewer · above the clouds', lounge: 'Business lounge' };
 splashOpen(id => enter(id, TITLES[id] || id));
+// after an update: what's new, once; and a quiet look for a newer version now and then
+whatsNewOnStart();
+updateInit(v => toast(`Version ${v} is ready: Settings → Updates`));

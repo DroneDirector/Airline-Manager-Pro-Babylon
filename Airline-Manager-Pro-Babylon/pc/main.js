@@ -6,6 +6,31 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(path.dirname(process.execPath), 'app');
+const os = require('node:os');
+const { spawn } = require('node:child_process');
+// Updates from inside the game: the new installer is downloaded, then the game closes, the installer runs quietly
+// over it (keeping the settings) and the game opens again.
+const UPD = { state: 'idle', pct: -1, error: '' };
+async function startUpdate(url, version) {
+  if (UPD.state === 'downloading' || UPD.state === 'installing') return;
+  let host = ''; try { host = new URL(url).hostname; } catch (e) { /* not an address */ }
+  if (!/(^|\.)github\.com$/.test(host)) { UPD.state = 'failed'; UPD.error = 'The update must come from the game\'s own releases.'; return; }
+  UPD.state = 'downloading'; UPD.pct = 0; UPD.error = '';
+  try {
+    const r = await fetch(url, { redirect: 'follow' });
+    if (!r.ok) throw new Error(`The download answered ${r.status} ${r.statusText}`);
+    const total = Number(r.headers.get('content-length')) || 0, file = path.join(os.tmpdir(), `AirlineManagerProBabylon-Setup-${String(version).replace(/[^0-9.]/g, '')}.exe`);
+    const out = fs.createWriteStream(file), rd = r.body.getReader(); let got = 0;
+    for (;;) { const { done, value } = await rd.read(); if (done) break; got += value.length; out.write(Buffer.from(value)); if (total) UPD.pct = Math.floor(got * 100 / total); }
+    await new Promise((res, rej) => { out.on('error', rej); out.end(res); });
+    if (total && got !== total) throw new Error(`The download was incomplete (${got} of ${total} bytes)`);
+    UPD.state = 'installing'; UPD.pct = 100;
+    const cmd = path.join(os.tmpdir(), 'ampb-update.cmd');
+    fs.writeFileSync(cmd, ['@echo off', 'timeout /t 2 /nobreak >nul', `"${file}" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS`, `start "" "${process.execPath}"`, ''].join('\r\n'));
+    spawn('cmd.exe', ['/c', cmd], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    setTimeout(() => app.quit(), 900);
+  } catch (e) { UPD.state = 'failed'; UPD.error = 'The update couldn\'t be installed: ' + ((e && e.message) || e); }
+}
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.png': 'image/png', '.mp3': 'audio/mpeg', '.woff': 'font/woff', '.woff2': 'font/woff2', '.txt': 'text/plain' };
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
@@ -14,6 +39,10 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 function serve() {
   return new Promise(res => {
     const srv = http.createServer((req, rsp) => {
+      if ((req.url || '').split('?')[0] === '/api/update') {
+        if (req.method === 'POST') { let b = ''; req.on('data', c => { b += c; if (b.length > 1e5) req.destroy(); }); req.on('end', () => { let j = {}; try { j = JSON.parse(b || '{}'); } catch (e) { /* empty */ } startUpdate(j.url, j.version); rsp.writeHead(200, { 'Content-Type': 'application/json' }); rsp.end(JSON.stringify(UPD)); }); return; }
+        rsp.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); rsp.end(JSON.stringify(UPD)); return;
+      }
       let p = decodeURIComponent((req.url || '/').split('?')[0]); if (p === '/') p = '/index.html';
       const f = path.normalize(path.join(ROOT, p));
       if (!f.startsWith(ROOT)) { rsp.writeHead(403); rsp.end(); return; }

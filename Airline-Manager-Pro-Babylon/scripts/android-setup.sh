@@ -18,7 +18,10 @@ grep -q 'android.hardware.gamepad' "$MAN" || sed -i 's|</manifest>|    <uses-fea
 JDIR="android/app/src/main/java/$(echo "$APPID" | tr '.' '/')"
 mkdir -p "$JDIR"
 sed "s/__PACKAGE__/${APPID}/" scripts/android/MainActivity.java > "$JDIR/MainActivity.java"
-sed "s/__PACKAGE__/${APPID}/" scripts/android/AppExitPlugin.java > "$JDIR/AppExitPlugin.java"
+for J in AppExitPlugin AppUpdatePlugin UpdatedReceiver; do sed "s/__PACKAGE__/${APPID}/" "scripts/android/$J.java" > "$JDIR/$J.java"; done
+# updates from inside the game: permission to install them, and opening again by itself after one has installed
+for P in REQUEST_INSTALL_PACKAGES UPDATE_PACKAGES_WITHOUT_USER_ACTION; do grep -q "permission.$P" "$MAN" || sed -i "s|</manifest>|    <uses-permission android:name=\"android.permission.$P\" />\n</manifest>|" "$MAN"; done
+grep -q 'UpdatedReceiver' "$MAN" || sed -i 's|</application>|    <receiver android:name=".UpdatedReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter></receiver>\n    </application>|' "$MAN"
 RES=android/app/src/main/res
 for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do mkdir -p "$RES/mipmap-$d"; cp scripts/android/res/mipmap-$d/ic_launcher*.png "$RES/mipmap-$d/"; done
 mkdir -p "$RES/mipmap-anydpi-v26"; cp scripts/android/res/mipmap-anydpi-v26/ic_launcher*.xml "$RES/mipmap-anydpi-v26/"

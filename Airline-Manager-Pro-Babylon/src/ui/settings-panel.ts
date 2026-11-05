@@ -6,12 +6,15 @@ import { APP, IS_PC } from '../core/app';
 import { gpuInfo } from '../core/engine';
 import { padConnected, vibrate, onPad } from '../core/input';
 import { icon, esc } from './icons';
+import { U, onUpdate, updateCheck, updateInstall, updatePermission, updateStatus, canSelfUpdate } from '../core/update';
+import { whatsNewHtml, whatsNewBind, mdHtml } from './whats-new';
 
 type Row = { k: 'seg'; key: string; label: string; sub?: string; opts: [any, string][] }
   | { k: 'tog'; key: string; label: string; sub?: string }
   | { k: 'range'; key: string; label: string; sub?: string; min: number; max: number; step: number; fmt: (v: number) => string }
   | { k: 'btn'; label: string; sub?: string; act: string; text: string }
-  | { k: 'info'; label: string; text: () => string };
+  | { k: 'info'; label: string; text: () => string }
+  | { k: 'html'; html: () => string };
 
 const pct = (v: number) => Math.round(v * 100) + '%';
 const GFX: Row[] = [
@@ -53,6 +56,22 @@ const CTL: Row[] = [
   { k: 'btn', label: 'Controls as they were', act: 'reset-ctl', text: 'Reset' },
 ];
 
+const TABS: [string, string, string][] = [['gfx', 'monitor', 'Graphics'], ['ctl', 'pad', 'Controls'], ['upd', 'download', 'Updates'], ['new', 'star', 'What\'s new']];
+/** Settings → Updates: the installed version, the newest one and what it holds, and the buttons to check and install. */
+function updRows(): Row[] {
+  const busy = U.state === 'checking' || U.state === 'downloading' || U.state === 'installing', R: Row[] = [
+    { k: 'info', label: 'Installed', text: () => `${APP.name} ${APP.version}` },
+    { k: 'info', label: 'Status', text: () => updateStatus() },
+  ];
+  if (canSelfUpdate()) {
+    if (U.state === 'permission') R.push({ k: 'btn', label: 'Allow updates', sub: 'Android needs your permission once: turn on "Allow from this source", then come back', act: 'upd-perm', text: 'Open the setting' });
+    else if (U.state === 'available' && U.info) R.push({ k: 'btn', label: `Install version ${U.info.version}`, sub: `${U.info.size ? (U.info.size / 1048576).toFixed(1) + ' MB · ' : ''}installs over this version and keeps your settings`, act: 'upd-install', text: 'Update' });
+    if (!busy) R.push({ k: 'btn', label: 'Check for updates', sub: 'Also checked by itself every few hours', act: 'upd-check', text: 'Check' });
+  }
+  if (U.info && U.info.notes) R.push({ k: 'html', html: () => `<div class="upd-notes"><b>What version ${esc(U.info!.version)} holds</b>${mdHtml(U.info!.notes)}</div>` });
+  return R;
+}
+const NEW: Row[] = [{ k: 'html', html: () => `<div class="wn-list in-sp">${whatsNewHtml()}</div>` }];
 let el: HTMLElement | null = null, tab = 'gfx', focus = 0, onClose: (() => void) | null = null;
 const get = (key: string) => { const [a, b] = key.split('.'); return (S as any)[a][b]; };
 const set = (key: string, v: any) => {
@@ -75,19 +94,23 @@ export function settingsHide() {
   const f = onClose; onClose = null; if (f) f();
 }
 onPad(() => { if (el) render(); });
-function rows(): Row[] { return tab === 'gfx' ? GFX : CTL; }
+function rows(): Row[] { return tab === 'gfx' ? GFX : tab === 'ctl' ? CTL : tab === 'upd' ? updRows() : NEW; }
+onUpdate(() => { if (el && tab === 'upd') render(); });
+const NT = TABS.length;
 function render() {
-  if (!el) return; const R = rows(); focus = Math.max(0, Math.min(R.length + 1, focus));
+  if (!el) return; const R = rows(); focus = Math.max(0, Math.min(R.length + NT - 1, focus));
   el.innerHTML = `<div class="sp-head"><b>${icon('gear')}Settings</b><button class="sp-x" data-a="close" aria-label="Close">${icon('close')}</button></div>
-    <div class="sp-tabs"><button data-a="tab" data-v="gfx" class="${tab === 'gfx' ? 'on' : ''} ${focus === 0 ? 'f' : ''}">${icon('monitor')}Graphics</button><button data-a="tab" data-v="ctl" class="${tab === 'ctl' ? 'on' : ''} ${focus === 1 ? 'f' : ''}">${icon('pad')}Controls</button></div>
-    <div class="sp-list">${R.map((r, i) => rowHtml(r, i + 2)).join('')}</div>`;
+    <div class="sp-tabs">${TABS.map(([k, ic, l], i) => `<button data-a="tab" data-v="${k}" class="${tab === k ? 'on' : ''} ${focus === i ? 'f' : ''}">${icon(ic)}<span>${l}</span>${k === 'upd' && U.state === 'available' ? '<i class="sp-dot"></i>' : ''}</button>`).join('')}</div>
+    <div class="sp-list">${R.map((r, i) => rowHtml(r, i + NT)).join('')}</div>`;
+  if (tab === 'new') whatsNewBind(el);
   const f = el.querySelector('.sp-row.f') as HTMLElement; if (f) f.scrollIntoView({ block: 'nearest' });
 }
 function rowHtml(r: Row, i: number): string {
-  const cls = `sp-row ${focus === i ? 'f' : ''}`, lab = `<span class="sp-l"><b>${esc(r.label)}</b>${(r as any).sub ? `<small>${esc((r as any).sub)}</small>` : ''}</span>`;
+  const cls = `sp-row ${focus === i ? 'f' : ''}`, lab = `<span class="sp-l"><b>${esc((r as any).label)}</b>${(r as any).sub ? `<small>${esc((r as any).sub)}</small>` : ''}</span>`;
   if (r.k === 'seg') { const v = get(r.key); return `<div class="${cls}" data-i="${i}">${lab}<span class="sp-seg">${r.opts.map(o => `<button data-a="seg" data-key="${r.key}" data-v="${o[0]}" class="${String(v) === String(o[0]) ? 'on' : ''}">${esc(o[1])}</button>`).join('')}</span></div>`; }
   if (r.k === 'tog') { const v = !!get(r.key); return `<div class="${cls}" data-i="${i}">${lab}<button class="sp-tog ${v ? 'on' : ''}" data-a="tog" data-key="${r.key}" aria-pressed="${v}"><i></i></button></div>`; }
   if (r.k === 'range') { const v = get(r.key); return `<div class="${cls}" data-i="${i}">${lab}<span class="sp-rng"><input type="range" min="${r.min}" max="${r.max}" step="${r.step}" value="${v}" data-key="${r.key}"><em>${esc(r.fmt(v))}</em></span></div>`; }
+  if (r.k === 'html') return `<div class="${cls} html" data-i="${i}">${r.html()}</div>`;
   if (r.k === 'btn') return `<div class="${cls}" data-i="${i}">${lab}<button class="sp-btn" data-a="${r.act}">${esc(r.text)}</button></div>`;
   return `<div class="${cls} info" data-i="${i}"><span class="sp-l"><b>${esc(r.label)}</b><small>${esc(r.text())}</small></span></div>`;
 }
@@ -95,11 +118,14 @@ function clickIn(e: Event) {
   const b = (e.target as HTMLElement).closest('[data-a]') as HTMLElement; if (!b) return;
   const a = b.getAttribute('data-a') || '', key = b.getAttribute('data-key') || '', v = b.getAttribute('data-v');
   if (a === 'close') { settingsHide(); return; }
-  if (a === 'tab') { tab = v || 'gfx'; render(); return; }
+  if (a === 'tab') { tab = v || 'gfx'; focus = Math.max(0, TABS.findIndex(t => t[0] === tab)); render(); return; }
   if (a === 'seg') { const cur = get(key); set(key, typeof cur === 'number' ? Number(v) : v); render(); return; }
   if (a === 'tog') { set(key, !get(key)); render(); return; }
   if (a === 'rumble') { vibrate(400, 1, 0.8); return; }
   if (a === 'reset-ctl') { resetControls(); render(); return; }
+  if (a === 'upd-check') { updateCheck(); return; }
+  if (a === 'upd-install') { updateInstall(); return; }
+  if (a === 'upd-perm') { updatePermission(); return; }
 }
 function inputIn(e: Event) {
   const t = e.target as HTMLInputElement; const key = t.getAttribute('data-key'); if (!key) return;
@@ -107,15 +133,15 @@ function inputIn(e: Event) {
 }
 /** A controller or the keyboard in the settings: move, change, switch, close. */
 export function settingsButton(btn: string): boolean {
-  if (!el) return false; const R = rows(), n = R.length + 2;
+  if (!el) return false; const R = rows(), n = R.length + NT;
   if (btn === 'back' || btn === 'menu') { settingsHide(); return true; }
   if (btn === 'up') { focus = (focus + n - 1) % n; render(); return true; }
   if (btn === 'down') { focus = (focus + 1) % n; render(); return true; }
-  if (focus <= 1) { if (btn === 'left' || btn === 'right' || btn === 'confirm') { tab = btn === 'confirm' ? (focus === 0 ? 'gfx' : 'ctl') : tab === 'gfx' ? 'ctl' : 'gfx'; focus = tab === 'gfx' ? 0 : 1; render(); } return true; }
-  const r = R[focus - 2]; if (!r) return true;
+  if (focus < NT) { if (btn === 'left' || btn === 'right' || btn === 'confirm') { const cur = TABS.findIndex(t => t[0] === tab), to = btn === 'confirm' ? focus : (cur + (btn === 'left' ? NT - 1 : 1)) % NT; tab = TABS[to][0]; focus = to; render(); } return true; }
+  const r = R[focus - NT]; if (!r) return true;
   if (r.k === 'seg') { const cur = get(r.key), i = r.opts.findIndex(o => String(o[0]) === String(cur)); const d = btn === 'left' ? -1 : btn === 'right' || btn === 'confirm' ? 1 : 0; if (d) { const o = r.opts[(Math.max(0, i) + d + r.opts.length) % r.opts.length]; set(r.key, o[0]); render(); } }
   else if (r.k === 'tog') { if (btn === 'confirm' || btn === 'left' || btn === 'right') { set(r.key, !get(r.key)); render(); } }
   else if (r.k === 'range') { const d = btn === 'left' ? -1 : btn === 'right' ? 1 : 0; if (d) { const v = Math.max(r.min, Math.min(r.max, Math.round((get(r.key) + d * r.step) / r.step) * r.step)); set(r.key, Number(v.toFixed(3))); render(); } }
-  else if (r.k === 'btn') { if (btn === 'confirm') { if (r.act === 'rumble') vibrate(400, 1, 0.8); else if (r.act === 'reset-ctl') { resetControls(); render(); } } }
+  else if (r.k === 'btn') { if (btn === 'confirm') { if (r.act === 'rumble') vibrate(400, 1, 0.8); else if (r.act === 'reset-ctl') { resetControls(); render(); } else if (r.act === 'upd-check') updateCheck(); else if (r.act === 'upd-install') updateInstall(); else if (r.act === 'upd-perm') updatePermission(); } }
   return true;
 }

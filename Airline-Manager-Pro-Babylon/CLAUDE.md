@@ -15,7 +15,9 @@
   close, onSettings) and is opened from `src/main.ts`. Today: the 3D viewer (a demo flight above the clouds) and the lounge (its doors stay shut),
   each with its own button on the start screen.
 - In every place: the gear, Exit and Title screen (back to the start screen) are always on screen.
-- The gear is always on screen; its settings are graphics and controls only, until more is brought over.
+- The gear is always on screen; its settings: Graphics, Controls, Updates (check, see what the new version holds,
+  install it from inside the game on Android and the PC) and What's new (the three newest release notes, built in from
+  `release-notes/`; also shown once as a pop-up after an update).
 - Controls from day one: touchscreen (stick and look), keyboard and mouse, PlayStation (and other) controllers, with
   their settings under Controls.
 - Exit (beside the gear) shuts the game down completely and gives back all its memory (the scene and engine released,
