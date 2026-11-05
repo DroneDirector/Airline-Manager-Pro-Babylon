@@ -15,6 +15,12 @@ import { toast } from '../../ui/icons';
 import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core/perf-meter';
 import { buildAirliner, setGear } from '../viewer3d/airliner';
 import { makeWeather, Weather } from '../terminal/weather';
+import { makeKit } from '../terminal/kit';
+import { buildShell } from '../terminal/shell';
+import { buildDoors } from '../terminal/doors';
+import { furnish } from '../terminal/furnish';
+import { buildFixtures } from '../terminal/fixtures';
+import { buildRental } from '../terminal/rental';
 import { addFlatZone, clearFlatZones, flatHeight, onFlatChange, zoneForModel } from '../../core/flatten';
 
 const D2R = Math.PI / 180, R = 6371000, HEIGHT_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/';
@@ -127,29 +133,10 @@ function airport(sc: Scene, site: any, elev: number, casters: AbstractMesh[]) {
   for (const u of [-RWY.len / 2 + 40, 0, RWY.len / 2 - 40]) twy(u, RWY.vA, u, RWY.vB);
   twy(-RWY.len / 2, RWY.vB - 182, RWY.len / 2, RWY.vB - 182);
   // the apron in concrete, its stand lines, a wider apron east and west for more stands later
-  pave(PX(-110), PV(PN), PX(270), PV(PN + 70), concrete, 0.05, 20); pave(PX(270), PV(PN), PX(900), PV(PN + 70), concrete, 0.05, 20); pave(PX(-700), PV(PN), PX(-110), PV(PN + 70), concrete, 0.05, 20);
+  pave(PX(260), PV(PN), PX(900), PV(PN + 70), concrete, 0.05, 20); pave(PX(-700), PV(PN), PX(-100), PV(PN + 70), concrete, 0.05, 20); // the terminal's own apron is between these
   pave(-1700, PV(PN + 70), 1700, TWY.vA - 16, concrete, 0.045, 20);
-  // the terminal (its shape, from the plans): the landside block, the Grand Hall under its wave roof, the pier with the gates' glass facing the runways
-  const T = new TransformNode('TERMINAL', sc); T.parent = root;
-  const tb = (x0: number, z0: number, x1: number, z1: number, y0: number, y1: number, m: any) => { const b = box(x1 - x0, y1 - y0, z1 - z0, m, PX((x0 + x1) / 2), (y0 + y1) / 2, PV((z0 + z1) / 2), true); b.parent = T; return b; };
-  tb(-80, 30, 156, 52, 0, 12, white); tb(114, 0, 156, 30, 0, 12, white); tb(0, 0, 36, 30, 0, 9, white);
-  tb(36, 0.5, 114, 30, 0, 11, glass);
-  { const pts: Vector3[][] = []; for (let i = 0; i <= 30; i++) { const x = 24 + 102 * i / 30, row: Vector3[] = []; for (let j = 0; j <= 6; j++) { const z = -14 + 48 * j / 6; row.push(new Vector3(PX(x), 13.5 + 1.6 * Math.sin(i / 30 * Math.PI * 3) - 1.2 * (1 - j / 6), PV(z))); } pts.push(row); }
-    const w = MeshBuilder.CreateRibbon('wave', { pathArray: pts, sideOrientation: Mesh.DOUBLESIDE }, sc); w.material = roofW; w.parent = root; w.renderingGroupId = 1; casters.push(w); }
-  // the pier: hollow, so the gates' view is from inside, behind glass and mullions
-  const PW0 = -80, PW1 = 242; tb(PW0, 52, PW1, 53, 0, 12, white); tb(PW0, 52, PW1, 82, 0, 0.4, concrete); tb(PW0, 52, PW1, 82, 5.6, 6.2, white); tb(PW0, 52, PW1, 82, 11.4, 12, roofW);
-  tb(PW0 - 1, 52, PW0, 82, 0, 12, white); tb(PW1, 52, PW1 + 1, 82, 0, 12, white);
-  const gl = MeshBuilder.CreatePlane('pg', { width: PW1 - PW0, height: 11.2, sideOrientation: Mesh.DOUBLESIDE }, sc); const gm = new PBRMaterial('pgm', sc); gm.albedoColor = Color3.FromHexString('#BFD4E2'); gm.alpha = 0.18; gm.roughness = 0.02; gm.metallic = 0.2; gm.backFaceCulling = false; gl.material = gm;
-  gl.parent = root; gl.position.set(PX((PW0 + PW1) / 2), 6, PV(82)); gl.renderingGroupId = 1;
-  for (let x = PW0; x <= PW1; x += 2.6) tb(x - 0.06, 81.85, x + 0.06, 82.1, 0, 12, steel); for (const y of [0.4, 3.1, 6.2, 9]) tb(PW0, 81.85, PW1, 82.15, y, y + 0.14, steel);
-  tb(PW0, 66, PW1, 66.3, 6.2, 7.3, timber); // gate seats' backs, a hint of the gate rooms inside
-  // the jet bridges and the aircraft at the stands
-  for (let k = 0; k < 4; k++) { const x0 = MOD[k], sx = x0 + 14, sz = PN + 6;
-    tb(sx + 6, 82, sx + 9, 96, 4.4, 7.2, steel); tb(sx + 6.8, 96, sx + 8.2, 97, 0, 4.4, steel);
-    for (const [ax, az] of [[sx, sz + 22], [x0 + 54, PN + 30]]) { const ac = buildAirliner(sc); ac.root.parent = root; ac.root.position.set(PX(ax), 3.05, PV(az)); ac.root.rotation.y = Math.PI; try { setGear(ac, 1); } catch (e) { /* as built */ }
-      for (const m of ac.root.getChildMeshes()) { m.renderingGroupId = 1; casters.push(m); } } }
   // the tower and its cab, a fire station, a hangar
-  { const tx = PX(320), tz = PV(20); const t = MeshBuilder.CreateCylinder('tower', { diameterTop: 5, diameterBottom: 7, height: 48, tessellation: 24 }, sc); t.position.set(tx, 24, tz); t.material = white; t.parent = root; t.renderingGroupId = 1; casters.push(t);
+  { const tx = PX(-180), tz = PV(30); const t = MeshBuilder.CreateCylinder('tower', { diameterTop: 5, diameterBottom: 7, height: 48, tessellation: 24 }, sc); t.position.set(tx, 24, tz); t.material = white; t.parent = root; t.renderingGroupId = 1; casters.push(t);
     const cab = MeshBuilder.CreateCylinder('cab', { diameterTop: 13, diameterBottom: 10, height: 5, tessellation: 12 }, sc); cab.position.set(tx, 50.5, tz); cab.material = glass; cab.parent = root; cab.renderingGroupId = 1;
     const cap = MeshBuilder.CreateCylinder('cap', { diameter: 14, height: 1.2, tessellation: 12 }, sc); cap.position.set(tx, 53.6, tz); cap.material = white; cap.parent = root; cap.renderingGroupId = 1; }
   box(80, 14, 50, mat('#C9CED5', 0.5, 0.3), 1200, 7, PV(10), true); box(90, 0.5, 60, concrete, 1200, 0.05, PV(70)); box(40, 9, 30, mat('#B3261E', 0.5), -1250, 4.5, PV(20), true);
@@ -158,12 +145,12 @@ function airport(sc: Scene, site: any, elev: number, casters: AbstractMesh[]) {
   for (const [a, b, c, d] of [[FENCE.u0, FENCE.v0, FENCE.u1, FENCE.v0], [FENCE.u1, FENCE.v0, FENCE.u1, FENCE.v1], [FENCE.u1, FENCE.v1, FENCE.u0, FENCE.v1], [FENCE.u0, FENCE.v1, FENCE.u0, FENCE.v0]]) {
     const L = Math.hypot(c - a, d - b), p = MeshBuilder.CreatePlane('fn', { width: L, height: 2.4, sideOrientation: Mesh.DOUBLESIDE }, sc); p.material = fm; p.parent = root; p.position.set((a + c) / 2, 1.2, (b + d) / 2); p.rotation.y = -Math.atan2(d - b, c - a); p.renderingGroupId = 1; }
   // the road to the kerb
-  pave(-60, PV(-40), 60, PV(-8), asphalt, 0.05); pave(-14, FENCE.v0 - 400, 14, PV(-40), asphalt, 0.05);
+  pave(-14, FENCE.v0 - 400, 14, PV(-34), asphalt, 0.05);
   return root;
 }
 /** The ready-made views: where (in the airport's frame: u, height, v) and what it looks at. */
 const VIEWS: { id: string; name: string; at: [number, number, number]; look: [number, number, number] }[] = [
-  { id: 'gate', name: 'Gate 4', at: [PX(MOD[3] + 20), 7.85, PV(PN - 1.5)], look: [PX(MOD[3] + 30), 30, 2600] },
+  { id: 'gate', name: 'Gate 4', at: [PX(MOD[3] + 17), 7.66, PV(PN - 1.4)], look: [PX(MOD[3] + 27), 30, 2600] },
   { id: 'apron', name: 'On the apron', at: [PX(MOD[2] + 40), 1.7, PV(PN + 45)], look: [-600, 120, 3000] },
   { id: 'runway', name: 'Runway threshold', at: [-RWY.len / 2 - 20, 3, RWY.vA - 20], look: [RWY.len / 2, 80, RWY.vA + 1600] },
   { id: 'between', name: 'Between the runways', at: [400, 2, 0], look: [-400, 150, 4000] },
@@ -199,6 +186,18 @@ const Site$: Section = {
     const sea = MeshBuilder.CreateGround('sea', { width: 160000, height: 160000 }, sc); sea.position.y = 0.3 - 0; const sm = new PBRMaterial('seaM', sc); sm.albedoColor = Color3.FromHexString('#1D3443'); sm.roughness = 0.12; sm.metallic = 0.1; sea.material = sm; sea.renderingGroupId = 1; sea.isPickable = false;
     progress(84, 'Laying out the airport…');
     const casters: AbstractMesh[] = []; const ap = airport(sc, site, elev, casters); O.ap = ap;
+    // your terminal itself, built by its own builders (they are not changed): its rooms, walls, glass, roofs, stairs,
+    // doors, furniture, screens, its own grounds and apron with the aircraft and jet bridges, and the rental car centre;
+    // then set into the airport frame, the plan's origin at (u, v) = (-81, -1482), on the levelled ground
+    progress(86, 'Building your terminal…'); await new Promise(r => setTimeout(r, 0));
+    const before = new Set(sc.transformNodes.concat(sc.meshes as any[]));
+    const K = makeKit(sc); buildShell(K, () => { /* its own steps */ }); buildDoors(K); furnish(K, () => { /* */ }); K.clearWalls();
+    buildFixtures(K, '#1C3A8A', '#3FD3E6', 'Airline Manager Pro', () => { /* */ }); buildRental(K); (K.struct as any).finish();
+    for (const n of (sc.transformNodes as any[]).concat(sc.meshes as any[])) if (!before.has(n) && !n.parent && n !== K.root) n.parent = K.root;   // anything built loose goes with it
+    K.root.parent = ap; K.root.position.set(PX(0), 0, PV(0)); O.K = K;
+    for (const m of K.casters) casters.push(m);
+    for (const m of sc.meshes) { if (!before.has(m)) { m.renderingGroupId = 1; m.computeWorldMatrix(true); m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true; } }
+    progress(92, 'Setting up the views…');
     // lights, camera, the sky and its weather
     const hemi = new HemisphericLight('hemi', new Vector3(0, 1, 0), sc); hemi.intensity = 0.8;
     const sun = new DirectionalLight('sun', new Vector3(-0.4, -1, 0.3), sc); sun.intensity = 2.2; sun.shadowMinZ = 1; sun.shadowMaxZ = 9000;
