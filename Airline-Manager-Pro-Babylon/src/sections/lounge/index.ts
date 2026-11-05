@@ -13,6 +13,7 @@ import { IS_PC, IS_TOUCH } from '../../core/app';
 import { toast } from '../../ui/icons';
 import { buildLounge, blockedAt, Lounge } from './build';
 import * as P from './pictures';
+import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core/perf-meter';
 
 const EYE = 1.65;
 const L: any = { scene: null as Scene | null };
@@ -56,7 +57,7 @@ function apply(what: string) {
     if (g.ssao) { try { const ss = new SSAO2RenderingPipeline('ssao', sc, { ssaoRatio: 0.5, blurRatio: 0.5 }, [cam]); ss.radius = 1.2; ss.totalStrength = 1.1; ss.samples = IS_PC ? 16 : 8; L.ssao = ss; } catch (e) { L.ssao = null; } }
   }
   if (all || what === 'particles') makeFire();
-  if (all || what === 'showFps') { const f = L.ui.querySelector('.fps') as HTMLElement; if (f) f.hidden = !g.showFps; }
+  if (all || /^show(Fps|Cpu|Gpu|Mem)$/.test(what)) perfShow();
 }
 /** The fire: flames rising from the logs, their light flickering on the room. */
 function makeFire() {
@@ -91,7 +92,7 @@ const Lounge$: Section = {
     L.dp = new DefaultRenderingPipeline('dp', true, sc, [cam]);
     apply('all');
     // the hint and the frame-rate meter
-    const hud = document.createElement('div'); hud.className = 'hud'; hud.innerHTML = `<div class="fps" hidden></div><div class="aim" hidden></div>`; ui.appendChild(hud); L.hud = hud;
+    const hud = document.createElement('div'); hud.className = 'hud'; hud.innerHTML = `<div class="aim" hidden></div>`; ui.appendChild(hud); L.hud = hud; perfAttach(engine, sc, hud); perfShow();
     toast(IS_TOUCH ? 'Left thumb: walk · Right: drag to look' : 'W A S D to walk · click to look with the mouse · a controller works too');
     // a tap or a click (not a drag) on something: use it
     let down: any = null; const cv = ctx.canvas;
@@ -101,8 +102,9 @@ const Lounge$: Section = {
     L.btn = (b: string) => { if (L.scene && b === 'confirm' && isPlay()) use(); };
     onButton(L.btn);
     // each frame: walking, looking, the fire's light, the boards, the meter
-    let boardT = 0, fpsT = 0;
+    let boardT = 0;
     runLoop(() => {
+      perfBegin();
       const dt = Math.min(0.05, engine.getDeltaTime() / 1000), now = performance.now() / 1000;
       const inp = inputFrame(dt);
       F.yaw -= inp.lx; F.pitch = Math.max(-1.2, Math.min(1.0, F.pitch - inp.ly));
@@ -117,15 +119,15 @@ const Lounge$: Section = {
       const cp = Math.cos(F.pitch); cam.setTarget(new Vector3(F.x - Math.sin(F.yaw) * cp, EYE + bobY + Math.sin(F.pitch), -(F.z - Math.cos(F.yaw) * cp)));
       lo.fire.light.intensity = 2.6 + 0.9 * Math.sin(now * 9) * Math.sin(now * 4.7) + 0.3 * Math.sin(now * 23);
       if (now > boardT) { boardT = now + 30; for (const b of lo.boards) { P.board(b.c, b.kind); const x = b.tex.getContext() as any; x.drawImage(b.c, 0, 0); b.tex.update(true); } }
-      if (S.gfx.showFps && now > fpsT) { fpsT = now + 0.5; const f = hud.querySelector('.fps') as HTMLElement; if (f) f.textContent = `${Math.round(engine.getFps())} fps`; }
       (hud.querySelector('.aim') as HTMLElement).hidden = !(IS_PC && document.pointerLockElement);
       sc.render();
+      perfEnd();
     });
   },
   close() {
     const sc: Scene = L.scene; if (!sc) return;
     try { L.cam && ctxCanvas() && ctxCanvas().removeEventListener('pointerdown', L.pd); } catch (e) { /* gone */ }
-    if (L.hud) L.hud.remove(); sc.dispose(); L.scene = null;
+    perfDetach(); if (L.hud) L.hud.remove(); sc.dispose(); L.scene = null;
   },
   onSettings(what: string) { apply(what === 'preset' ? 'all' : what); },
 };

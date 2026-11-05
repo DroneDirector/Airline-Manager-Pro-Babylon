@@ -30,7 +30,10 @@ const GFX: Row[] = [
   { k: 'range', key: 'gfx.exposure', label: 'Brightness', min: 0.5, max: 1.8, step: 0.05, fmt: pct },
   { k: 'tog', key: 'gfx.sharpen', label: 'Sharpen' },
   { k: 'range', key: 'gfx.fov', label: 'Field of view', min: 50, max: 100, step: 1, fmt: v => Math.round(v) + '°' },
-  { k: 'tog', key: 'gfx.showFps', label: 'Show the frame rate' },
+  { k: 'tog', key: 'gfx.showFps', label: 'Show the frame rate', sub: 'Frames a second and the time between them' },
+  { k: 'tog', key: 'gfx.showCpu', label: 'Show the CPU load', sub: 'How much of each frame the processor is busy' },
+  { k: 'tog', key: 'gfx.showGpu', label: 'Show the GPU load', sub: 'How long the graphics chip takes per frame, draw calls and triangles' },
+  { k: 'tog', key: 'gfx.showMem', label: 'Show the memory', sub: 'The app\'s memory and what pictures and models take on the graphics chip' },
   { k: 'info', label: 'Engine', text: () => `Babylon.js ${APP.babylon} · ${gpuInfo() || 'starting'}` },
 ];
 const CTL: Row[] = [
@@ -54,7 +57,7 @@ const get = (key: string) => { const [a, b] = key.split('.'); return (S as any)[
 const set = (key: string, v: any) => {
   if (key === 'gfx.preset') { applyPreset(v); return; }
   const [a, b] = key.split('.'); (S as any)[a][b] = v;
-  if (a === 'gfx' && b !== 'fps' && b !== 'fov' && b !== 'showFps' && b !== 'exposure' && b !== 'aces' && S.gfx.preset !== 'custom') {
+  if (a === 'gfx' && b !== 'fps' && b !== 'fov' && b !== 'showFps' && b !== 'showCpu' && b !== 'showGpu' && b !== 'showMem' && b !== 'exposure' && b !== 'aces' && S.gfx.preset !== 'custom') {
     const P: any = PRESETS[S.gfx.preset]; if (P && P[b] !== undefined && P[b] !== v) S.gfx.preset = 'custom';
   }
   saveSettings(b);

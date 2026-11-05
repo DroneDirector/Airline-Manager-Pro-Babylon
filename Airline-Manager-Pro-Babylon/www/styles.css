@@ -149,6 +149,16 @@ button.ts-slot, .ts-sb { display: flex; align-items: center; gap: 10px; padding:
 
 /* the meter, the aim, messages */
 .hud { position: fixed; inset: 0; pointer-events: none !important; z-index: 4; }
+.perf { position: absolute; left: max(12px, env(safe-area-inset-left)); top: max(12px, env(safe-area-inset-top)); display: flex; flex-direction: column; gap: 6px; min-width: 190px; padding: 8px 10px; border-radius: 10px; background: rgba(0, 0, 0, .55); font: 600 12px 'Inter', sans-serif; color: #EAF2FA; }
+.perf[hidden] { display: none; }
+.perf > div { display: grid; grid-template-columns: 42px auto 1fr; align-items: baseline; column-gap: 8px; row-gap: 3px; }
+.perf b { color: #9FB6CC; font-weight: 600; }
+.perf span { color: #7CFFB2; font-variant-numeric: tabular-nums; }
+.perf span.na { color: #FFC24A; }
+.perf small { color: rgba(225, 215, 255, .6); font-weight: 500; font-variant-numeric: tabular-nums; }
+.perf small.sub { grid-column: 2 / 4; }
+.perf .pb { grid-column: 1 / 4; display: block; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.perf .pb i { display: block; height: 100%; }
 .fps { position: absolute; left: max(12px, env(safe-area-inset-left)); top: max(12px, env(safe-area-inset-top)); padding: 4px 10px; border-radius: 8px; background: rgba(0, 0, 0, .45); font: 600 12px 'Inter', sans-serif; color: #7CFFB2; }
 .aim { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255, 255, 255, .8); box-shadow: 0 0 4px #000; }
 .toast { position: fixed; left: 50%; bottom: max(26px, env(safe-area-inset-bottom)); transform: translate(-50%, 20px); z-index: 70; max-width: 86vw; padding: 10px 18px; border-radius: 12px; background: rgba(14, 10, 34, .9); border: 1px solid rgba(140, 170, 255, .3); font-size: 13.5px; text-align: center; opacity: 0; transition: opacity .3s, transform .3s var(--ease); pointer-events: none !important; }
