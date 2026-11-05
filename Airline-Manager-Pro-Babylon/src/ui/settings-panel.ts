@@ -65,12 +65,12 @@ const set = (key: string, v: any) => {
 export function settingsOpen(): boolean { return !!el; }
 export function settingsShow(closed?: () => void) {
   if (el) return; onClose = closed || null;
-  const ui = document.getElementById('ui') as HTMLElement; el = document.createElement('div'); el.className = 'sp'; ui.appendChild(el);
+  const ui = document.getElementById('ui') as HTMLElement; el = document.createElement('div'); el.className = 'sp'; ui.appendChild(el); document.body.classList.add('sp-on');
   el.addEventListener('click', clickIn); el.addEventListener('input', inputIn);
   render(); requestAnimationFrame(() => el && el.classList.add('in'));
 }
 export function settingsHide() {
-  const e = el; if (!e) return; el = null; e.classList.remove('in'); setTimeout(() => e.remove(), 300);
+  const e = el; if (!e) return; el = null; e.classList.remove('in'); setTimeout(() => e.remove(), 300); document.body.classList.remove('sp-on');
   const f = onClose; onClose = null; if (f) f();
 }
 onPad(() => { if (el) render(); });

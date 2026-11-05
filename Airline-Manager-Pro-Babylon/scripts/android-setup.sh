@@ -18,6 +18,7 @@ grep -q 'android.hardware.gamepad' "$MAN" || sed -i 's|</manifest>|    <uses-fea
 JDIR="android/app/src/main/java/$(echo "$APPID" | tr '.' '/')"
 mkdir -p "$JDIR"
 sed "s/__PACKAGE__/${APPID}/" scripts/android/MainActivity.java > "$JDIR/MainActivity.java"
+sed "s/__PACKAGE__/${APPID}/" scripts/android/AppExitPlugin.java > "$JDIR/AppExitPlugin.java"
 RES=android/app/src/main/res
 for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do mkdir -p "$RES/mipmap-$d"; cp scripts/android/res/mipmap-$d/ic_launcher*.png "$RES/mipmap-$d/"; done
 mkdir -p "$RES/mipmap-anydpi-v26"; cp scripts/android/res/mipmap-anydpi-v26/ic_launcher*.xml "$RES/mipmap-anydpi-v26/"

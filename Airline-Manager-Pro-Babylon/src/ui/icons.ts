@@ -4,6 +4,7 @@ export const ICONS: { [k: string]: string } = {
   close: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   play: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5L8 5.5Z" fill="currentColor"/></svg>',
   pad: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M7.5 7h9a4.5 4.5 0 0 1 4.4 3.6l.9 4.6a2.6 2.6 0 0 1-4.5 2.2L15.6 15H8.4l-1.7 2.4a2.6 2.6 0 0 1-4.5-2.2l.9-4.6A4.5 4.5 0 0 1 7.5 7Z"/><path d="M7 10v3M5.5 11.5h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="16.5" cy="10.3" r=".9" fill="currentColor"/><circle cx="18.3" cy="12.1" r=".9" fill="currentColor"/></svg>',
+  power: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M12 3v8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7.1 6.2a7.5 7.5 0 1 0 9.8 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   monitor: '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9 20h6M12 16.5V20" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
 };
 export function icon(k: string): string { return ICONS[k] || ''; }

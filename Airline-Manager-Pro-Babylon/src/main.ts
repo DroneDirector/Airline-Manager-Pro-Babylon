@@ -9,6 +9,7 @@ import { splashOpen, splashEnter, splashIsOpen } from './ui/splash';
 import { settingsShow, settingsHide, settingsOpen, settingsButton } from './ui/settings-panel';
 import { loadingShow, loadingProgress, loadingHide } from './ui/loading';
 import { icon, toast } from './ui/icons';
+import { exitGame } from './core/exit';
 import './sections/lounge/index';
 
 const canvas = document.getElementById('bjs') as HTMLCanvasElement, ui = document.getElementById('ui') as HTMLElement;
@@ -18,6 +19,9 @@ inputInit(canvas, ui);
 // the gear: always on the screen
 const gear = document.createElement('button'); gear.className = 'gear'; gear.setAttribute('aria-label', 'Settings'); gear.innerHTML = icon('gear'); ui.appendChild(gear);
 gear.addEventListener('click', () => toggleSettings());
+// Exit, beside the gear: the game shuts down completely and you are back on the desktop (PC) or home screen (Android)
+const exitB = document.createElement('button'); exitB.className = 'exit'; exitB.setAttribute('aria-label', 'Exit the game'); exitB.innerHTML = `${icon('power')}<span>Exit</span>`; ui.appendChild(exitB);
+exitB.addEventListener('click', () => exitGame());
 function toggleSettings() {
   if (settingsOpen()) { settingsHide(); return; }
   setPlay(false); settingsShow(() => { if (inPlace) setPlay(true); });

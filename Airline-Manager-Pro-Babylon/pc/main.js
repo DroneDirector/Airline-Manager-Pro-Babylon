@@ -33,4 +33,5 @@ app.whenReady().then(async () => {
   win.webContents.on('before-input-event', (e, input) => { if (input.type === 'keyDown' && input.key === 'F11') { win.setFullScreen(!win.isFullScreen()); e.preventDefault(); } });
   globalShortcut.register('Alt+F4', () => app.quit());
 });
+// Exit in the game closes the window: the program quits completely
 app.on('window-all-closed', () => app.quit());
