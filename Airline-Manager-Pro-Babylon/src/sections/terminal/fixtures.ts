@@ -4,7 +4,7 @@
 // entrance on the Grand Hall, an airliner on each stand and the jetways J-1 to J-4 from gates 1–4.
 import { MeshBuilder, Mesh, Vector3, TransformNode, PointLight, SpotLight, Light } from '@babylonjs/core';
 import { Kit, P, signC } from './kit';
-import { SCREENS, STAIRS, LIFTS, STANDS, MOD, F2Y, F2CEIL, Stair } from './plan';
+import { SCREENS, STAIRS, LIFTS, STANDS, MOD, F2Y, F2CEIL, Stair, PN } from './plan';
 import { buildMuseum, Museum, Exhibit } from '../building/museum';
 import { buildAirliner, repaint, setGear, Airliner } from '../viewer3d/airliner';
 import { IS_PC } from '../../core/app';
@@ -87,15 +87,15 @@ export function buildFixtures(K: Kit, c1: string, c2: string, airline: string, p
     } catch (e) { console.error(e); }
   });
   for (let k = 0; k < 4; k++) {
-    const x0 = MOD[k], s = STANDS[k * 2], o = K.obj('APRON', 'JETWAY', x0 + 22, F2Y, 76, 0, `J-${k + 1}`); o.metadata.kind = 'jetway';
+    const x0 = MOD[k], s = STANDS[k * 2], o = K.obj('APRON', 'JETWAY', x0 + 22, F2Y, PN, 0, `J-${k + 1}`); o.metadata.kind = 'jetway';
     // the fixed tunnel out from the gate, the rotunda on its column, the moving tunnel down to the aircraft's door
     K.box(o, 2.6, 2.8, 4.0, M.offwhite, 0, 1.4, 2.0); K.box(o, 2.4, 0.6, 3.9, M.glass, 0, 2.2, 2.0);
     K.cyl(o, 1.8, 3.0, M.offwhite, 0, 1.4, 5.2, undefined, 24); K.cyl(o, 0.35, F2Y, M.steel, 0, -F2Y / 2, 5.2);
-    const door = new Vector3(s.x + 2.4 - (x0 + 22), 3.3 - F2Y, s.nz + 5.5 - 76), from = new Vector3(0, 0, 6.6), dv = door.subtract(from), L = dv.length();
+    const door = new Vector3(s.x + 2.4 - (x0 + 22), 3.3 - F2Y, s.nz + 5.5 - PN), from = new Vector3(0, 0, 6.6), dv = door.subtract(from), L = dv.length();
     const t = new TransformNode(K.nm('tunnel'), sc); t.parent = o; t.position = from.add(dv.scale(0.5)); t.rotation.y = Math.atan2(dv.x, dv.z); t.rotation.x = -Math.atan2(dv.y, Math.hypot(dv.x, dv.z)); t.metadata = o.metadata;
     K.box(t, 2.4, 2.6, L, M.offwhite, 0, 1.3, 0); K.box(t, 2.2, 0.5, L - 0.2, M.glass, 0, 2.0, 0); K.box(t, 2.5, 2.7, 0.5, M.black, 0, 1.3, L / 2);
     K.cyl(o, 0.22, 3.3, M.steel, door.x * 0.6, 3.3 - F2Y - 1.6 - 0.1, (6.6 + door.z) * 0.6 / 1 - 6.6 * 0.6 + 6.6); K.box(o, 1.4, 0.5, 0.8, M.black, door.x * 0.6, -F2Y + 0.25, (6.6 + door.z) * 0.6 - 6.6 * 0.6 + 6.6);
-    K.block(1, x0 + 22 - 1.9, 76, x0 + 22 + 1.9, 83);
+    K.block(1, x0 + 22 - 1.9, PN, x0 + 22 + 1.9, PN + 7);
   }
   return { museum, museumDoor, aircraft, lifts };
 }

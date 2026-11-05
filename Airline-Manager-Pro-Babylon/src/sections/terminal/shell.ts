@@ -5,7 +5,7 @@
 // and the site: the kerb, the access road, the car park, the trees, the apron with its stands and taxi lane.
 import { MeshBuilder, Mesh, Vector3, VertexData, TransformNode } from '@babylonjs/core';
 import { Kit, signC } from './kit';
-import { ROOMS, DOORS, STAIRS, Room, Fl, F2Y, F1CEIL, F2CEIL, ROOF, doorH, WAVE, waveSouth, waveH, COLUMNS, STANDS, inRoom } from './plan';
+import { ROOMS, DOORS, STAIRS, Room, Fl, F2Y, F1CEIL, F2CEIL, ROOF, doorH, WAVE, waveSouth, waveH, COLUMNS, STANDS, inRoom, PN } from './plan';
 import { IS_PC } from '../../core/app';
 
 type R4 = { x0: number; z0: number; x1: number; z1: number };
@@ -143,7 +143,7 @@ function buildSite(K: Kit) {
   const { sc, M } = K, par = K.groups.SITE;
   const ground = (id: string, mat: any, x0: number, z0: number, x1: number, z1: number, y: number) => { const g = MeshBuilder.CreateGround(id, { width: x1 - x0, height: z1 - z0 }, sc); g.position.set((x0 + x1) / 2, y, (z0 + z1) / 2); g.material = mat; g.parent = par; g.receiveShadows = true; g.isPickable = false; g.metadata = { id, kind: 'ground', room: 'SITE' }; g.freezeWorldMatrix(); return g; };
   ground('SITE/GRASS', M.grass, -260, -200, 420, 260, -0.03); ground('SITE/KERB', M.kerb, 20, -20, 130, -4, 0.004); ground('SITE/FORECOURT', M.kerb, 0, -4, 160, 0, 0.003);
-  ground('SITE/ROAD', M.asphalt, -120, -34, 280, -20, 0.006); ground('SITE/APRON', M.apron, -100, 76, 260, 145, 0.004); ground('SITE/CARPARK', M.asphalt, 20, -96, 150, -40, 0.005);
+  ground('SITE/ROAD', M.asphalt, -120, -34, 280, -20, 0.006); ground('SITE/APRON', M.apron, -100, PN, 260, PN + 69, 0.004); ground('SITE/CARPARK', M.asphalt, 20, -96, 150, -40, 0.005);
   ground('SITE/SIDE-PATH', M.kerb, 156, 40, 170, 52, 0.004);
   // the road's dashes, the kerb edge, the car park's lines
   const dash = K.obj('SITE', 'ROAD-MARKING', 0, 0.012, -27, 0, 'SITE/ROAD-MARKING'); for (let x = -118; x < 278; x += 8) K.box(dash, 3.5, 0.01, 0.18, M.white, x, 0, 0);
@@ -160,12 +160,12 @@ function buildSite(K: Kit) {
   for (let x = -100; x < 270; x += 12) tree('SITE', x, -36.5); for (let x = 26; x < 150; x += 11) tree('SITE', x, -98, 1.1);
   for (let z = -92; z < -40; z += 11) { tree('SITE', 18, z); tree('SITE', 153, z); }
   // the apron: the taxi lane, each stand's lead-in line and stop bar, and the stands' signs
-  const lane = K.obj('APRON', 'TAXI-LANE', 0, 0.012, 132, 0, 'APRON/TAXI-LANE'); K.box(lane, 350, 0.01, 0.25, M.yellow, 80, 0, 0); K.box(lane, 350, 0.01, 0.12, M.yellow, 80, 0, -8);
-  for (const s of STANDS) { const o = K.obj('APRON', 'STAND', s.x, 0.013, s.nz, 0, s.id); K.box(o, 0.2, 0.01, 132 - s.nz, M.yellow, 0, 0, (132 - s.nz) / 2); K.box(o, 3, 0.01, 0.3, M.yellow, 0, 0, -1.2);
+  const lane = K.obj('APRON', 'TAXI-LANE', 0, 0.012, PN + 56, 0, 'APRON/TAXI-LANE'); K.box(lane, 350, 0.01, 0.25, M.yellow, 80, 0, 0); K.box(lane, 350, 0.01, 0.12, M.yellow, 80, 0, -8);
+  for (const s of STANDS) { const o = K.obj('APRON', 'STAND', s.x, 0.013, s.nz, 0, s.id); K.box(o, 0.2, 0.01, PN + 56 - s.nz, M.yellow, 0, 0, (PN + 56 - s.nz) / 2); K.box(o, 3, 0.01, 0.3, M.yellow, 0, 0, -1.2);
     const sign = MeshBuilder.CreatePlane(K.nm('ss'), { width: 3.2, height: 0.8 }, sc); sign.material = K.picture(signC(s.id, '#14202E', '#F2C230', 512, 128, '700 64px Arial, sans-serif'), 1); sign.parent = o; sign.position.set(-6, 3.2, -5); sign.rotation.y = Math.PI; sign.metadata = o.metadata;
     K.box(o, 0.12, 3.2, 0.12, M.steel, -6, 1.6, -4.9); }
   // the pier's roof: rows of solar panels
   const sol = K.obj('ROOF', 'SOLAR-PANELS', 0, ROOF + 0.15, 0, 0, 'ROOF/SOLAR-PANELS');
-  for (let x = -76; x < 238; x += 4.2) for (const z of [54, 57.2, 60.4, 64.5, 68, 71.5]) { const p = K.box(sol, 3.8, 0.08, 2.6, M.solar, x, 0, z); p.rotation.x = -0.12; }
+  for (let x = -76; x < 238; x += 4.2) for (const z of [54, 57.5, 61, 64.5, 70, 73.5, 77, 80.5]) { const p = K.box(sol, 3.8, 0.08, 2.6, M.solar, x, 0, z); p.rotation.x = -0.12; }
   for (const [x, z] of [[20, 40], [60, 36], [118, 46], [140, 22]]) { const u = K.obj('ROOF', 'ROOF-UNIT', x, ROOF, z); K.box(u, 5, 1.6, 3.2, M.offwhite, 0, 0.8, 0); K.box(u, 4.4, 0.1, 2.6, M.steel, 0, 1.65, 0); }
 }

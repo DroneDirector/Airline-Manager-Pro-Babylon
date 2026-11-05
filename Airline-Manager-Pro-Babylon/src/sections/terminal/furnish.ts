@@ -7,7 +7,7 @@
 // the view bays, the ceiling lights of every room.
 import { MeshBuilder, Mesh, Vector3, TransformNode } from '@babylonjs/core';
 import { Kit, signC, P } from './kit';
-import { ROOMS, Room, F2Y, MOD, STAIRS } from './plan';
+import { ROOMS, Room, F2Y, MOD, STAIRS, PG, PN } from './plan';
 import { IS_PC } from '../../core/app';
 
 export function furnish(K: Kit, progress: (p: number, s: string) => void) {
@@ -106,12 +106,12 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
         for (const z of [42.5, 44.2]) { const g = K.obj(r.id, 'TURNSTILE', 152, 0, z); K.box(g, 0.3, 1.0, 1.0, M.steel, 0, 0.5, 0); K.box(g, 0.02, 0.4, 0.8, M.glass, 0.5, 0.9, 0); K.block(1, 151.8, z - 0.5, 152.2, z + 0.5); }
         lockers(r, 150, 40.3, 0, 10); sign(r, 'STAFF ENTRANCE · ID REQUIRED', 146, 3.2, 51.8, Math.PI, 4.4, 0.42, '#B3261E'); break; }
       case 'baghall': baghall(r); break;
-      case 'ramp': { for (let k = 0; k < 3; k++) { const o = K.obj(r.id, 'BAGGAGE-CART', r.x0 + 6 + k * 4, 0, 70); K.box(o, 1.6, 0.06, 3.0, M.steel, 0, 0.55, 0); for (const s of [-1, 1]) K.box(o, 1.6, 1.2, 0.05, M.steel, 0, 1.15, s * 1.5); K.box(o, 1.62, 0.08, 3.0, M.yellow, 0, 1.75, 0); for (const sx of [-0.7, 0.7]) for (const sz of [-1.2, 1.2]) K.cyl(o, 0.18, 0.12, M.black, sx, 0.2, sz); K.block(1, r.x0 + 5.1 + k * 4, 68.4, r.x0 + 6.9 + k * 4, 71.6); }
-        { const o = K.obj(r.id, 'TUG', r.x0 + 20, 0, 69); K.box(o, 1.6, 1.0, 2.6, M.yellow, 0, 0.75, 0); K.box(o, 1.4, 0.9, 1.0, M.glass, 0, 1.7, -0.4); K.block(1, r.x0 + 19.1, 67.6, r.x0 + 20.9, 70.4); }
-        lockers(r, r.x0 + 14, 63.2, 0, 10); break; }
+      case 'ramp': { for (let k = 0; k < 3; k++) { const o = K.obj(r.id, 'BAGGAGE-CART', r.x0 + 6 + k * 4, 0, PG + 8); K.box(o, 1.6, 0.06, 3.0, M.steel, 0, 0.55, 0); for (const s of [-1, 1]) K.box(o, 1.6, 1.2, 0.05, M.steel, 0, 1.15, s * 1.5); K.box(o, 1.62, 0.08, 3.0, M.yellow, 0, 1.75, 0); for (const sx of [-0.7, 0.7]) for (const sz of [-1.2, 1.2]) K.cyl(o, 0.18, 0.12, M.black, sx, 0.2, sz); K.block(1, r.x0 + 5.1 + k * 4, PG + 6.4, r.x0 + 6.9 + k * 4, PG + 9.6); }
+        { const o = K.obj(r.id, 'TUG', r.x0 + 20, 0, PG + 7); K.box(o, 1.6, 1.0, 2.6, M.yellow, 0, 0.75, 0); K.box(o, 1.4, 0.9, 1.0, M.glass, 0, 1.7, -0.4); K.block(1, r.x0 + 19.1, PG + 5.6, r.x0 + 20.9, PG + 8.4); }
+        lockers(r, r.x0 + 14, PG + 1.2, 0, 10); break; }
       case 'gate1': gateRoom(r, 1); break;
       case 'gate2': gateRoom(r, 2); break;
-      case 'view': for (let k = 0; k < 3; k++) seats(r, cx, 65 + k * 3.2, 0, 26, false); plant(r, r.x0 + 1.2, 74.6, true); plant(r, r.x1 - 1.2, 74.6, true); break;
+      case 'view': for (let k = 0; k < 3; k++) seats(r, cx, PG + 3 + k * 3.2, 0, 26, false); plant(r, r.x0 + 1.2, PN - 1.4, true); plant(r, r.x1 - 1.2, PN - 1.4, true); break;
       case 'link': for (const z of [36, 44]) seats(r, 9.8, z, Math.PI / 2, 6); plant(r, 7, 31.2); plant(r, 13, 31.2); break;
       case 'food': food(r); break;
       case 'eatery': eatery(r); break;
@@ -240,22 +240,22 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
       chair(r, x, z - 0.65, 0, M.fabricBlue); }
   }
   function baghall(r: Room) {
-    for (const [z0, dir] of [[55, 0], [59, 1]] as number[][]) {
+    for (const [z0, dir] of [[56.5, 0], [63.5, 1]] as number[][]) {
       // the sorting belts, in pieces between the doors (so you can cross from the corridor to the ramps)
       const gaps = [18, 134, ...MOD.map(m => m + 14)].sort((a, b) => a - b); let x = r.x0 + 2;
       for (const gx of [...gaps, r.x1]) { const a = x, b = gx - 3; if (b - a > 4) { const o = K.obj(r.id, 'SORTING-BELT', (a + b) / 2, 0, z0, 0); K.box(o, b - a, 0.7, 1.1, M.steel, 0, 0.35, 0); K.box(o, b - a, 0.03, 0.9, M.rubber, 0, 0.71, 0); for (let k = 0; k < Math.floor((b - a) / 6); k++) K.box(o, 0.6, 0.4, 0.4, [M.navy, M.red, M.black, M.trunk][k % 4], -(b - a) / 2 + 3 + k * 6, 0.92, 0); K.block(1, a, z0 - 0.6, b, z0 + 0.6); } x = gx + 3; }
       void dir;
     }
-    for (let k = 0; k < 10; k++) { const x = r.x0 + 20 + k * 32, o = K.obj(r.id, 'BAGGAGE-CART', x, 0, 57, Math.PI / 2); K.box(o, 1.4, 0.06, 2.6, M.steel, 0, 0.55, 0); K.box(o, 1.42, 0.08, 2.6, M.yellow, 0, 1.6, 0); for (const sx of [-0.6, 0.6]) for (const sz of [-1.0, 1.0]) K.cyl(o, 0.16, 0.12, M.black, sx, 0.18, sz); K.block(1, x - 1.3, 56.3, x + 1.3, 57.7); }
+    for (let k = 0; k < 10; k++) { const x = r.x0 + 20 + k * 32, o = K.obj(r.id, 'BAGGAGE-CART', x, 0, 60, Math.PI / 2); K.box(o, 1.4, 0.06, 2.6, M.steel, 0, 0.55, 0); K.box(o, 1.42, 0.08, 2.6, M.yellow, 0, 1.6, 0); for (const sx of [-0.6, 0.6]) for (const sz of [-1.0, 1.0]) K.cyl(o, 0.16, 0.12, M.black, sx, 0.18, sz); K.block(1, x - 1.3, 59.3, x + 1.3, 60.7); }
   }
   /** A gate: rows of seats facing the windows, the gate desk, its stairs and lift down to the walk-out gate (or up to the jetway). */
   function gateRoom(r: Room, fl: number) {
     const x0 = r.x0, rowsX = fl === 2 ? [x0 + 2.5, x0 + 26] : [x0 + 5.5, x0 + 38.5];
-    for (let k = 0; k < 3; k++) seats(r, (rowsX[0] + rowsX[1]) / 2, 65.4 + k * 3.0, 0, Math.floor((rowsX[1] - rowsX[0]) / 0.62), false);
-    const dx = fl === 2 ? x0 + 17 : x0 + 20, gd = K.obj(r.id, 'GATE-DESK', dx, Y(r), 74.4, 0); K.box(gd, 2.6, 1.05, 0.7, M.white, 0, 0.52, 0); K.box(gd, 2.7, 0.05, 0.8, M.marbleDark, 0, 1.07, 0); K.box(gd, 0.5, 0.3, 0.03, M.screenBlack, 0.6, 1.3, -0.1);
-    K.block(r.f, dx - 1.35, 74.0, dx + 1.35, 74.8); officeChair(r, dx, 75.3, Math.PI);
-    sign(r, `GATE ${r.id.replace(/\D+/g, '').slice(-1)}`, dx, 3.5, 75.75, Math.PI, 2.4, 0.6, '#F2C230', '#14202E');
-    plant(r, r.x1 - 1.2, 63, true); bin(r, dx - 2.6, 74.4);
+    for (let k = 0; k < 3; k++) seats(r, (rowsX[0] + rowsX[1]) / 2, PG + 3.4 + k * 3.0, 0, Math.floor((rowsX[1] - rowsX[0]) / 0.62), false);
+    const dx = fl === 2 ? x0 + 17 : x0 + 20, gd = K.obj(r.id, 'GATE-DESK', dx, Y(r), PN - 1.6, 0); K.box(gd, 2.6, 1.05, 0.7, M.white, 0, 0.52, 0); K.box(gd, 2.7, 0.05, 0.8, M.marbleDark, 0, 1.07, 0); K.box(gd, 0.5, 0.3, 0.03, M.screenBlack, 0.6, 1.3, -0.1);
+    K.block(r.f, dx - 1.35, PN - 2.0, dx + 1.35, PN - 1.2); officeChair(r, dx, PN - 0.7, Math.PI);
+    sign(r, `GATE ${r.id.replace(/\D+/g, '').slice(-1)}`, dx, 3.5, PN - 0.25, Math.PI, 2.4, 0.6, '#F2C230', '#14202E');
+    plant(r, r.x1 - 1.2, PG + 1, true); bin(r, dx - 2.6, PN - 1.6);
   }
   function food(r: Room) {
     for (const x of [18, 24.5, 31, 37.5, 44, 50.5]) for (const z of [39.3, 33.9]) { table(r, x, z, 0.55, 0.74, M.white); for (const [dx, dz, yaw] of [[0, -0.85, 0], [0, 0.85, Math.PI], [-0.85, 0, Math.PI / 2], [0.85, 0, -Math.PI / 2]]) chair(r, x + dx, z + dz, yaw, M.fabricRust); }
@@ -297,15 +297,22 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
     for (const [x, z] of [[105, 31], [145, 31], [105, 51]]) plant(r, x, z, true);
     sign(r, 'THE BAR', 125, 4.6, 30.25, 0, 4, 0.8, '#101114', '#D4AF37');
   }
-  /** The walkway: moving walkways in pairs (east and west), seats along its south wall. */
+  /** The walkway, 16 m wide: the two moving walkways side by side down its middle (east and west, one rail between them),
+   *  a clear lane about 6 m wide on each side, and seating islands with planters by the gates, between the walkways' sections. */
   function walk(r: Room) {
-    for (const [a, b] of [[-75, -5], [5, 75], [85, 155], [165, 235]]) for (const [z, dir] of [[54.6, 1], [59.4, -1]]) {
-      const o = K.obj(r.id, 'MOVING-WALKWAY', (a + b) / 2, Y(r), z, 0); o.metadata.dir = dir; o.metadata.x0 = a; o.metadata.x1 = b; o.metadata.z = z;
-      K.box(o, b - a, 0.12, 1.4, M.rubber, 0, 0.06, 0); for (const s of [-1, 1]) { K.box(o, b - a, 0.9, 0.08, M.glass, 0, 0.55, s * 0.78); K.box(o, b - a, 0.08, 0.14, M.black, 0, 1.02, s * 0.78); }
-      K.box(o, 0.6, 0.02, 1.4, M.yellow, -(b - a) / 2 + 0.3, 0.125, 0); K.box(o, 0.6, 0.02, 1.4, M.yellow, (b - a) / 2 - 0.3, 0.125, 0);
-      K.block(2, a, z - 0.86, b, z - 0.7); K.block(2, a, z + 0.7, b, z + 0.86); }
-    for (let x = -70; x < 240; x += 22) { if (Math.abs(x - 10) < 6 || Math.abs(x - 118) < 6 || Math.abs(x - 132) < 6) continue; seats(r, x, 52.7, 0, 8); }
-    for (let x = -78; x < 242; x += 40) plant(r, x, 61.4, true);
+    const zc = (r.z0 + r.z1) / 2, segs = [[-75, -5], [5, 75], [85, 155], [165, 235]];
+    for (const [a, b] of segs) {
+      for (const [dz, dir] of [[-0.85, 1], [0.85, -1]]) { const z = zc + dz, o = K.obj(r.id, 'MOVING-WALKWAY', (a + b) / 2, Y(r), z, 0); o.metadata.dir = dir; o.metadata.x0 = a; o.metadata.x1 = b; o.metadata.z = z;
+        K.box(o, b - a, 0.12, 1.5, M.rubber, 0, 0.06, 0); K.box(o, 0.6, 0.02, 1.5, M.yellow, -(b - a) / 2 + 0.3, 0.125, 0); K.box(o, 0.6, 0.02, 1.5, M.yellow, (b - a) / 2 - 0.3, 0.125, 0);
+        for (let k = 0; k < Math.floor((b - a) / 12); k++) { const p = MeshBuilder.CreatePlane(K.nm('arw'), { width: 1.0, height: 0.5 }, sc); p.material = K.picture(signC(dir > 0 ? '→' : '←', '#2A2D33', '#F2C230', 256, 128, '700 110px Arial, sans-serif'), 1); p.parent = o; p.rotation.x = Math.PI / 2; p.position.set(-(b - a) / 2 + 6 + k * 12, 0.13, 0); p.metadata = o.metadata; } }
+      const rails = K.obj(r.id, 'WALKWAY-RAILS', (a + b) / 2, Y(r), zc, 0);
+      for (const dz of [-1.68, 0, 1.68]) { K.box(rails, b - a, 0.9, 0.06, M.glass, 0, 0.55, dz); K.box(rails, b - a, 0.07, dz ? 0.14 : 0.2, M.black, 0, 1.02, dz); K.block(2, a, zc + dz - 0.1, b, zc + dz + 0.1); }
+    }
+    // a seating island in each crossing between the walkways' sections (about 3 m clear on each side of it), planters along the south wall
+    for (const gx of [0, 80, 160]) {
+      seats(r, gx, zc - 0.6, 0, 6, false); seats(r, gx, zc + 0.6, Math.PI, 6, false);
+    }
+    for (let x = -78; x < 242; x += 40) { plant(r, x + 2, r.z0 + 0.8, true); }
   }
   void IS_PC; void TransformNode;
 }
