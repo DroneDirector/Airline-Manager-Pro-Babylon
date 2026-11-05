@@ -1,6 +1,6 @@
 // The 3D viewer, as a demonstration: an airliner in the cruise at flight level 300 (30,000 ft) following its flight
 // plan from Vágar to Copenhagen above a layer of volumetric clouds, the sun, the moon and the real stars where they
-// are for the time and the place. The time of day runs (paused, as it is, 60× or 600×) and the slider moves the sun
+// are for the time and the place. The time of day runs (paused, as it is, 60×, 600×, 2000× or 3200×) and the slider moves the sun
 // at once, so you can see how the light changes everything. Camera angles: behind, side, front, above, below, the
 // left and right windows, the tail and a fly-by; drag (or the right stick, or the mouse) to look round, pinch, the
 // wheel or the left stick to come closer.
@@ -118,7 +118,7 @@ function hudHtml(): string {
     <div class="v3d-time">
       <div class="v3d-clock">${icon('clock')}<b class="v3d-lt">--:--</b><small class="v3d-sub"></small></div>
       <input class="v3d-slider" type="range" min="0" max="1439" step="1" aria-label="Time of day (demo): moves the sun">
-      <div class="v3d-speed">${[[0, 'Pause'], [1, '1×'], [60, '60×'], [600, '600×']].map(([k, l]) => `<button class="v3d-b ${k === 60 ? 'on' : ''}" data-speed="${k}">${l}</button>`).join('')}</div>
+      <div class="v3d-speed">${[[0, 'Pause'], [1, '1×'], [60, '60×'], [600, '600×'], [2000, '2000×'], [3200, '3200×']].map(([k, l]) => `<button class="v3d-b ${k === 60 ? 'on' : ''}" data-speed="${k}">${l}</button>`).join('')}</div>
       <small class="v3d-demo">Demo: drag the slider to move the sun</small>
     </div>
     <div class="v3d-perf"></div>
@@ -236,7 +236,7 @@ const Viewer: Section = {
       V.sky.dome.position.copyFrom(cam.position);
       sky(now);
       // the sky's reflection on the paint: refreshed now and then, and at once when the slider moves
-      if (V.probeOn && (V.envDirty || now > envT)) { pr.cubeTexture.resetRefreshCounter(); envT = now + (V.speed >= 600 ? 0.4 : 1.2); V.envDirty = false; }
+      if (V.probeOn && (V.envDirty || now > envT)) { pr.cubeTexture.resetRefreshCounter(); envT = now + (V.speed >= 2000 ? 0.2 : V.speed >= 600 ? 0.4 : 1.2); V.envDirty = false; }
       if (now > infoT) { infoT = now + 0.25; info(); }
       sc.render();
       perfEnd();
