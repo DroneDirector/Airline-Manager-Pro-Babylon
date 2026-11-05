@@ -80,7 +80,8 @@ function groundMesh(sc: Scene, site: any, half: number, n: number, z: number, el
     }
     const v = 0.92 + nz * 0.14; col.push(c.r * v, c.g * v, c.b * v, 1);
   }
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const a = j * (n + 1) + i, b = a + n + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+  // the triangles wound so their fronts face up (the top of the land is what is drawn)
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const a = j * (n + 1) + i, b = a + n + 1; idx.push(a, a + 1, b, a + 1, b + 1, b); }
   const m = new Mesh('ground', sc), vd = new VertexData(), nr: number[] = []; VertexData.ComputeNormals(pos, idx, nr); vd.positions = pos; vd.indices = idx; vd.normals = nr; vd.colors = col; vd.uvs = uv; vd.applyToMesh(m);
   const mat = new PBRMaterial('groundM', sc); mat.albedoTexture = detail; mat.metallic = 0; mat.roughness = 0.95; mat.environmentIntensity = 0.35; (mat as any).useVertexColors = true; m.useVertexColors = true;
   m.material = mat; m.isPickable = false; m.receiveShadows = true; m.renderingGroupId = 1; return { m, hs };
@@ -207,8 +208,9 @@ const Site$: Section = {
     // what the panel shows: the site, its numbers, the views, the drone's speed
     const kx = 111320 * Math.cos(site.lat * D2R);
     hud.insertAdjacentHTML('beforeend', `<div class="site-top"><b>${site.name}</b><small>${site.lat.toFixed(3)}° ${site.lat >= 0 ? 'N' : 'S'} · ${Math.abs(site.lon).toFixed(3)}° ${site.lon < 0 ? 'W' : 'E'} · runways ${site.rwy[0]}/${site.rwy[1]} true ${String(site.hdg).padStart(3, '0')}°/${String((site.hdg + 180) % 360).padStart(3, '0')}° · gates face ${String(site.gates).padStart(3, '0')}° · ground ${Math.round(elev)} m</small></div>
+      <div class="site-dock"><div class="site-speed"><small>Drone speed</small>${[[8, 'Walk'], [40, 'Fast'], [220, 'Plane']].map(([k, l]) => `<button class="wx-o" data-sp2="${k}">${l}</button>`).join('')}</div>
       <div class="site-views">${VIEWS.map(v => `<button class="wx-b" data-view="${v.id}">${v.name}</button>`).join('')}<button class="wx-b" data-site>${SITES.filter(s => s !== site).map(s => 'Go to ' + s.name.split(',')[0]).join('')}</button></div>
-      <div class="site-speed"><small>Drone speed</small>${[[8, 'Walk'], [40, 'Fast'], [220, 'Plane']].map(([k, l]) => `<button class="wx-o" data-sp2="${k}">${l}</button>`).join('')}</div>
+</div>
       <div class="wx-updown site-ud" ${IS_TOUCH ? '' : 'hidden'}><button class="wx-b" data-ud="up">▲</button><button class="wx-b" data-ud="down">▼</button></div>`);
     const CAM = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, speed: 40, up: 0, down: 0 }; O.CAM = CAM;
     const place = (id: string) => { const v = VIEWS.find(q => q.id === id) || VIEWS[0], at = Vector3.TransformCoordinates(new Vector3(v.at[0], v.at[1], v.at[2]), ap.computeWorldMatrix(true)), lk = Vector3.TransformCoordinates(new Vector3(v.look[0], v.look[1], v.look[2]), ap.getWorldMatrix());
