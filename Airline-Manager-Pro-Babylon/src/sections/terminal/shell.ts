@@ -29,11 +29,12 @@ export function buildShell(K: Kit, progress: (p: number, s: string) => void) {
   const base = (f: Fl) => f === 1 ? 0 : F2Y;
   const top = (r: Room) => base(r.f) + (r.h != null ? r.h : r.kind === 'vestibule' ? 3.4 : 5.4);
   const F2R = ROOMS.filter(r => r.f === 2), holes = stairHoles();
-  const inAny = (f: Fl, x: number, z: number) => ROOMS.some(r => r.f === f && r.kind !== 'museum' && inRoom(r, x, z));
   const wallBox = (roomId: string, mat: any, ax: 'x' | 'z', line: number, a: number, b: number, y0: number, y1: number, off: number, th = 0.12) => {
     if (b - a < 0.02 || y1 - y0 < 0.02) return; const m = MeshBuilder.CreateBox(K.nm('w'), { width: ax === 'x' ? b - a : th, height: y1 - y0, depth: ax === 'x' ? th : b - a }, sc);
     if (ax === 'x') m.position.set((a + b) / 2, (y0 + y1) / 2, line + off); else m.position.set(line + off, (y0 + y1) / 2, (a + b) / 2);
-    K.struct(roomId, m, mat); };
+    put(roomId, m, mat); };
+  // glass stays its own mesh in its room (merged glass sorts badly and flickers); everything else is merged per room
+  const put = (roomId: string, m: Mesh, mat: any) => { if (mat === M.glass) { m.material = mat; m.parent = K.rooms[roomId]; m.isPickable = false; m.alphaIndex = 10; m.metadata = { id: roomId + '/GLASS', kind: 'glass', room: roomId }; m.freezeWorldMatrix(); } else K.struct(roomId, m, mat); };
   /** A run of wall along a side: solid (or glass) between the doors, a lintel over each door. */
   const sideRun = (r: Room, side: string, y0: number, y1: (u: number) => number, mat: any, glass: boolean, off: number, th = 0.12, rid = r.id) => {
     const ax: 'x' | 'z' = side === 'n' || side === 's' ? 'x' : 'z', line = side === 'n' ? r.z1 : side === 's' ? r.z0 : side === 'e' ? r.x1 : r.x0;
@@ -49,7 +50,7 @@ export function buildShell(K: Kit, progress: (p: number, s: string) => void) {
         if (flat) { wallBox(rid, m, ax, line, s, e, py, y1(s), off, glass && py === y0 ? 0.03 : th); continue; }
         // a sloping top: one flat panel from the bottom up to the roof at each end, so it meets the roof all along
         const P = (u: number, yy: number) => ax === 'x' ? new Vector3(u, yy, line + off) : new Vector3(line + off, yy, u);
-        const q = MeshBuilder.CreateRibbon(K.nm('wq'), { pathArray: [[P(s, py), P(e, py)], [P(s, y1(s)), P(e, y1(e))]], sideOrientation: Mesh.DOUBLESIDE }, sc); K.struct(rid, q, m); }
+        const q = MeshBuilder.CreateRibbon(K.nm('wq'), { pathArray: [[P(s, py), P(e, py)], [P(s, y1(s)), P(e, y1(e))]], sideOrientation: Mesh.DOUBLESIDE }, sc); put(rid, q, m); }
       if (glass && py === y0) for (let s = pa; s <= pb + 0.001; s += (pb - pa) / Math.max(1, Math.round((pb - pa) / 1.8))) wallBox(rid, M.mullion, ax, line, s - 0.04, s + 0.04, y0, y1(s), off, 0.14);
     }
   };
@@ -59,13 +60,13 @@ export function buildShell(K: Kit, progress: (p: number, s: string) => void) {
     const b = base(r.f), fm = M[FLOOR_M[r.kind] || 'terrazzo'], wm = M[WALL_M[r.kind] || 'plaster'], isHall = r.kind === 'hall';
     // the floor (less the stairs going down through it on Floor 2); its slab under it on Floor 2
     for (const c of (r.f === 2 ? rectMinus(r, holes) : [r])) {
-      const g = MeshBuilder.CreateGround(K.nm('fl'), { width: c.x1 - c.x0, height: c.z1 - c.z0 }, sc); g.position.set((c.x0 + c.x1) / 2, b + 0.005, (c.z0 + c.z1) / 2); K.struct(r.id, g, fm);
+      const g = MeshBuilder.CreateGround(K.nm('fl'), { width: c.x1 - c.x0, height: c.z1 - c.z0 }, sc); g.position.set((c.x0 + c.x1) / 2, b + (r.f === 1 ? 0.012 : 0.008), (c.z0 + c.z1) / 2); K.struct(r.id, g, fm);
       if (r.f === 2) { const s = MeshBuilder.CreateBox(K.nm('slab'), { width: c.x1 - c.x0, height: 0.36, depth: c.z1 - c.z0 }, sc); s.position.set((c.x0 + c.x1) / 2, F2Y - 0.19, (c.z0 + c.z1) / 2); K.struct(r.id, s, M.concrete); }
     }
     // the ceiling; the roof slab where nothing is built over it
     if (!isHall) {
       const ct = top(r), cm = r.kind === 'baghall' || r.kind === 'plant' || r.kind === 'ramp' ? M.concrete : M.offwhite;
-      for (const c of rectMinus(r, holes)) { const p = MeshBuilder.CreatePlane(K.nm('ce'), { width: c.x1 - c.x0, height: c.z1 - c.z0 }, sc); p.rotation.x = -Math.PI / 2; p.position.set((c.x0 + c.x1) / 2, ct, (c.z0 + c.z1) / 2); K.struct(r.id, p, cm); }
+      for (const c of rectMinus(r, holes)) { const p = MeshBuilder.CreatePlane(K.nm('ce'), { width: c.x1 - c.x0, height: c.z1 - c.z0 }, sc); p.rotation.x = -Math.PI / 2; p.position.set((c.x0 + c.x1) / 2, ct - 0.04, (c.z0 + c.z1) / 2); K.struct(r.id, p, cm); }
       if (r.f === 1) { const open = rectMinus(r, F2R); for (const c of open) { const s = MeshBuilder.CreateBox(K.nm('rf'), { width: c.x1 - c.x0, height: 0.4, depth: c.z1 - c.z0 }, sc); s.position.set((c.x0 + c.x1) / 2, (r.kind === 'vestibule' ? ct : F1CEIL) + 0.2, (c.z0 + c.z1) / 2); K.struct(r.id, s, M.white); } }
       else { const s = MeshBuilder.CreateBox(K.nm('rf'), { width: r.x1 - r.x0, height: ROOF - F2CEIL, depth: r.z1 - r.z0 }, sc); s.position.set((r.x0 + r.x1) / 2, (F2CEIL + ROOF) / 2, (r.z0 + r.z1) / 2); K.struct(r.id, s, M.white); }
     }
@@ -76,23 +77,29 @@ export function buildShell(K: Kit, progress: (p: number, s: string) => void) {
       if (isHall) {
         // the Grand Hall: its walls go up to the wave roof; on its north side, between 6 and 12 m, the glass of the Floor 2 rooms over the hall takes their place
         const roofAt = (u: number) => ax === 'x' ? waveH(u, line) - 0.05 : waveH(line, u) - 0.05;
-        sideRun(r, side, 0, u => Math.min(F2Y, roofAt(u)), wm, glass, inward * 0.09);
+        sideRun(r, side, 0, u => Math.min(F2Y, roofAt(u)), wm, glass, 0, 0.2);
         const a0 = ax === 'x' ? r.x0 : r.z0, a1 = ax === 'x' ? r.x1 : r.z1; let s0 = a0;
         const covered = (u: number) => { const px = ax === 'x' ? u : line - inward * 0.5, pz = ax === 'x' ? line - inward * 0.5 : u; return F2R.some(q => inRoom(q, px, pz)); };
-        const band = (p0: number, p1: number) => { if (p1 - p0 < 0.05) return; const sub = { ...r, x0: ax === 'x' ? p0 : r.x0, x1: ax === 'x' ? p1 : r.x1, z0: ax === 'z' ? p0 : r.z0, z1: ax === 'z' ? p1 : r.z1 } as Room; sideRun(sub, side, F2Y, u2 => Math.min(ROOF, roofAt(u2)), wm, glass, inward * 0.09); };
+        const band = (p0: number, p1: number) => { if (p1 - p0 < 0.05) return; const sub = { ...r, x0: ax === 'x' ? p0 : r.x0, x1: ax === 'x' ? p1 : r.x1, z0: ax === 'z' ? p0 : r.z0, z1: ax === 'z' ? p1 : r.z1 } as Room; sideRun(sub, side, F2Y, u2 => Math.min(ROOF, roofAt(u2)), wm, glass, 0, 0.2); };
         for (let u = a0; u < a1; u += 1) { if (covered(Math.min(a1 - 0.01, u + 0.5))) { band(s0, u); s0 = u + 1; } }
         band(Math.min(s0, a1), a1);
-        const sub2 = r; sideRun(sub2, side, ROOF, roofAt, wm, glass, inward * 0.09);
+        sideRun(r, side, ROOF, roofAt, wm, glass, 0, 0.2);
         continue;
       }
-      sideRun(r, side, base(r.f), () => top(r), wm, glass, inward * 0.09);
-      if (glass) continue;
-      // outside: sample the side every metre; where the air is beyond it, white cladding over the floor's height
-      const a0 = ax === 'x' ? r.x0 : r.z0, a1 = ax === 'x' ? r.x1 : r.z1; let s0 = -1;
-      const air = (u: number) => { const px = ax === 'x' ? u : line - inward * 0.4, pz = ax === 'x' ? line - inward * 0.4 : u; return !inAny(r.f, px, pz) && !(r.f === 1 && inAny(1, px, pz)); };
-      const flush = (a: number, b2: number) => { const sub = { ...r, x0: ax === 'x' ? a : r.x0, x1: ax === 'x' ? b2 : r.x1, z0: ax === 'z' ? a : r.z0, z1: ax === 'z' ? b2 : r.z1 } as Room; sideRun(sub, side, base(r.f), () => base(r.f) + 6, M.white, false, -inward * 0.04, 0.08); };
-      for (let u = a0 + 0.5; u < a1 + 0.5; u += 1) { const isAir = u < a1 && air(u); if (isAir && s0 < 0) s0 = u - 0.5; if (!isAir && s0 >= 0) { flush(Math.max(a0, s0), Math.min(a1, u - 0.5)); s0 = -1; } }
-      if (s0 >= 0) flush(Math.max(a0, s0), a1);
+      // one wall per shared edge: sample the side every half metre and look at what is beyond it. Where another room
+      // is, only one of the two builds the wall (the hall always; else the one listed first), centred on the line and
+      // as tall as the taller room; where the open air is, the wall inside and the white cladding outside.
+      const a0 = ax === 'x' ? r.x0 : r.z0, a1 = ax === 'x' ? r.x1 : r.z1, me = ROOMS.indexOf(r);
+      const beyond = (u: number) => { const px = ax === 'x' ? u : line - inward * 0.3, pz = ax === 'x' ? line - inward * 0.3 : u; return ROOMS.find(q => q !== r && q.f === r.f && q.kind !== 'museum' && inRoom(q, px, pz)); };
+      // a glass side: built by this room, unless the Grand Hall's own glass is already on that line (the entrances)
+      if (glass) { if (beyond(((ax === 'x' ? r.x0 + r.x1 : r.z0 + r.z1) / 2))?.kind !== 'hall') sideRun(r, side, base(r.f), () => top(r), wm, glass, inward * 0.09); continue; }
+      const cls = (u: number): string => { const q = beyond(u); if (!q) return 'air'; if (q.kind === 'hall' || ROOMS.indexOf(q) < me) return 'skip'; return 'own:' + Math.max(top(r), top(q)).toFixed(2); };
+      const runOf = (p0: number, p1: number, c: string) => { if (p1 - p0 < 0.02 || c === 'skip') return; const sub = { ...r, x0: ax === 'x' ? p0 : r.x0, x1: ax === 'x' ? p1 : r.x1, z0: ax === 'z' ? p0 : r.z0, z1: ax === 'z' ? p1 : r.z1 } as Room;
+        if (c === 'air') { sideRun(sub, side, base(r.f), () => top(r), wm, false, inward * 0.09); sideRun(sub, side, base(r.f), () => base(r.f) + 6, M.white, false, -inward * 0.04, 0.08); }
+        else { const h = +c.slice(4); sideRun(sub, side, base(r.f), () => h, wm, false, 0, 0.2); } };
+      let s0 = a0, c0 = cls(Math.min(a1 - 0.01, a0 + 0.25));
+      for (let u = a0 + 0.5; u < a1 - 0.01; u += 0.5) { const c = cls(Math.min(a1 - 0.01, u + 0.25)); if (c !== c0) { runOf(s0, u, c0); s0 = u; c0 = c; } }
+      runOf(s0, a1, c0);
     }
   }
   progress(26, 'Raising the wave roof…');
@@ -142,7 +149,7 @@ function buildWaveRoof(K: Kit) {
 function buildSite(K: Kit) {
   const { sc, M } = K, par = K.groups.SITE;
   const ground = (id: string, mat: any, x0: number, z0: number, x1: number, z1: number, y: number) => { const g = MeshBuilder.CreateGround(id, { width: x1 - x0, height: z1 - z0 }, sc); g.position.set((x0 + x1) / 2, y, (z0 + z1) / 2); g.material = mat; g.parent = par; g.receiveShadows = true; g.isPickable = false; g.metadata = { id, kind: 'ground', room: 'SITE' }; g.freezeWorldMatrix(); return g; };
-  ground('SITE/GRASS', M.grass, -260, -200, 420, 260, -0.03); ground('SITE/KERB', M.kerb, 20, -20, 130, -4, 0.004); ground('SITE/FORECOURT', M.kerb, 0, -4, 160, 0, 0.003);
+  ground('SITE/GRASS', M.grass, -260, -200, 420, 260, -0.03); ground('SITE/KERB', M.kerb, 20, -20, 130, -4, 0.004);
   ground('SITE/ROAD', M.asphalt, -120, -34, 280, -20, 0.006); ground('SITE/APRON', M.apron, -100, PN, 260, PN + 69, 0.004); ground('SITE/CARPARK', M.asphalt, 20, -96, 150, -40, 0.005);
   ground('SITE/SIDE-PATH', M.kerb, 156, 40, 170, 52, 0.004);
   // the road's dashes, the kerb edge, the car park's lines

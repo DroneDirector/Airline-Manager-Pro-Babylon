@@ -6,6 +6,7 @@
 //  - Objects of the same kind share one source mesh per part (instances): many chairs cost little to draw.
 import { Scene, Vector3, Color3, MeshBuilder, Mesh, PBRMaterial, StandardMaterial, DynamicTexture, Texture, TransformNode, AbstractMesh, InstancedMesh } from '@babylonjs/core';
 import * as P from '../lounge/pictures';
+import { ROOMS, inRoom } from './plan';
 
 export interface Obj { id: string; kind: string; room: string; node: TransformNode }
 export interface Kit {
@@ -25,10 +26,13 @@ export interface Kit {
   block: (f: number, x0: number, z0: number, x1: number, z1: number) => void;
   circle: (f: number, x: number, z: number, r: number) => void;
   nm: (k: string) => string;
+  /** After furnishing: free-standing furniture that reaches into a wall is moved back into its room, clear of the wall. */
+  clearWalls: () => void;
 }
 export interface MatO { col?: string; tex?: Texture; metal?: number; rough?: number; emis?: string; emisK?: number; alpha?: number; coat?: number; key?: string }
 
 export function makeKit(sc: Scene): Kit {
+  let cur: string | null = null; const owner = new Map<number[], string>();
   const root = new TransformNode('TERMINAL', sc), groups: { [k: string]: TransformNode } = {}, rooms: { [id: string]: TransformNode } = {};
   for (const g of ['F1', 'F2', 'ROOF', 'SITE', 'DOORS', 'STAIRS', 'SCREENS', 'STANDS']) { const t = new TransformNode(g, sc); t.parent = root; groups[g] = t; }
   const objects = new Map<string, Obj>(), metals: PBRMaterial[] = [], casters: AbstractMesh[] = [], blocks: { [f: number]: number[][] } = { 1: [], 2: [] }, circles: { [f: number]: number[][] } = { 1: [], 2: [] };
@@ -77,7 +81,7 @@ export function makeKit(sc: Scene): Kit {
     const k = roomId + '/' + kind; counts[k] = (counts[k] || 0) + 1;
     const oid = id || `${roomId}/${kind}-${String(counts[k]).padStart(3, '0')}`;
     const t = new TransformNode(oid, sc); t.position.set(x, y, z); t.rotation.y = yaw; t.metadata = { id: oid, kind, room: roomId };
-    t.parent = rooms[roomId] || groups[roomId] || root; objects.set(oid, { id: oid, kind, room: roomId, node: t }); return t; };
+    t.parent = rooms[roomId] || groups[roomId] || root; objects.set(oid, { id: oid, kind, room: roomId, node: t }); cur = oid; return t; };
   const sources = new Map<string, Mesh>();
   const part = (key: string, build: () => Mesh, mat: any, par: TransformNode, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => {
     const sk = key + '|' + (mat && mat.name); let src = sources.get(sk);
@@ -95,9 +99,24 @@ export function makeKit(sc: Scene): Kit {
       for (let i = 0; i < list.length; i += 300) { const mm = Mesh.MergeMeshes(list.slice(i, i + 300), true, true, undefined, false, false); if (mm) { mm.name = `${roomId}/STRUCTURE-${mat.name}`; mm.material = mat; mm.parent = par; mm.receiveShadows = true; mm.isPickable = false; mm.metadata = { id: roomId, kind: 'structure', room: roomId }; mm.freezeWorldMatrix(); } } }
     structs.clear();
   };
-  const block = (f: number, x0: number, z0: number, x1: number, z1: number) => blocks[f].push([Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1)]);
-  const circle = (f: number, x: number, z: number, r: number) => circles[f].push([x, z, r]);
-  return { sc, root, groups, rooms, objects, metals, casters, blocks, circles, M, tex, pbr, glow, picture, obj, part, box, cyl, ball, struct, block, circle, nm };
+  const block = (f: number, x0: number, z0: number, x1: number, z1: number) => { const b = [Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1)]; blocks[f].push(b); if (cur) owner.set(b, cur); };
+  const circle = (f: number, x: number, z: number, r: number) => { const c = [x, z, r]; circles[f].push(c); if (cur) owner.set(c, cur); };
+  const FREE = new Set(['AIR-HANDLER', 'ARMCHAIR', 'BACK-BAR', 'BAGGAGE-CART', 'BAR-STOOL', 'BENCH', 'BIN', 'CABINET', 'CHAIR', 'CLEANING-CART', 'COUNTER', 'DESK', 'GATE-DESK', 'LOCKERS', 'MEETING-TABLE', 'OFFICE-CHAIR', 'PLANT', 'PUMP', 'SEATS', 'SHELF', 'SOFA', 'STOOL', 'STUDENT-DESK', 'TABLE', 'TREE-PLANTER', 'TUG', 'TOY-BLOCK', 'SECURITY-DESK', 'KITCHEN', 'STALL', 'PERFUME-ISLAND']);
+  const clearWalls = () => {
+    const CLEAR = 0.25; // the wall's face is at most 0.15 m in from the room's line; 10 cm more to spare
+    for (const o of objects.values()) {
+      if (!FREE.has(o.kind)) continue; const r = ROOMS.find(q => q.id === o.room); if (!r || r.kind === 'museum') continue;
+      const { min, max } = o.node.getHierarchyBoundingVectors(true), cx = (min.x + max.x) / 2, cz = (min.z + max.z) / 2;
+      if (!inRoom(r, cx, cz)) continue;
+      const push = (lo: number, hi: number, a: number, b: number) => { const dl = a + CLEAR - lo, dh = hi - (b - CLEAR); if (dl > 0 && dh > 0) return 0; if (dl > 0 && dl < 0.8) return dl; if (dh > 0 && dh < 0.8) return -dh; return 0; };
+      const dx = push(min.x, max.x, r.x0, r.x1), dz = push(min.z, max.z, r.z0, r.z1); if (!dx && !dz) continue;
+      const near = (x: number, z: number) => x > min.x - 0.5 && x < max.x + 0.5 && z > min.z - 0.5 && z < max.z + 0.5;
+      o.node.position.x += dx; o.node.position.z += dz;
+      for (const f of [1, 2]) { for (const b of blocks[f]) if (owner.get(b) === o.id && near((b[0] + b[2]) / 2, (b[1] + b[3]) / 2)) { b[0] += dx; b[2] += dx; b[1] += dz; b[3] += dz; } for (const c of circles[f]) if (owner.get(c) === o.id && near(c[0], c[1])) { c[0] += dx; c[1] += dz; } }
+    }
+    cur = null;
+  };
+  return { sc, root, groups, rooms, objects, metals, casters, blocks, circles, M, tex, pbr, glow, picture, obj, part, box, cyl, ball, struct, block, circle, nm, clearWalls };
 }
 /** Square tiles with grout. */
 export function tiles(a: string, b: string, n: number): HTMLCanvasElement {

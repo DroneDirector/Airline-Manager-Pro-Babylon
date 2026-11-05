@@ -19,7 +19,7 @@ import { buildFixtures, Fixtures } from './fixtures';
 import { ROOMS, STAIRS, OUTSIDE, SPAWN, F2Y, Fl, Stair, inRoom, roomAt } from './plan';
 import { museumBlocked } from '../building/museum';
 
-const EYE = 1.65, R = 0.24;
+const EYE = 1.65, R = 0.3;
 const O: any = { scene: null as Scene | null };
 
 function apply(what: string) {
@@ -51,13 +51,13 @@ const Terminal$: Section = {
     const { engine, ui, progress } = ctx; O.ctx = ctx;
     const D: any = Object.assign({ airline: 'Airline Manager Pro', color: '#1C3A8A', color2: '#3FD3E6' }, (ctx.opts && ctx.opts.data) || {});
     progress(6, 'Drawing up the terminal…'); await new Promise(r => setTimeout(r, 30));
-    const sc = new Scene(engine); O.scene = sc; sc.clearColor = new Color4(0.66, 0.78, 0.9, 1); sc.skipPointerMovePicking = true;
+    engine.useReverseDepthBuffer = true; O.engine = engine; const sc = new Scene(engine); O.scene = sc; sc.clearColor = new Color4(0.66, 0.78, 0.9, 1); sc.skipPointerMovePicking = true;
     const hemi = new HemisphericLight('hemi', new Vector3(0.2, 1, -0.3), sc); hemi.diffuse = Color3.FromHexString('#EEF3FA'); hemi.groundColor = Color3.FromHexString('#6E665C'); hemi.intensity = 0.95;
     const sun = new DirectionalLight('sun', new Vector3(-0.45, -1, 0.4).normalize(), sc); sun.position = new Vector3(160, 120, -90); sun.intensity = 2.0; sun.diffuse = Color3.FromHexString('#FFF1DC'); O.sun = sun;
     const K = makeKit(sc); O.K = K;
     buildShell(K, (p, s) => progress(p, s)); await new Promise(r => setTimeout(r, 0));
     O.doors = buildDoors(K) as DoorObj[];
-    furnish(K, (p, s) => progress(p, s)); await new Promise(r => setTimeout(r, 0));
+    furnish(K, (p, s) => progress(p, s)); K.clearWalls(); await new Promise(r => setTimeout(r, 0));
     O.fx = buildFixtures(K, D.color, D.color2, D.airline, (p, s) => progress(p, s)) as Fixtures;
     progress(86, 'Finishing the rooms…');
     (K.struct as any).finish();
@@ -70,7 +70,7 @@ const Terminal$: Section = {
     // you, at the Grand Hall's main entrance
     const F = { x: SPAWN.x, z: SPAWN.z, f: SPAWN.f as Fl, y: 0, yaw: SPAWN.yaw, pitch: -0.04, v: 0, bob: 0, stair: null as Stair | null }; O.F = F;
     if (!walkable(1, F.x, F.z)) { const s = freeNear(1, F.x, F.z); F.x = s[0]; F.z = s[1]; }
-    const cam = new UniversalCamera('eyes', new Vector3(F.x, EYE, F.z), sc); cam.minZ = 0.05; cam.maxZ = 900; cam.inertia = 0; O.cam = cam; sc.activeCamera = cam;
+    const cam = new UniversalCamera('eyes', new Vector3(F.x, EYE, F.z), sc); cam.minZ = 0.1; cam.maxZ = 900; cam.inertia = 0; O.cam = cam; sc.activeCamera = cam;
     O.glow = new GlowLayer('glow', sc, { mainTextureRatio: IS_PC ? 0.5 : 0.3, blurKernelSize: 32 }); O.glow.intensity = 0.35;
     O.dp = new DefaultRenderingPipeline('dp', true, sc, [cam]);
     progress(92, 'Lighting the terminal…');
@@ -110,7 +110,7 @@ const Terminal$: Section = {
   close() {
     const sc: Scene = O.scene; if (!sc) return;
     try { O.ctx.canvas.removeEventListener('pointerdown', O.pd); O.ctx.canvas.removeEventListener('pointerup', O.pu); } catch (e) { /* gone */ }
-    perfDetach(); if (O.hud) O.hud.remove(); sc.dispose(); O.scene = null; O.K = null; O.doors = []; O.fx = null;
+    perfDetach(); if (O.hud) O.hud.remove(); sc.dispose(); try { O.engine.useReverseDepthBuffer = false; } catch (e) { /* gone */ } O.scene = null; O.K = null; O.doors = []; O.fx = null;
   },
   onSettings(what: string) { apply(what === 'preset' ? 'all' : what); },
 };
@@ -119,16 +119,16 @@ const Terminal$: Section = {
 /** How far up a stair's run (0 at its foot on Floor 1, 1 at its head on Floor 2), and whether you are within its width. */
 function stairAt(s: Stair, x: number, z: number): { t: number; inside: boolean } {
   const ax = s.dir[0] === 'x', run = ax ? s.x1 - s.x0 : s.z1 - s.z0, u = ax ? (x - s.x0) / run : (z - s.z0) / run, t = s.dir[1] === '+' ? u : 1 - u;
-  const lat = ax ? z : x, l0 = ax ? s.z0 : s.x0, l1 = ax ? s.z1 : s.x1; return { t, inside: lat > l0 + 0.28 && lat < l1 - 0.28 && t > -0.02 && t < 1.02 };
+  const lat = ax ? z : x, l0 = ax ? s.z0 : s.x0, l1 = ax ? s.z1 : s.x1; return { t, inside: lat > l0 + 0.35 && lat < l1 - 0.35 && t > -0.02 && t < 1.02 };
 }
 function walkable(f: Fl, x: number, z: number): boolean {
   for (const s of STAIRS) if (x > s.x0 - 0.05 && x < s.x1 + 0.05 && z > s.z0 - 0.05 && z < s.z1 + 0.05) return false;   // the stairs are walked on their own
   // the museum's way in from the Grand Hall: through its sliding doors only when they are open
   if (f === 1 && x > 35.2 && x < 36.95 && Math.abs(z - 15) < 2.2) return Math.abs(z - 15) < 1.0 && O.fx && O.fx.museum && O.fx.museumDoor.k > 0.6;
   let ok = false;
-  for (const r of ROOMS) if (r.f === f && r.kind !== 'museum' && inRoom(r, x, z, 0.28)) { ok = true; break; }
+  for (const r of ROOMS) if (r.f === f && r.kind !== 'museum' && inRoom(r, x, z, 0.45)) { ok = true; break; }
   if (!ok) for (const d of O.doors as DoorObj[]) { if (d.d.f !== f) continue; const along = d.d.along === 'x', a = along ? x - d.d.x : z - d.d.z, c = along ? z - d.d.z : x - d.d.x;
-    if (Math.abs(a) < d.d.w / 2 - 0.25 && Math.abs(c) < 0.75) { if (!doorPassable(d)) return false; ok = true; break; } }
+    if (Math.abs(a) < Math.max(0.15, d.d.w / 2 - 0.38) && Math.abs(c) < 0.75) { if (!doorPassable(d)) return false; ok = true; break; } }
   if (!ok && f === 1) { for (const o of OUTSIDE) if (inRoom(o, x, z, 0.2)) { ok = true; break; }
     const M = O.fx && O.fx.museum; if (!ok && M) { const lx = -(z - 15), lz = x - 26; if (Math.abs(lz) < M.D / 2 + 0.5 && Math.abs(lx) < M.W / 2 + 0.5 && !museumBlocked(M, lx, lz)) ok = true; } }
   if (!ok) return false;
@@ -143,7 +143,7 @@ function walkable(f: Fl, x: number, z: number): boolean {
 function step(nx: number, nz: number): boolean {
   const F = O.F;
   if (F.stair) { const s: Stair = F.stair, a = stairAt(s, nx, nz), ax = s.dir[0] === 'x', lat = ax ? nz : nx, l0 = ax ? s.z0 : s.x0, l1 = ax ? s.z1 : s.x1;
-    if (lat < l0 + 0.28 || lat > l1 - 0.28) return false;
+    if (lat < l0 + 0.35 || lat > l1 - 0.35) return false;
     if (a.t < 0) { if (!walkable(1, nx, nz)) return false; F.stair = null; F.f = 1; F.y = 0; F.x = nx; F.z = nz; return true; }
     if (a.t > 1) { if (!walkable(2, nx, nz)) return false; F.stair = null; F.f = 2; F.y = F2Y; F.x = nx; F.z = nz; return true; }
     F.x = nx; F.z = nz; F.y = F2Y * Math.max(0, Math.min(1, a.t)); return true; }

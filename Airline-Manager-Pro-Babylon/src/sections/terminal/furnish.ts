@@ -73,7 +73,7 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
   // ---- the lights of every room: panels in the ceiling, each its own object ----
   const lamps = (r: Room, step = 4.2) => {
     if (r.kind === 'hall' || r.kind === 'museum' || r.kind === 'lounge' || r.kind === 'bar') return;
-    const top = (r.f === 2 ? F2Y : 0) + (r.h != null ? r.h : r.kind === 'vestibule' ? 3.4 : 5.4) - 0.02, nx = Math.max(1, Math.round((r.x1 - r.x0) / step)), nz = Math.max(1, Math.round((r.z1 - r.z0) / step));
+    const top = (r.f === 2 ? F2Y : 0) + (r.h != null ? r.h : r.kind === 'vestibule' ? 3.4 : 5.4) - 0.07, nx = Math.max(1, Math.round((r.x1 - r.x0) / step)), nz = Math.max(1, Math.round((r.z1 - r.z0) / step));
     for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) { const x = r.x0 + (r.x1 - r.x0) * (i + 0.5) / nx, z = r.z0 + (r.z1 - r.z0) * (j + 0.5) / nz;
       if (STAIRS.some(s => x > s.x0 - 0.5 && x < s.x1 + 0.5 && z > s.z0 - 0.5 && z < s.z1 + 0.5)) continue;
       const o = K.obj(r.id, 'LAMP', x, top, z); K.box(o, r.kind === 'baghall' || r.kind === 'walk' ? 2.4 : 1.2, 0.04, r.kind === 'baghall' || r.kind === 'walk' ? 0.3 : 0.6, M.light, 0, 0, 0); }
@@ -85,14 +85,14 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
     const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
     switch (r.kind) {
       case 'hall': hall(r); break;
-      case 'vestibule': { const o = K.obj(r.id, 'MAT', cx, 0.006, cz); K.box(o, r.x1 - r.x0 - 1, 0.01, 2.6, M.rubber, 0, 0, 0); break; }
+      case 'vestibule': { const o = K.obj(r.id, 'MAT', cx, 0.022, cz); K.box(o, r.x1 - r.x0 - 1, 0.01, 2.6, M.rubber, 0, 0, 0); break; }
       case 'plant': for (let k = 0; k < 4; k++) { const o = K.obj(r.id, 'AIR-HANDLER', 5 + k * 8, 0, 40); K.box(o, 6, 2.8, 3.2, M.offwhite, 0, 1.4, 0); K.box(o, 1.6, 1.6, 0.05, M.steel, -1.8, 1.6, 1.62); K.cyl(o, 0.4, 2.6, M.steel, 2.2, 4.1, 0); K.block(1, 2 + k * 8, 38.4, 8 + k * 8, 41.6); }
         for (let k = 0; k < 3; k++) { const o = K.obj(r.id, 'PUMP', 6 + k * 9, 0, 48); K.box(o, 1.6, 1.2, 1.0, M.navy, 0, 0.6, 0); K.cyl(o, 0.15, 3, M.steel, 0.9, 1.5, 0); K.block(1, 5 + k * 9, 47.4, 7.2 + k * 9, 48.6); }
         { const o = K.obj(r.id, 'PIPES', 18, 4.6, 33, 0); for (let k = 0; k < 4; k++) { const p = K.cyl(o, 0.14, 34, M.steel, 0, k * 0.35, 0); p.rotation.z = Math.PI / 2; } } break;
       case 'wc': wcBlock(r); break;
       case 'clean': shelf(r, 40, 51.4, Math.PI, 3, 2, 0.5); shelf(r, 46, 51.4, Math.PI, 3, 2, 0.5); { const o = K.obj(r.id, 'CLEANING-CART', 44, 0, 46); K.box(o, 1.0, 0.9, 0.55, M.yellow, 0, 0.6, 0); K.cyl(o, 0.2, 0.5, M.navy, -0.3, 1.25, 0); K.block(1, 43.4, 45.6, 44.6, 46.4); } break;
       case 'security': security(r); break;
-      case 'airside': for (const [x, z] of [[74, 44], [80, 44], [86, 44]]) seats(r, x, z, Math.PI, 6); plant(r, 52, 50, true); plant(r, 88, 50, true); bin(r, 72, 50.5); sign(r, 'GATES 1–8 · FLOOR 2', 62, 4.2, 42.3, 0, 5, 0.6); break;
+      case 'airside': for (const x of [74, 80, 86]) seats(r, x, 51.5, Math.PI, 6); plant(r, 52, 50, true); plant(r, 88, 50, true); bin(r, 72, 50.5); sign(r, 'GATES 1–8 · FLOOR 2', 62, 4.2, 42.3, 0, 5, 0.6); break;
       case 'lounge': lounge(r); break;
       case 'office': office(r); break;
       case 'passage': sign(r, 'STAFF ONLY', 116, 2.6, 21, -Math.PI / 2, 1.4, 0.3, '#B3261E'); break;
@@ -104,7 +104,7 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
       case 'academy': academy(r); break;
       case 'staffentr': { const t = K.obj(r.id, 'SECURITY-DESK', 147, 0, 47, 0); K.box(t, 3, 1.05, 0.7, M.white, 0, 0.52, 0); K.box(t, 3.1, 0.05, 0.8, M.marbleDark, 0, 1.07, 0); K.block(1, 145.5, 46.6, 148.5, 47.4); officeChair(r, 147, 48.2, Math.PI);
         for (const z of [42.5, 44.2]) { const g = K.obj(r.id, 'TURNSTILE', 152, 0, z); K.box(g, 0.3, 1.0, 1.0, M.steel, 0, 0.5, 0); K.box(g, 0.02, 0.4, 0.8, M.glass, 0.5, 0.9, 0); K.block(1, 151.8, z - 0.5, 152.2, z + 0.5); }
-        lockers(r, 150, 40.3, 0, 10); sign(r, 'STAFF ENTRANCE · ID REQUIRED', 146, 3.2, 51.8, Math.PI, 4.4, 0.42, '#B3261E'); break; }
+        lockers(r, 150, 40.5, 0, 10); sign(r, 'STAFF ENTRANCE · ID REQUIRED', 146, 3.2, 51.8, Math.PI, 4.4, 0.42, '#B3261E'); break; }
       case 'baghall': baghall(r); break;
       case 'ramp': { for (let k = 0; k < 3; k++) { const o = K.obj(r.id, 'BAGGAGE-CART', r.x0 + 6 + k * 4, 0, PG + 8); K.box(o, 1.6, 0.06, 3.0, M.steel, 0, 0.55, 0); for (const s of [-1, 1]) K.box(o, 1.6, 1.2, 0.05, M.steel, 0, 1.15, s * 1.5); K.box(o, 1.62, 0.08, 3.0, M.yellow, 0, 1.75, 0); for (const sx of [-0.7, 0.7]) for (const sz of [-1.2, 1.2]) K.cyl(o, 0.18, 0.12, M.black, sx, 0.2, sz); K.block(1, r.x0 + 5.1 + k * 4, PG + 6.4, r.x0 + 6.9 + k * 4, PG + 9.6); }
         { const o = K.obj(r.id, 'TUG', r.x0 + 20, 0, PG + 7); K.box(o, 1.6, 1.0, 2.6, M.yellow, 0, 0.75, 0); K.box(o, 1.4, 0.9, 1.0, M.glass, 0, 1.7, -0.4); K.block(1, r.x0 + 19.1, PG + 5.6, r.x0 + 20.9, PG + 8.4); }
@@ -112,10 +112,10 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
       case 'gate1': gateRoom(r, 1); break;
       case 'gate2': gateRoom(r, 2); break;
       case 'view': for (let k = 0; k < 3; k++) seats(r, cx, PG + 3 + k * 3.2, 0, 26, false); plant(r, r.x0 + 1.2, PN - 1.4, true); plant(r, r.x1 - 1.2, PN - 1.4, true); break;
-      case 'link': for (const z of [36, 44]) seats(r, 9.8, z, Math.PI / 2, 6); plant(r, 7, 31.2); plant(r, 13, 31.2); break;
+      case 'link': for (const z of [36, 44]) seats(r, 6.5, z, Math.PI / 2, 6); plant(r, 7, 31.2); plant(r, 13, 31.2); break;
       case 'food': food(r); break;
       case 'eatery': eatery(r); break;
-      case 'landing': for (const z of [48.7, 46.3, 43.8]) seats(r, 79.3, z, Math.PI, 18); plant(r, 57.2, 51, true); plant(r, 88.8, 43, true); break;
+      case 'landing': seats(r, 79.3, 51.5, Math.PI, 18); seats(r, 83.5, 42.5, 0, 18); plant(r, 57.2, 51, true); plant(r, 88.8, 43, true); break;
       case 'taxfree': taxfree(r); break;
       case 'family': family(r); break;
       case 'bar': bar(r); break;
@@ -145,9 +145,9 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
       K.block(1, x - 0.9, z - 0.3, x + 1.5, z + 1.2); }
     sign(r, 'BAG DROP · SELF SERVICE', 105, 4.4, 26.5, Math.PI, 6, 0.8, '#1C2D52');
     // trees in white planters, benches round them, bins
-    for (const [x, z] of [[58, 5], [92, 5], [40, 25], [88, 25.5]]) treePlanter(r, x, z);
-    for (const [x, z, yaw] of [[64, 8, 0], [86, 8, 0], [40, 9, Math.PI / 2]] as number[][]) seats(r, x, z, yaw, 5);
-    for (const [x, z] of [[66, 2], [86, 2], [52, 12], [98, 28]]) bin(r, x, z);
+    for (const [x, z] of [[58, 2.55], [92, 2.55], [38.55, 25], [92.5, 27.45]]) treePlanter(r, x, z);
+    for (const [x, z, yaw] of [[64, 0.5, 0], [86, 0.5, 0], [36.5, 9, Math.PI / 2]] as number[][]) seats(r, x, z, yaw, 5);
+    for (const [x, z] of [[66, 0.45], [89, 0.45], [36.45, 5.5], [97, 29.6]]) bin(r, x, z);
     sign(r, 'SECURITY · ALL GATES', 70, 3.4, 29.75, Math.PI, 6.4, 0.7, '#1C2D52');
     // DEPARTURES over the main entrance, outside
     { const o = K.obj('KERB', 'SIGN', 75, 7.6, -0.4, 0, 'KERB/DEPARTURES-SIGN'); const p = MeshBuilder.CreatePlane(K.nm('dep'), { width: 12, height: 1.6 }, sc); p.material = K.picture(signC('DEPARTURES', '#F2F4F7', '#14202E', 1536, 205, '700 150px Arial, sans-serif'), 0); (p.material as any).backFaceCulling = true; p.parent = o; K.box(o, 12.2, 1.8, 0.12, M.whiteGloss, 0, 0, 0.08); p.metadata = o.metadata; }
@@ -172,8 +172,8 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
     { const o = K.obj(r.id, 'CEILING-COPPER-WAVES', 0, 0, 0, 0, 'F1-LOUNGE/CEILING'); const tubes: Mesh[] = [];
       for (let j = 0; j < 40; j++) { const z = r.z0 + 0.3 + j * (r.z1 - r.z0 - 0.6) / 39, path: Vector3[] = []; for (let k = 0; k <= 36; k++) path.push(new Vector3(r.x0 + 0.1 + k * (r.x1 - r.x0 - 0.2) / 36, LH - 0.5 - 0.4 * Math.sin(k / 36 * Math.PI * 3 + j * 0.25), z)); tubes.push(MeshBuilder.CreateTube(K.nm('cu'), { path, radius: 0.05, tessellation: 6 }, sc)); }
       const cu = Mesh.MergeMeshes(tubes, true, true) as Mesh; cu.material = M.copper; cu.parent = o; cu.metadata = o.metadata; cu.isPickable = false;
-      const dark = MeshBuilder.CreatePlane(K.nm('dk'), { width: r.x1 - r.x0, height: r.z1 - r.z0 }, sc); dark.rotation.x = -Math.PI / 2; dark.position.set((r.x0 + r.x1) / 2, LH - 0.02, (r.z0 + r.z1) / 2); dark.material = K.pbr({ key: 'loungeDark', col: '#1A1612', rough: 0.85 }); (dark.material as any).backFaceCulling = false; dark.parent = o;
-      for (const z of [r.z0 + 0.3, r.z1 - 0.15]) K.box(o, r.x1 - r.x0 - 0.3, 0.03, 0.08, M.lightWarm, (r.x0 + r.x1) / 2, LH - 0.06, z); }
+      const dark = MeshBuilder.CreatePlane(K.nm('dk'), { width: r.x1 - r.x0, height: r.z1 - r.z0 }, sc); dark.rotation.x = -Math.PI / 2; dark.position.set((r.x0 + r.x1) / 2, LH - 0.09, (r.z0 + r.z1) / 2); dark.material = K.pbr({ key: 'loungeDark', col: '#1A1612', rough: 0.85 }); (dark.material as any).backFaceCulling = false; dark.parent = o;
+      for (const z of [r.z0 + 0.3, r.z1 - 0.15]) K.box(o, r.x1 - r.x0 - 0.3, 0.03, 0.08, M.lightWarm, (r.x0 + r.x1) / 2, LH - 0.13, z); }
     // walnut wainscot with a brass rail round the room
     { const o = K.obj(r.id, 'WAINSCOT', 0, 0, 0, 0, 'F1-LOUNGE/WAINSCOT'); for (const [x, z, w, d] of [[(r.x0 + r.x1) / 2, r.z0 + 0.17, r.x1 - r.x0, 0.03], [(r.x0 + r.x1) / 2, r.z1 - 0.17, r.x1 - r.x0, 0.03], [r.x1 - 0.17, (r.z0 + r.z1) / 2, 0.03, r.z1 - r.z0]]) { K.box(o, w, 1.1, d, M.walnut, x, 0.55, z); K.box(o, w, 0.04, d + 0.02, M.brass, x, 1.12, z); }
       K.box(o, 0.03, 1.1, 14, M.walnut, r.x0 + 0.17, 0.55, 37); }
@@ -191,7 +191,7 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
       K.box(o, xr - xa + 0.2, 0.06, 0.8, M.marbleDark, (xa + xr) / 2, 1.1, bz); K.box(o, 0.8, 0.06, r.z1 - bz - 0.4, M.marbleDark, xr - 0.3, 1.1, (bz + r.z1 - 0.4) / 2);
       const rail = K.cyl(o, 0.022, xr - xa, M.brass, (xa + xr) / 2, 0.2, bz - 0.4); rail.rotation.z = Math.PI / 2;
       K.block(1, xa - 0.1, bz - 0.45, xr + 0.15, r.z1);
-      const bb = K.obj(r.id, 'BACK-BAR', 99, 0, r.z1 - 0.2, Math.PI, 'F1-LOUNGE/BACK-BAR'); K.box(bb, 6, 0.9, 0.35, M.lacquer, 0, 0.45, 0); K.box(bb, 6.1, 2.1, 0.04, M.screenBlack, 0, 2.0, 0.15);
+      const bb = K.obj(r.id, 'BACK-BAR', 99, 0, r.z1 - 0.38, Math.PI, 'F1-LOUNGE/BACK-BAR'); K.box(bb, 6, 0.9, 0.35, M.lacquer, 0, 0.45, 0); K.box(bb, 6.1, 2.1, 0.04, M.screenBlack, 0, 2.0, 0.15);
       for (const [w, h, x, y] of [[6.2, 0.05, 0, 3.05], [6.2, 0.05, 0, 0.95], [0.05, 2.1, -3.08, 2.0], [0.05, 2.1, 3.08, 2.0]]) K.box(bb, w, h, 0.04, M.gold, x, y, 0.12);
       const bottle = [M.plantDark, M.gold, M.red, M.offwhite, M.navy, M.trunk, M.tealUI, M.yellow, M.brass, M.black, M.porcelain];
       for (const yy of [1.4, 1.85, 2.3]) { K.box(bb, 5.6, 0.015, 0.25, M.glass, 0, yy, 0.0); K.box(bb, 5.5, 0.01, 0.02, M.lightWarm, 0, yy - 0.012, 0.08);
@@ -201,7 +201,7 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
       for (let k = 0; k < 6; k++) { const gx = xa + 0.6 + k * (xr - xa - 1.2) / 5, g = K.obj(r.id, 'GLOBE-LIGHT', gx, 0, bz - 0.5); K.cyl(g, 0.004, LH - 2.85, M.black, 0, (LH + 2.85) / 2, 0); K.ball(g, 0.17, M.light, 0, 2.85, 0); } }
     // seating: two rows of three groups of armchairs round coffee tables, on rugs
     for (const [k, gx] of [97.5, 103.5, 109.5].entries()) for (const gz of [34.2, 40.2]) {
-      const rug = K.obj(r.id, 'RUG', gx, 0.006, gz); K.box(rug, 4.2, 0.01, 4.2, M.carpet, 0, 0, 0);
+      const rug = K.obj(r.id, 'RUG', gx, 0.024, gz); K.box(rug, 4.2, 0.01, 4.2, M.carpet, 0, 0, 0);
       table(r, gx, gz, 0.5, 0.42, M.walnut);
       for (const [dx, dz, yaw] of [[0, -1.1, 0], [0, 1.1, Math.PI], [-1.1, 0, Math.PI / 2], [1.1, 0, -Math.PI / 2]]) armchair(r, gx + dx, gz + dz, yaw, (k + Math.round(gz)) % 2 ? M.fabricTeal : M.fabricRust);
     }
@@ -275,7 +275,7 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
     { const o = K.obj(r.id, 'PERFUME-ISLAND', 73, Y(r), 35.5); K.cyl(o, 1.0, 1.0, M.whiteGloss, 0, 0.5, 0, undefined, 32); for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; K.cyl(o, 0.05, 0.16, M.gold, Math.cos(a) * 0.75, 1.08, Math.sin(a) * 0.75); } K.circle(2, 73, 35.5, 1.05); }
   }
   function family(r: Room) {
-    const mat = K.obj(r.id, 'PLAY-MAT', 97, Y(r) + 0.006, 35); K.box(mat, 6, 0.04, 5, M.tealUI, 0, 0, 0);
+    const mat = K.obj(r.id, 'PLAY-MAT', 97, Y(r) + 0.03, 35); K.box(mat, 6, 0.04, 5, M.tealUI, 0, 0, 0);
     for (const [k, c] of [M.red, M.yellow, M.navy].entries()) { const b = K.obj(r.id, 'TOY-BLOCK', 95 + k * 1.6, Y(r), 34.5); K.box(b, 0.6, 0.6, 0.6, c, 0, 0.3, 0); K.circle(2, 95 + k * 1.6, 34.5, 0.4); }
     sofa(r, 97, 40.6, Math.PI, 3, M.fabricTeal); table(r, 101.5, 33, 0.5, 0.5, M.white); for (const a of [0, 2.1, 4.2]) chair(r, 101.5 + Math.cos(a) * 0.85, 33 + Math.sin(a) * 0.85, -a - Math.PI / 2, M.fabricBlue);
     counter(r, 92, 41.2, Math.PI, 2.2, 0.7, M.white, M.white, 0.9);
@@ -308,10 +308,8 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
       const rails = K.obj(r.id, 'WALKWAY-RAILS', (a + b) / 2, Y(r), zc, 0);
       for (const dz of [-1.68, 0, 1.68]) { K.box(rails, b - a, 0.9, 0.06, M.glass, 0, 0.55, dz); K.box(rails, b - a, 0.07, dz ? 0.14 : 0.2, M.black, 0, 1.02, dz); K.block(2, a, zc + dz - 0.1, b, zc + dz + 0.1); }
     }
-    // a seating island in each crossing between the walkways' sections (about 3 m clear on each side of it), planters along the south wall
-    for (const gx of [0, 80, 160]) {
-      seats(r, gx, zc - 0.6, 0, 6, false); seats(r, gx, zc + 0.6, Math.PI, 6, false);
-    }
+    // seating along the south wall at each crossing between the walkways' sections (the middle kept clear), planters along the south wall
+    for (const gx of [0, 80, 160]) seats(r, gx, r.z0 + 0.5, 0, 6, false);
     for (let x = -78; x < 242; x += 40) { plant(r, x + 2, r.z0 + 0.8, true); }
   }
   void IS_PC; void TransformNode;
