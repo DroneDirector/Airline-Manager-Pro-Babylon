@@ -16,6 +16,7 @@ import { buildShell } from './shell';
 import { buildDoors, stepDoors, doorPassable, DoorObj } from './doors';
 import { furnish } from './furnish';
 import { buildFixtures, Fixtures } from './fixtures';
+import { buildRental } from './rental';
 import { ROOMS, STAIRS, OUTSIDE, SPAWN, F2Y, Fl, Stair, inRoom, roomAt } from './plan';
 import { museumBlocked } from '../building/museum';
 
@@ -60,6 +61,7 @@ const Terminal$: Section = {
     furnish(K, (p, s) => progress(p, s)); K.clearWalls(); await new Promise(r => setTimeout(r, 0));
     O.fx = buildFixtures(K, D.color, D.color2, D.airline, (p, s) => progress(p, s)) as Fixtures;
     progress(86, 'Finishing the rooms…');
+    buildRental(K);
     (K.struct as any).finish();
     // everything that never moves is fixed in place (cheaper to draw); the doors, the revolving wings, the lifts move
     const moving = new Set<AbstractMesh>(); for (const d of O.doors as DoorObj[]) for (const m of d.node.getChildMeshes()) moving.add(m);
@@ -156,7 +158,7 @@ function whereAmI(): string {
   const F = O.F; if (F.stair) return `Stairs ${F.stair.id}|${F.stair.from} ↔ ${F.stair.to}`;
   const r = roomAt(F.f, F.x, F.z);
   if (r) return `Floor ${F.f} · ${r.id}|${r.name}`;
-  for (const o of OUTSIDE) if (inRoom(o, F.x, F.z)) return `Outside · ${o.id}|${o.id === 'KERB' ? 'The kerb (drop-off under the roof)' : o.id === 'APRON' ? 'The apron' : 'Outside the staff entrance'}`;
+  for (const o of OUTSIDE) if (inRoom(o, F.x, F.z)) return `Outside · ${o.id}|${o.name ? o.name : o.id === 'KERB' ? 'The kerb (drop-off under the roof)' : o.id === 'APRON' ? 'The apron' : 'Outside the staff entrance'}`;
   return 'Floor 1 · F1-MUSEUM|Museum (Vortex Gallery)';
 }
 // ---- what you look at ----

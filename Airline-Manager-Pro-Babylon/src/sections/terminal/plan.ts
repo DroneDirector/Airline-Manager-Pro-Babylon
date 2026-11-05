@@ -151,6 +151,10 @@ export function waveH(x: number, z: number) { return 18.4 + 3.4 * Math.cos(2 * M
 /** Where you step in: the Grand Hall, just inside the main entrance, facing into the hall. */
 export const SPAWN = { x: 79, z: 2.8, yaw: 0, f: 1 as Fl };
 /** Outside, where you can walk: the kerb under the roof, the apron. */
-export const OUTSIDE: { id: string; x0: number; z0: number; x1: number; z1: number }[] = [{ id: 'KERB', x0: 20, z0: -20, x1: 130, z1: -4 }, { id: 'APRON', x0: -95, z0: PN, x1: 255, z1: PN + 64 }, { id: 'OUTSIDE', x0: 156, z0: 40, x1: 170, z1: 52 }];
+export const OUTSIDE: { id: string; name?: string; x0: number; z0: number; x1: number; z1: number }[] = [{ id: 'KERB', x0: 20, z0: -20, x1: 130, z1: -4 }, { id: 'APRON', x0: -95, z0: PN, x1: 255, z1: PN + 64 }, { id: 'OUTSIDE', x0: 156, z0: 40, x1: 170, z1: 52 },
+  // the rental car centre beside the east wing (rental.ts): its pick-up lanes and front, the hall, the covered walk, the garage's ready/return level
+  { id: 'RENTAL-FRONT', name: 'Rental car centre · pick-up lanes', x0: 128, z0: -20, x1: 300, z1: 7.4 }, { id: 'RENTAL-HALL', name: 'Rental car centre · customer hall', x0: 173, z0: 7, x1: 201, z1: 49 },
+  { id: 'RENTAL-WALK', name: 'Covered walk to the rental car centre', x0: 156.3, z0: 21.6, x1: 173.5, z1: 28.4 }, { id: 'RENTAL-GARAGE', name: 'Rental car centre · ready / return', x0: 202, z0: 4, x1: 272, z1: 50 },
+  { id: 'RENTAL-GARAGE-DOOR', name: 'Rental car centre · customer hall', x0: 200.4, z0: 26, x1: 202.6, z1: 31 }];
 export function inRoom(r: { x0: number; z0: number; x1: number; z1: number }, x: number, z: number, m = 0) { return x > r.x0 + m && x < r.x1 - m && z > r.z0 + m && z < r.z1 - m; }
 export function roomAt(f: Fl, x: number, z: number): Room | null { for (const r of ROOMS) if (r.f === f && inRoom(r, x, z)) return r; return null; }
