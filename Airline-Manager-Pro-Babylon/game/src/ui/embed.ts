@@ -51,9 +51,41 @@ if (EMBED) {
     [Museum, 'The museum'], [Salute, 'The water salute'], [TestRooms, 'The test rooms']];
   for (const [R, name] of rooms) if (R) R.open = soon(name);
   for (const a of ['photo-mode', 'hangar-visit', 'lounge-visit']) if (typeof (ACTIONS as any)[a] === 'function') (ACTIONS as any)[a] = soon('This 3D place');
-  // the 3D view of a flight: the edition's 3D viewer
-  W.v3dOpen = () => { try { saveNow(true); } catch (e) { /* saved */ } embedTell('viewer3d'); };
-  ACTIONS['v3d-open'] = () => W.v3dOpen(); ACTIONS['apt-3d'] = () => W.v3dOpen();
-  // the edition can ask for a save before it closes this page
-  window.addEventListener('message', (e: MessageEvent) => { const d: any = e.data; if (d && d.ampb === 'save') { try { saveNow(true); } catch (err) { /* saved */ } embedTell('saved'); } });
+  // the 3D view of a flight: the edition's 3D viewer follows it, live. This page keeps running behind it (the airline,
+  // its schedules and the other airlines' flights go on) and sends where the flight is, several times a second.
+  W.v3dOpen = (id: string) => {
+    try { saveNow(true); } catch (e) { /* saved */ }
+    const m: any = (typeof _curMap === 'function') ? _curMap() : null;
+    const fid = id || (m && (m.following || m.selected)) || (liveOf().filter(f => f.you)[0] || liveOf()[0] || {} as any).id || '';
+    if (!fid || String(fid).indexOf('apt:') === 0) { embedTell('viewer3d', { id: '' }); return; }
+    embedTell('viewer3d', { id: fid });
+  };
+  W.v3dSupported = () => true;   // the edition's 3D viewer is always there
+  ACTIONS['v3d-open'] = () => W.v3dOpen(''); ACTIONS['apt-3d'] = () => W.v3dOpen('');
+  let follow = '', timer: any = 0;
+  const findFlight = (id: string): any => State.live.filter(x => x.id === id)[0] || (typeof Traffic !== 'undefined' && Traffic.on() ? (Traffic.live() as any[]).filter((x: any) => x.id === id)[0] : null) || null;
+  const describe = (f: any) => {
+    const w: any = v3dWhere(f), a: any = f.reg ? plane(f.reg) : null, c: any = a ? company(a.companyId) : null, A = apt(f.from), B = apt(f.to);
+    return { id: f.id, callsign: f.callsign || f.reg || '', reg: f.reg || '', type: (a && a.typeId) || f.typeId || '', from: f.from, to: f.to, fromName: A ? A.city || A.name : f.from, toName: B ? B.city || B.name : f.to,
+      airline: c ? c.name : f.airline || '', color: c ? c.color : f.color || '#1C2A4A', color2: c ? c.color2 : f.color2 || '#3FD3E6', you: !!f.you, mine: !!(a && a.companyId === State.companyId),
+      phase: w.phase || f.phase || '', pax: f.pax || 0, paxMax: f.paxMax || 0, gs: f.gs || 0, lat: w.lat, lon: w.lon, altM: w.altM, hdg: w.hdg, vs: w.vs || 0, onGround: !!w.onGround,
+      elev: 0 };
+  };
+  const send = () => {
+    if (!follow) return;
+    try {
+      const f = findFlight(follow); if (!f) { embedTell('flight', { gone: true }); return; }
+      const me = describe(f), near: any[] = [];
+      const all: any[] = State.live.concat(typeof Traffic !== 'undefined' && Traffic.on() ? (Traffic.live() as any[]) : []);
+      for (const o of all) { if (o.id === f.id || near.length >= 16) continue; try { const w: any = v3dWhere(o); const dx = (w.lon - me.lon) * 111320 * Math.cos(me.lat * Math.PI / 180), dz = (w.lat - me.lat) * 110540; if (dx * dx + dz * dz < 40000 * 40000) near.push({ id: o.id, callsign: o.callsign || '', lat: w.lat, lon: w.lon, altM: w.altM, hdg: w.hdg, onGround: !!w.onGround }); } catch (e) { /* not placed */ } }
+      const list = liveOf().map(x => ({ id: x.id, callsign: x.callsign, from: x.from, to: x.to }));
+      embedTell('flight', { t: Date.now(), me, near, list });
+    } catch (e) { /* the next time */ }
+  };
+  window.addEventListener('message', (e: MessageEvent) => {
+    const d: any = e.data; if (!d || !d.ampb) return;
+    if (d.ampb === 'save') { try { saveNow(true); } catch (err) { /* saved */ } embedTell('saved'); }
+    else if (d.ampb === 'follow') { follow = d.id || ''; clearInterval(timer); if (follow) { send(); timer = setInterval(send, 250); } }
+    else if (d.ampb === 'stop') { follow = ''; clearInterval(timer); }
+  });
 }

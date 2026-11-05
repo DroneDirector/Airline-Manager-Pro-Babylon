@@ -2,7 +2,7 @@
 // registering them here (an id, a title, open and close), with nothing else to change.
 import type { Engine } from '@babylonjs/core';
 
-export interface SectionCtx { engine: Engine; canvas: HTMLCanvasElement; ui: HTMLElement; progress: (pct: number, step: string) => void; back?: () => void }
+export interface SectionCtx { engine: Engine; canvas: HTMLCanvasElement; ui: HTMLElement; progress: (pct: number, step: string) => void; back?: () => void; opts?: any; toGame?: () => void }
 export interface Section { id: string; title: string; open(ctx: SectionCtx): Promise<void>; close(): void; onSettings?(what: string): void }
 const list: { [id: string]: Section } = {};
 let current: Section | null = null;

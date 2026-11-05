@@ -16,7 +16,8 @@ import { IS_PC, IS_TOUCH } from '../../core/app';
 import { icon, esc, toast } from '../../ui/icons';
 import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core/perf-meter';
 import { makeSky, skyFrame, Sky } from './sky';
-import { buildAirliner, Airliner } from './airliner';
+import { buildAirliner, Airliner, repaint } from './airliner';
+import { gameSend, onGameFlight } from '../../ui/game-frame';
 import { sunAt, moonAt, dirOf, sunlight, lst } from './astro';
 import { FROM, TO, ROUTE_M, gcAt, gcBrg, gcDist, D2R } from './route';
 
@@ -35,6 +36,40 @@ const VIEWS: View[] = [
   { id: 'flyby', label: 'Fly-by', flyby: true },
 ];
 const V: any = { scene: null as Scene | null };
+
+/* ---------- following a real flight of the game (yours, your airline's or another airline's) ---------- */
+interface Sample { id: string; callsign: string; reg: string; type: string; from: string; to: string; fromName: string; toName: string; airline: string; color: string; color2: string;
+  phase: string; pax: number; paxMax: number; gs: number; lat: number; lon: number; altM: number; hdg: number; vs: number; onGround: boolean; at: number }
+onGameFlight((d: any) => {
+  const L = V.live; if (!V.scene || !L) return;
+  if (d.gone) { if (!L.goneSaid) { L.goneSaid = true; toast('This flight has ended'); const nx = (L.list || []).filter((x: any) => x.id !== L.id)[0]; if (nx) follow(nx.id); } return; }
+  const me: Sample = Object.assign({}, d.me, { at: performance.now() });
+  if (me.id !== L.id) return;
+  L.s0 = L.s1 || me; L.s1 = me; L.list = d.list || []; L.near = d.near || []; L.goneSaid = false;
+  const key = me.color + me.color2; if (L.painted !== key) { L.painted = key; try { repaint(V.ac, me.color, me.color2); } catch (e) { /* its own colours */ } }
+});
+/** Follow another flight. */
+function follow(id: string) { const L = V.live; if (!L) return; L.id = id; L.s0 = null; L.s1 = null; L.painted = ''; L.prev = null; gameSend({ ampb: 'follow', id }); }
+/** Where the followed flight is now: between the last two positions the game sent (a quarter of a second behind, so
+ *  it moves smoothly), its heading turning the short way. */
+function liveState(now: number): Sample | null {
+  const L = V.live, a: Sample = L.s0, b: Sample = L.s1; if (!b) return null;
+  const span = Math.max(60, b.at - a.at), k = Math.max(0, Math.min(1, (now - b.at) / span));
+  const lerp = (x: number, y: number) => x + (y - x) * k, dh = ((b.hdg - a.hdg + 540) % 360) - 180;
+  return Object.assign({}, b, { lat: lerp(a.lat, b.lat), lon: lerp(a.lon, b.lon), altM: lerp(a.altM, b.altM), hdg: (a.hdg + dh * k + 360) % 360, vs: lerp(a.vs, b.vs), gs: lerp(a.gs, b.gs) });
+}
+/** The other aircraft near the one you follow, where they are (the same model; up to 16). */
+function others(me: Sample) {
+  const L = V.live, have: { [id: string]: any } = V.others || (V.others = {}), seen: { [id: string]: boolean } = {};
+  const k = Math.cos(me.lat * D2R);
+  for (const o of (L.near || []).slice(0, 16)) {
+    seen[o.id] = true; let n = have[o.id];
+    if (!n) { n = V.ac.root.instantiateHierarchy(null, undefined, (src: any, cl: any) => { if (cl.renderingGroupId !== undefined) cl.renderingGroupId = 1; }); if (!n) continue; have[o.id] = n; }
+    n.position.set((o.lon - me.lon) * 111320 * k, (o.altM + (o.onGround ? 3.9 : 0)) - (me.altM + (me.onGround ? 3.9 : 0)), (o.lat - me.lat) * 110540);
+    n.rotation.set(0, o.hdg * D2R, 0); n.setEnabled(true);
+  }
+  for (const id in have) if (!seen[id]) { have[id].dispose(); delete have[id]; }
+}
 
 function apply(what: string) {
   const sc: Scene = V.scene; if (!sc) return; const g = S.gfx, all = what === 'all' || what === 'preset';
@@ -81,7 +116,7 @@ function sky(now: number) {
   const lit = s.alt > -3 || moonK < 0.002 ? sd : md, lc = s.alt > -3 ? sc : [moonK * 0.75, moonK * 0.85, moonK * 1.1];
   V.sunAlt = s.alt;
   const q = CLOUDQ[S.gfx.clouds] || CLOUDQ.medium;
-  skyFrame(V.sky, { sun: sd, sunCol: sc, moon: md, lit, litCol: lc, alt: FL + V.cam.position.y, drift: V.drift, time: now, cover: 0.82, steps: V.steps || q[0], lsteps: V.lsteps || q[1],
+  skyFrame(V.sky, { sun: sd, sunCol: sc, moon: md, lit, litCol: lc, alt: (V.alt || FL) + V.cam.position.y, drift: V.drift, time: now, cover: 0.82, steps: V.steps || q[0], lsteps: V.lsteps || q[1],
     lat: pos[0] * D2R, lst: lst(V.t, pos[1]) * D2R, starK: Math.min(1.4, nightK * 1.4), nightK });
   // the sun (or the moon) on the aircraft, its shadows, the sky's light from above and the clouds' from below
   const L: DirectionalLight = V.sun, ld = new Vector3(-lit[0], -lit[1], -lit[2]), mx = Math.max(lc[0], lc[1], lc[2], 1e-4);
@@ -110,9 +145,10 @@ function sunsetStart(): number {
 }
 
 function hudHtml(): string {
-  return `<div class="v3d">
+  return `<div class="v3d ${V.live ? 'live' : ''}">
     <div class="v3d-top">
-      <div class="v3d-info"><b class="v3d-cs">AMP 214 · ${esc(FROM.name)} → ${esc(TO.name)}</b><div class="v3d-rows"></div></div>
+      ${V.live ? `<button class="v3d-b v3d-game" data-v="game" aria-label="Back to the game">${icon('back')}<span>Back to the game</span></button>` : ''}
+      <div class="v3d-info"><div class="v3d-csr">${V.live ? `<button class="v3d-b v3d-pk" data-v="prev" aria-label="The previous flight">‹</button>` : ''}<b class="v3d-cs">${V.live ? 'Waiting for the flight…' : `AMP 214 · ${esc(FROM.name)} → ${esc(TO.name)}`}</b>${V.live ? `<button class="v3d-b v3d-pk" data-v="next" aria-label="The next flight">›</button>` : ''}</div><small class="v3d-al"></small><div class="v3d-rows"></div></div>
     </div>
     <div class="v3d-views" role="toolbar" aria-label="Camera">${VIEWS.map((v, i) => `<button class="v3d-b ${i === 0 ? 'on' : ''}" data-view="${v.id}">${esc(v.label)}</button>`).join('')}</div>
     <div class="v3d-time">
@@ -140,10 +176,12 @@ const Viewer: Section = {
   id: 'viewer3d', title: '3D viewer',
   async open(ctx: SectionCtx) {
     const { engine, ui, progress } = ctx; V.ctx = ctx;
+    const liveId = ctx.opts && ctx.opts.live; V.live = liveId ? { id: liveId, s0: null, s1: null, list: [], near: [], painted: '', prev: null } : null; V.others = {}; V.turn = 0; V.cur = null;
+    if (liveId) gameSend({ ampb: 'follow', id: liveId });
     progress(10, 'Filling the sky…'); await new Promise(r => setTimeout(r, 30));
     const sc = new Scene(engine); V.scene = sc; V.sc = sc; sc.clearColor = new Color4(0, 0, 0, 1); sc.skipPointerMovePicking = true;
     V.frac = 0.14; V.pos = gcAt([FROM.lat, FROM.lon], [TO.lat, TO.lon], V.frac); V.hdg = gcBrg(V.pos, [TO.lat, TO.lon]); V.drift = [0, 0];
-    V.t = sunsetStart(); V.speed = 60;
+    V.t = V.live ? Date.now() : sunsetStart(); V.speed = V.live ? 1 : 60;
     V.sky = makeSky(sc) as Sky;
     progress(40, 'Building the aircraft…'); await new Promise(r => setTimeout(r, 30));
     const ac = buildAirliner(sc) as Airliner; V.ac = ac;
@@ -167,6 +205,8 @@ const Viewer: Section = {
       const b = (e.target as HTMLElement).closest('button') as HTMLElement; if (!b) return;
       if (b.hasAttribute('data-view')) setView(b.getAttribute('data-view') as string);
       else if (b.hasAttribute('data-speed')) setSpeed(Number(b.getAttribute('data-speed')));
+      else if (b.getAttribute('data-v') === 'game' && ctx.toGame) ctx.toGame();
+      else if ((b.getAttribute('data-v') === 'prev' || b.getAttribute('data-v') === 'next') && V.live) { const l = V.live.list || [], i = l.findIndex((x: any) => x.id === V.live.id); if (l.length) follow(l[(i + (b.getAttribute('data-v') === 'next' ? 1 : l.length - 1) + l.length) % l.length].id); }
     });
     const sl = hud.querySelector('.v3d-slider') as HTMLInputElement; V.slider = sl;
     sl.addEventListener('input', () => { V.sliding = true; setLocalMin(Number(sl.value)); });
@@ -197,20 +237,41 @@ const Viewer: Section = {
         if (g.buttons[14] && g.buttons[14].pressed) setLocalMin((localMin() + 1440 - 90 * dt) % 1440); if (g.buttons[15] && g.buttons[15].pressed) setLocalMin((localMin() + 90 * dt) % 1440); }
       // the time of day, and the flight along its plan
       if (!V.sliding) V.t += dt * 1000 * V.speed;
-      V.frac += TAS * dt / ROUTE_M; if (V.frac > 0.93) { V.frac = 0.08; toast('Back at the start of the cruise'); }
-      V.pos = gcAt([FROM.lat, FROM.lon], [TO.lat, TO.lon], V.frac);
-      const hdg = gcBrg(V.pos, [TO.lat, TO.lon]); V.hdg = hdg; const h = hdg * D2R;
-      V.drift[0] += Math.sin(h) * TAS * dt; V.drift[1] += Math.cos(h) * TAS * dt;
-      // the aircraft: its heading, and the small movements of the cruise in smooth air
-      const r = ac.root; r.rotation.y = h; r.rotation.z = Math.sin(now * 0.31) * 0.012 + Math.sin(now * 1.7) * 0.003; r.rotation.x = -0.035 + Math.sin(now * 0.23) * 0.006;
-      r.position.y = Math.sin(now * 0.4) * 0.35 + Math.sin(now * 2.3) * 0.05;
-      for (const f of ac.fans) f.rotation.z += dt * 48;
+      let hdg: number, h: number, bank = 0, pitch = -0.035, fan = 48;
+      const r = ac.root;
+      if (V.live) {
+        // the real flight: where the game says it is
+        const st = liveState(performance.now()); V.cur = st;
+        if (st) {
+          const L = V.live, pv = L.prev; V.pos = [st.lat, st.lon]; V.alt = st.altM + (st.onGround ? 3.9 : 0); V.spd = Math.max(0, st.gs || 0) * 0.5144;
+          if (pv) { V.drift[0] += (st.lon - pv.lon) * 111320 * Math.cos(st.lat * D2R); V.drift[1] += (st.lat - pv.lat) * 110540; const dh = ((st.hdg - pv.hdg + 540) % 360) - 180; V.turn = V.turn * 0.9 + (dt > 0 ? dh / dt : 0) * 0.1; }
+          L.prev = { lat: st.lat, lon: st.lon, hdg: st.hdg };
+          hdg = st.hdg; bank = st.onGround ? 0 : Math.max(-0.45, Math.min(0.45, (V.turn || 0) / 3 * 0.44));
+          pitch = st.onGround ? 0 : -0.035 - Math.max(-0.28, Math.min(0.28, Math.atan2((st.vs || 0) * 0.00508, Math.max(40, V.spd))));
+          fan = st.onGround && V.spd < 2 ? 6 : 48;
+          others(st);
+        } else hdg = V.hdg || 0;
+        V.t = Date.now();
+        r.position.y = 0;
+      } else {
+        V.frac += TAS * dt / ROUTE_M; if (V.frac > 0.93) { V.frac = 0.08; toast('Back at the start of the cruise'); }
+        V.pos = gcAt([FROM.lat, FROM.lon], [TO.lat, TO.lon], V.frac); V.alt = FL; V.spd = TAS;
+        hdg = gcBrg(V.pos, [TO.lat, TO.lon]); const hh = hdg * D2R;
+        V.drift[0] += Math.sin(hh) * TAS * dt; V.drift[1] += Math.cos(hh) * TAS * dt;
+        bank = Math.sin(now * 0.31) * 0.012 + Math.sin(now * 1.7) * 0.003; pitch = -0.035 + Math.sin(now * 0.23) * 0.006;
+        r.position.y = Math.sin(now * 0.4) * 0.35 + Math.sin(now * 2.3) * 0.05;
+      }
+      V.hdg = hdg; h = hdg * D2R;
+      // the aircraft: its heading, bank and pitch
+      r.rotation.y = h; r.rotation.z = -bank; r.rotation.x = pitch;
+      for (const f of ac.fans) f.rotation.z += dt * fan;
       const strobe = (now % 1.25), on = strobe < 0.05 || (strobe > 0.12 && strobe < 0.17); for (const m of ac.strobes) m.isVisible = on;
       const bc = Math.max(0, 1 - Math.abs(((now % 1.05) - 0.08) / 0.1)); for (const m of ac.beacons) m.visibility = bc;
       for (const m of ac.logo) m.isVisible = V.sunAlt < 4;
       // the contrails leave from where the engines are now
       r.computeWorldMatrix(true); const wm = r.getWorldMatrix(), back = Vector3.TransformNormal(new Vector3(0, 0, -1), wm).normalize();
-      (V.trails || []).forEach((p: ParticleSystem, i: number) => { p.emitter = Vector3.TransformCoordinates(ac.exhausts[i].add(new Vector3(0, 0, -26)), wm); p.direction1 = back; p.direction2 = back; });
+      const trailsOn = (V.alt || FL) > 7600;
+      (V.trails || []).forEach((p: ParticleSystem, i: number) => { p.emitter = Vector3.TransformCoordinates(ac.exhausts[i].add(new Vector3(0, 0, -26)), wm); p.direction1 = back; p.direction2 = back; p.emitRate = trailsOn ? (S.gfx.particles === 'high' ? 380 : 140) : 0; p.minEmitPower = (V.spd || TAS) * 0.995; p.maxEmitPower = (V.spd || TAS) * 1.005; });
       // the camera
       const inp = inputFrame(dt), v: View = V.view;
       V.uYaw += inp.lx; V.uPitch = Math.max(-1.3, Math.min(1.3, V.uPitch + inp.ly)); V.zoom = Math.max(0.35, Math.min(4, V.zoom * Math.exp(-inp.my * dt * 1.4)));
@@ -225,7 +286,7 @@ const Viewer: Section = {
         at = Vector3.TransformCoordinates(Vector3.TransformCoordinates(lt.subtract(Vector3.FromArray(v.eye)), ly).add(Vector3.FromArray(v.eye)), wm);
       } else {
         // the point in the air moves back past the aircraft as it flies on
-        V.fb = V.fb.subtract(new Vector3(Math.sin(h), 0, Math.cos(h)).scale(TAS * dt)); eye = V.fb;
+        V.fb = V.fb.subtract(new Vector3(Math.sin(h), 0, Math.cos(h)).scale((V.spd || TAS) * dt)); eye = V.fb;
         const ahead = Vector3.Dot(V.fb, new Vector3(Math.sin(h), 0, Math.cos(h))); if (ahead < -420 && fbPrev >= -420) placeFlyby(); fbPrev = ahead;
         at = Vector3.TransformCoordinates(new Vector3(0, 0, 0), wm);
       }
@@ -246,6 +307,7 @@ const Viewer: Section = {
     const sc: Scene = V.scene; if (!sc) return;
     try { V.ctx.canvas.removeEventListener('wheel', V.wheel); } catch (e) { /* gone */ }
     window.removeEventListener('keydown', V.key);
+    if (V.live) { gameSend({ ampb: 'stop' }); V.live = null; } V.others = {};
     perfDetach(); if (V.hud) V.hud.remove(); V.trails = []; V.trailTex = null; sc.dispose(); V.scene = null;
   },
   onSettings(what: string) { apply(what === 'preset' ? 'all' : what); },
@@ -253,12 +315,26 @@ const Viewer: Section = {
 /** The flight's numbers and the time, on the screen. */
 function info() {
   const hud: HTMLElement = V.hud; if (!hud) return;
-  const left = gcDist(V.pos, [TO.lat, TO.lon]) / 1852, lat = V.pos[0], lon = V.pos[1];
+  const lat = V.pos[0], lon = V.pos[1];
   const ll = `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? 'N' : 'S'} ${Math.abs(lon).toFixed(2)}°${lon >= 0 ? 'E' : 'W'}`;
+  const st: Sample = V.cur;
+  if (V.live) {
+    if (!st) return;
+    const ft = Math.round(st.altM / 0.3048), alt = st.onGround ? 'On the ground' : ft >= 18000 ? `FL${String(Math.round(ft / 100)).padStart(3, '0')}` : `${ft.toLocaleString('en-GB')} ft`;
+    (hud.querySelector('.v3d-cs') as HTMLElement).textContent = `${st.callsign} · ${st.fromName} → ${st.toName}`;
+    (hud.querySelector('.v3d-al') as HTMLElement).textContent = [st.airline, st.type ? st.type.toUpperCase() : '', st.reg].filter(Boolean).join(' · ');
+    (hud.querySelector('.v3d-rows') as HTMLElement).innerHTML = [
+      ['Altitude', alt], ['Speed', `${Math.round(st.gs || 0)} kt`], ['Heading', `${String(Math.round(st.hdg) % 360).padStart(3, '0')}°`],
+      ['Position', ll], ['Route', `${esc(st.from)} → ${esc(st.to)}`], ['Phase', esc(st.phase || '—')], ['Passengers', st.paxMax ? `${st.pax} / ${st.paxMax}` : String(st.pax || 0)],
+      ['Climb', `${st.vs > 0 ? '+' : ''}${Math.round(st.vs || 0)} ft/min`],
+    ].map(([k, v]) => `<span><small>${k}</small><b>${v}</b></span>`).join('');
+  } else {
+  const left = gcDist(V.pos, [TO.lat, TO.lon]) / 1852;
   (hud.querySelector('.v3d-rows') as HTMLElement).innerHTML = [
     ['Altitude', 'FL300'], ['Speed', `${Math.round(TAS / 0.5144)} kt · M${MACH.toFixed(2)}`], ['Heading', `${String(Math.round(V.hdg) % 360).padStart(3, '0')}°`],
     ['Position', ll], ['To go', `${Math.round(left)} nm · ${esc(TO.icao)}`], ['Phase', 'Cruise'],
   ].map(([k, v]) => `<span><small>${k}</small><b>${v}</b></span>`).join('');
+  }
   const lm = localMin(); if (!V.sliding) V.slider.value = String(Math.round(lm));
   (hud.querySelector('.v3d-lt') as HTMLElement).textContent = `${String(Math.floor(lm / 60)).padStart(2, '0')}:${String(Math.floor(lm % 60)).padStart(2, '0')}`;
   (hud.querySelector('.v3d-sub') as HTMLElement).textContent = `local · ${fmtTime(V.t, 0)} UTC · sun ${V.sunAlt >= 0 ? '+' : ''}${V.sunAlt.toFixed(1)}°`;

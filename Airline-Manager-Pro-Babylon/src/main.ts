@@ -10,7 +10,7 @@ import { settingsShow, settingsHide, settingsOpen, settingsButton } from './ui/s
 import { loadingShow, loadingProgress, loadingHide } from './ui/loading';
 import { icon, toast } from './ui/icons';
 import { exitGame } from './core/exit';
-import { gameOpen, gameIsOpen } from './ui/game-frame';
+import { gameOpen, gameIsOpen, gameClose, gameShow, gameExists } from './ui/game-frame';
 import { APP } from './core/app';
 import { updateInit } from './core/update';
 import { whatsNewOnStart, whatsNewIsOpen, whatsNewClose } from './ui/whats-new';
@@ -45,17 +45,17 @@ onButton(b => {
   if (whatsNewIsOpen()) { if (b === 'back' || b === 'confirm' || b === 'menu') whatsNewClose(); return; }
   if (settingsOpen()) { settingsButton(b); return; }
   if (b === 'menu') { toggleSettings(); return; }
-  if (b === 'back' && inPlace) { backToTitle(); return; }
+  if (b === 'back' && inPlace) { if (gameExists()) backToGame(); else backToTitle(); return; }
   if (splashIsOpen() && b === 'confirm') splashEnter();
   if (splashIsOpen() && (b === 'up' || b === 'down')) splashNav(b === 'up' ? -1 : 1);
 });
 onPad(name => toast(name ? `${name} connected` : 'Controller disconnected'));
 
 /** Into a place of the game (today: the lounge), with its loading screen. */
-async function enter(id: string, title: string) {
+async function enter(id: string, title: string, opts?: any) {
   loadingShow(title);
   const engine = makeEngine(canvas);
-  const ctx: SectionCtx = { engine, canvas, ui, progress: (p, s) => loadingProgress(p, s), back: backToTitle };
+  const ctx: SectionCtx = { engine, canvas, ui, progress: (p, s) => loadingProgress(p, s), back: backToTitle, opts, toGame: opts && opts.live && gameExists() ? backToGame : undefined };
   try { await openSection(id, ctx); } catch (e) { console.error(e); loadingProgress(100, 'This place could not be opened on this device'); return; }
   loadingProgress(100, 'Welcome'); canvas.classList.add('on');
   setTimeout(() => { loadingHide(); inPlace = true; titleB.hidden = false; verB.hidden = false; document.body.classList.toggle('in-viewer', id === 'viewer3d'); if (!settingsOpen()) setPlay(true); }, 350);
@@ -64,13 +64,19 @@ async function enter(id: string, title: string) {
 function backToTitle() {
   if (!inPlace) return; inPlace = false; titleB.hidden = true; verB.hidden = true; document.body.classList.remove('in-viewer'); setPlay(false); if (settingsOpen()) settingsHide();
   canvas.classList.remove('on'); const e = getEngine(); if (e) e.stopRenderLoop();
-  closeSection(); splashOpen(pickPlace);
+  closeSection(); gameClose(); splashOpen(pickPlace);
+}
+/** Back from the 3D viewer to the game's interface (it kept running behind). */
+function backToGame() {
+  if (!inPlace) return; inPlace = false; titleB.hidden = true; verB.hidden = true; document.body.classList.remove('in-viewer'); setPlay(false); if (settingsOpen()) settingsHide();
+  canvas.classList.remove('on'); const e = getEngine(); if (e) e.stopRenderLoop();
+  closeSection(); gameShow();
 }
 const TITLES: { [id: string]: string } = { viewer3d: '3D viewer · above the clouds', lounge: 'Business lounge' };
 /** What was chosen on the title screen: the game (New, Continue, Load, Save, UI) or one of the demos. */
 function pickPlace(id: string) {
   if (id.indexOf('game:') === 0) {
-    gameOpen(id.slice(5) as any, { title: () => splashOpen(pickPlace), exit: () => exitGame(), viewer: () => enter('viewer3d', TITLES.viewer3d) });
+    gameOpen(id.slice(5) as any, { title: () => splashOpen(pickPlace), exit: () => exitGame(), viewer: (fid: string) => enter('viewer3d', fid ? '3D viewer · following the flight' : TITLES.viewer3d, fid ? { live: fid } : undefined) });
     return;
   }
   enter(id, TITLES[id] || id);

@@ -52,7 +52,7 @@ const mirror = (v: Vector3) => new Vector3(-v.x, v.y, v.z);
 
 /** The livery on the fuselage: white, a grey belly, a navy cheatline under the windows, the windows, the flight deck
  *  windows and the doors. The picture runs along the fuselage (across) and round it (down). */
-function paintBody(sc: Scene): DynamicTexture {
+function paintBody(sc: Scene, C1 = '#1C2A4A', C2 = '#3FD3E6'): DynamicTexture {
   const W = 4096, H = 1024, t = new DynamicTexture('livery', { width: W, height: H }, sc, true);
   const x = t.getContext() as CanvasRenderingContext2D, X = (s: number) => s / L * W, Y = (v: number) => (1 - v) * H;
   x.fillStyle = '#F3F5F7'; x.fillRect(0, 0, W, H);
@@ -60,8 +60,8 @@ function paintBody(sc: Scene): DynamicTexture {
   band(0.40, 0.60, '#C9CED4');   // the belly
   for (const side of [1, -1]) {
     const v = (a: number) => side > 0 ? a : 1 - a;   // round the right side (0–0.5) or the left (0.5–1)
-    const vv = [v(0.288), v(0.31)].sort(); x.fillStyle = '#1C2A4A'; x.fillRect(X(4.2), Y(vv[1]), X(L - 9) - X(4.2), Y(vv[0]) - Y(vv[1]));     // the cheatline
-    const ww = [v(0.312), v(0.319)].sort(); x.fillStyle = '#3FD3E6'; x.fillRect(X(6), Y(ww[1]), X(L - 10) - X(6), Y(ww[0]) - Y(ww[1]));      // its cyan edge
+    const vv = [v(0.288), v(0.31)].sort(); x.fillStyle = C1; x.fillRect(X(4.2), Y(vv[1]), X(L - 9) - X(4.2), Y(vv[0]) - Y(vv[1]));     // the cheatline
+    const ww = [v(0.312), v(0.319)].sort(); x.fillStyle = C2; x.fillRect(X(6), Y(ww[1]), X(L - 10) - X(6), Y(ww[0]) - Y(ww[1]));      // its cyan edge
     // the cabin windows
     for (let s = 7.1; s < 30.6; s += 0.53) {
       if (s > 15.0 && s < 16.4) continue;
@@ -80,21 +80,31 @@ function paintBody(sc: Scene): DynamicTexture {
     }
   }
   // the tail cone in navy with the cyan swoosh running up into the fin
-  const g = x.createLinearGradient(X(L - 9), 0, X(L), 0); g.addColorStop(0, 'rgba(28,42,74,0)'); g.addColorStop(0.35, '#1C2A4A'); g.addColorStop(1, '#1C2A4A');
+  const g = x.createLinearGradient(X(L - 9), 0, X(L), 0); g.addColorStop(0, hexA(C1, 0)); g.addColorStop(0.35, C1); g.addColorStop(1, C1);
   x.fillStyle = g; x.fillRect(X(L - 9), Y(0.30), X(9), Y(0.0) - Y(0.30)); x.fillRect(X(L - 9), Y(1.0), X(9), Y(0.70) - Y(1.0));
   t.update(true); t.anisotropicFilteringLevel = 8;
   return t;
 }
 function roundRect(x: CanvasRenderingContext2D, px: number, py: number, w: number, h: number, r: number) { x.beginPath(); x.moveTo(px + r, py); x.arcTo(px + w, py, px + w, py + h, r); x.arcTo(px + w, py + h, px, py + h, r); x.arcTo(px, py + h, px, py, r); x.arcTo(px, py, px + w, py, r); x.closePath(); }
 /** The fin's paint: navy with the cyan swoosh and our emblem (a stylised wing). */
-function paintFin(sc: Scene): DynamicTexture {
+function paintFin(sc: Scene, C1 = '#1C2A4A', C2 = '#3FD3E6'): DynamicTexture {
   const t = new DynamicTexture('fin', { width: 1024, height: 1024 }, sc, true), x = t.getContext() as CanvasRenderingContext2D;
-  x.fillStyle = '#1C2A4A'; x.fillRect(0, 0, 1024, 1024);
-  x.strokeStyle = '#3FD3E6'; x.lineWidth = 46; x.beginPath(); x.moveTo(-40, 820); x.bezierCurveTo(300, 760, 600, 420, 1060, 300); x.stroke();
+  x.fillStyle = C1; x.fillRect(0, 0, 1024, 1024);
+  x.strokeStyle = C2; x.lineWidth = 46; x.beginPath(); x.moveTo(-40, 820); x.bezierCurveTo(300, 760, 600, 420, 1060, 300); x.stroke();
   x.strokeStyle = '#FF3FB8'; x.lineWidth = 16; x.beginPath(); x.moveTo(-40, 900); x.bezierCurveTo(320, 840, 640, 520, 1060, 400); x.stroke();
   t.update(true); return t;
 }
 
+/** A colour with its transparency, for gradients. */
+function hexA(h: string, a: number): string { const c = Color3.FromHexString(h.length === 7 ? h : '#1C2A4A'); return `rgba(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)},${a})`; }
+/** The airline's own colours on the aircraft: the cheatline, its edge, the tail cone, the fin and the sharklets. */
+export function repaint(ac: Airliner, c1: string, c2: string) {
+  const sc = ac.root.getScene(), ok = (h: string) => /^#[0-9a-f]{6}$/i.test(h || '');
+  if (!ok(c1)) c1 = '#1C2A4A'; if (!ok(c2)) c2 = '#3FD3E6';
+  const [paint, , fin, navy] = ac.paint;
+  const ob = paint.albedoTexture, of = fin.albedoTexture; paint.albedoTexture = paintBody(sc, c1, c2); fin.albedoTexture = paintFin(sc, c1, c2); if (ob) ob.dispose(); if (of) of.dispose();
+  navy.albedoColor = Color3.FromHexString(c1);
+}
 export function buildAirliner(sc: Scene): Airliner {
   const root = new TransformNode('aircraft', sc);
   const paint = new PBRMaterial('paint', sc); paint.albedoTexture = paintBody(sc); paint.metallic = 0.15; paint.roughness = 0.34;

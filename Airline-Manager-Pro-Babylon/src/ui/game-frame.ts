@@ -3,9 +3,18 @@
 // and Quit in it come here; the 3D view of a flight opens this edition's 3D viewer. Closed, it is taken away
 // completely, so its memory goes back.
 let frame: HTMLIFrameElement | null = null;
-let handlers: { title: () => void; exit: () => void; viewer: () => void } | null = null;
+let handlers: { title: () => void; exit: () => void; viewer: (id: string) => void } | null = null;
+const flightSubs: ((d: any) => void)[] = [];
+/** The flight the 3D viewer follows, as the game sends it (several times a second). */
+export function onGameFlight(f: (d: any) => void) { flightSubs.push(f); }
+/** A message to the game (follow a flight, stop, save). */
+export function gameSend(m: any) { try { if (frame && frame.contentWindow) frame.contentWindow.postMessage(m, '*'); } catch (e) { /* gone */ } }
+/** The game out of sight, still running (its airline, schedules and flights go on): the 3D viewer is in front. */
+export function gameHide() { if (frame) { frame.classList.add('away'); document.body.classList.remove('game-on'); } }
+export function gameShow() { if (frame) { gameSend({ ampb: 'stop' }); frame.classList.remove('away'); document.body.classList.add('game-on'); setTimeout(() => { try { frame && frame.focus(); } catch (e) { /* later */ } }, 200); } }
+export function gameHidden(): boolean { return !!frame && frame.classList.contains('away'); }
 
-export function gameOpen(act: 'new' | 'continue' | 'load' | 'save' | 'ui', on: { title: () => void; exit: () => void; viewer: () => void }) {
+export function gameOpen(act: 'new' | 'continue' | 'load' | 'save' | 'ui', on: { title: () => void; exit: () => void; viewer: (id: string) => void }) {
   gameClose(); handlers = on;
   const f = document.createElement('iframe'); f.className = 'game-frame'; f.setAttribute('title', 'Airline Manager Pro');
   f.setAttribute('allow', 'autoplay; fullscreen; gamepad; clipboard-write');
@@ -14,7 +23,8 @@ export function gameOpen(act: 'new' | 'continue' | 'load' | 'save' | 'ui', on: {
   requestAnimationFrame(() => f.classList.add('in'));
   setTimeout(() => { try { f.focus(); } catch (e) { /* later */ } }, 400);
 }
-export function gameIsOpen(): boolean { return !!frame; }
+export function gameIsOpen(): boolean { return !!frame && !frame.classList.contains('away'); }
+export function gameExists(): boolean { return !!frame; }
 export function gameClose() {
   const f = frame; frame = null; document.body.classList.remove('game-on'); if (!f) return;
   try { f.src = 'about:blank'; } catch (e) { /* gone */ }
@@ -25,5 +35,6 @@ window.addEventListener('message', (e: MessageEvent) => {
   const h = handlers;
   if (d.amp === 'title') { gameClose(); h.title(); }
   else if (d.amp === 'exit') h.exit();
-  else if (d.amp === 'viewer3d') { gameClose(); h.viewer(); }
+  else if (d.amp === 'viewer3d') { if (d.id) { gameHide(); h.viewer(d.id); } else { gameClose(); h.viewer(''); } }
+  else if (d.amp === 'flight') { for (const f of flightSubs) { try { f(d); } catch (err) { console.error(err); } } }
 });
