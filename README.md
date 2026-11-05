@@ -3,7 +3,8 @@
 A separate edition of Airline Manager Pro on the Babylon.js engine, for Android and the PC. It installs beside the
 main game and doesn't touch it.
 
-Today it is one place, as a demonstration: the start screen (the same film and music as the main game), then the
+Today it has two places, as demonstrations: the start screen (the same film and music as the main game), then the
+3D viewer (an airliner at flight level 300 above volumetric clouds, with the sun, moon and real stars) or the
 Business lounge. The gear in the corner is always there, with the graphics and controls settings. Walk with the
 touchscreen, the keyboard and mouse, or a PlayStation controller (or any game controller).
 

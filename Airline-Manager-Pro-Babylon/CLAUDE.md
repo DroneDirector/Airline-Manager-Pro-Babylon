@@ -12,7 +12,9 @@
 - Don't run tests or check that things work unless the owner asks: build what is needed and release.
 - Don't make or share screenshots unless asked.
 - The game is added part by part as sections (`src/core/sections.ts`): each place registers itself (id, title, open,
-  close, onSettings) and is opened from `src/main.ts`. Today: the lounge only (its doors stay shut).
+  close, onSettings) and is opened from `src/main.ts`. Today: the 3D viewer (a demo flight above the clouds) and the lounge (its doors stay shut),
+  each with its own button on the start screen.
+- In every place: the gear, Exit and Title screen (back to the start screen) are always on screen.
 - The gear is always on screen; its settings are graphics and controls only, until more is brought over.
 - Controls from day one: touchscreen (stick and look), keyboard and mouse, PlayStation (and other) controllers, with
   their settings under Controls.
