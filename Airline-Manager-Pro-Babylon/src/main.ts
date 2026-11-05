@@ -23,6 +23,7 @@ import './sections/building/index';
 import './sections/salute/index';
 import './sections/court/index';
 import './sections/terminal/index';
+import './sections/site/index';
 
 const canvas = document.getElementById('bjs') as HTMLCanvasElement, ui = document.getElementById('ui') as HTMLElement;
 let inPlace = false;
@@ -79,7 +80,7 @@ function backToGame(screen?: string) {
   canvas.classList.remove('on'); const e = getEngine(); if (e) e.stopRenderLoop();
   closeSection(); gameShow(); if (screen) gameSend({ ampb: 'go', screen });
 }
-const TITLES: { [id: string]: string } = { viewer3d: '3D viewer · above the clouds', lounge: 'Business lounge', terminal: 'The terminal · Grand Hall' };
+const TITLES: { [id: string]: string } = { viewer3d: '3D viewer · above the clouds', lounge: 'Business lounge', terminal: 'The terminal · Grand Hall', site: 'Airport site · Mýrdalssandur' };
 /** What was chosen on the title screen: the game (New, Continue, Load, Save, UI) or one of the demos. */
 function pickPlace(id: string) {
   if (id.indexOf('game:') === 0) {
