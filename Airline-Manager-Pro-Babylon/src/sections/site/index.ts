@@ -18,7 +18,8 @@ import { buildAirliner, setGear } from '../viewer3d/airliner';
 import { makeWeather, Weather } from '../terminal/weather';
 import { makeKit } from '../terminal/kit';
 import { buildShell } from '../terminal/shell';
-import { buildDoors } from '../terminal/doors';
+import { buildDoors, stepDoors, DoorObj } from '../terminal/doors';
+import { STAIRS, F2Y } from '../terminal/plan';
 import { furnish } from '../terminal/furnish';
 import { buildFixtures } from '../terminal/fixtures';
 import { buildRental } from '../terminal/rental';
@@ -151,7 +152,9 @@ function airport(sc: Scene, site: any, elev: number, casters: AbstractMesh[]) {
 }
 /** The ready-made views: where (in the airport's frame: u, height, v) and what it looks at. */
 const VIEWS: { id: string; name: string; at: [number, number, number]; look: [number, number, number] }[] = [
-  { id: 'gate', name: 'Gate 4', at: [PX(MOD[3] + 17), 7.66, PV(PN - 1.4)], look: [PX(MOD[3] + 27), 30, 2600] },
+  // gate 4 (upper floor): standing between the second and third rows of seats, the gate desk and its sign to the right, looking straight out over the seats to the aircraft and the mountains
+  { id: 'gate', name: 'Gate 4', at: [PX(MOD[3] + 11), 7.62, PV(75.6)], look: [PX(MOD[3] + 11), 7.62, PV(75.6) + 200] },
+  { id: 'carpark', name: 'Over the car park', at: [PX(75), 26, PV(-135)], look: [PX(75), 9, PV(15)] },
   { id: 'apron', name: 'On the apron', at: [PX(MOD[2] + 40), 1.7, PV(PN + 45)], look: [-600, 120, 3000] },
   { id: 'runway', name: 'Runway threshold', at: [-RWY.len / 2 - 20, 3, RWY.vA - 20], look: [RWY.len / 2, 80, RWY.vA + 1600] },
   { id: 'between', name: 'Between the runways', at: [400, 2, 0], look: [-400, 150, 4000] },
@@ -192,12 +195,32 @@ const Site$: Section = {
     // then set into the airport frame, the plan's origin at (u, v) = (-81, -1482), on the levelled ground
     progress(86, 'Building your terminal…'); await new Promise(r => setTimeout(r, 0));
     const before = new Set(sc.transformNodes.concat(sc.meshes as any[]));
-    const K = makeKit(sc); buildShell(K, () => { /* its own steps */ }); buildDoors(K); furnish(K, () => { /* */ }); K.clearWalls();
+    const K = makeKit(sc); buildShell(K, () => { /* its own steps */ }); const doors = buildDoors(K) as DoorObj[]; furnish(K, () => { /* */ }); K.clearWalls();
     buildFixtures(K, '#1C3A8A', '#3FD3E6', 'Airline Manager Pro', () => { /* */ }); buildRental(K); (K.struct as any).finish();
     for (const n of (sc.transformNodes as any[]).concat(sc.meshes as any[])) if (!before.has(n) && !n.parent && n !== K.root) n.parent = K.root;   // anything built loose goes with it
     K.root.parent = ap; K.root.position.set(PX(0), 0, PV(0)); O.K = K;
     for (const m of K.casters) casters.push(m);
     for (const m of sc.meshes) { if (!before.has(m)) { m.renderingGroupId = 1; m.computeWorldMatrix(true); m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true; } }
+    // airport mode (from the game's Airport): on foot, with gravity, against the terminal's floors, walls and glass,
+    // the levelled ground and the aircraft; the stairs are walked up as ramps; the doors open as you come to them
+    const walkMode = !!(ctx.opts && ctx.opts.walk); O.walkMode = walkMode;
+    if (walkMode) {
+      sc.collisionsEnabled = true;
+      const skip = new Set<any>(); for (const d of doors) for (const m of d.node.getChildMeshes()) skip.add(m);
+      for (const m of K.groups.STAIRS.getChildMeshes()) skip.add(m); for (const m of K.groups.SCREENS.getChildMeshes()) skip.add(m);
+      for (const m of sc.meshes) if (!before.has(m) && !skip.has(m) && m.getTotalVertices() > 0) m.checkCollisions = true;
+      for (const m of ap.getChildMeshes()) if (m.getTotalVertices() > 0 && !/fn|num|rn/.test(m.name)) m.checkCollisions = true;
+      inner.m.checkCollisions = true; inner.m.subdivide(64);
+      // the stairs as invisible ramps, from the lower floor up to the upper
+      for (const st of STAIRS) { const r = (x: number, z: number, y: number) => new Vector3(x, y, z); let p: Vector3[];
+        if (st.dir === 'x+') p = [r(st.x0, st.z0, 0), r(st.x1, st.z0, F2Y), r(st.x1, st.z1, F2Y), r(st.x0, st.z1, 0)];
+        else if (st.dir === 'x-') p = [r(st.x0, st.z0, F2Y), r(st.x1, st.z0, 0), r(st.x1, st.z1, 0), r(st.x0, st.z1, F2Y)];
+        else if (st.dir === 'z+') p = [r(st.x0, st.z0, 0), r(st.x1, st.z0, 0), r(st.x1, st.z1, F2Y), r(st.x0, st.z1, F2Y)];
+        else p = [r(st.x0, st.z0, F2Y), r(st.x1, st.z0, F2Y), r(st.x1, st.z1, 0), r(st.x0, st.z1, 0)];
+        const m = new Mesh('ramp-' + st.id, sc), vd = new VertexData(); vd.positions = p.flatMap(v => [v.x, v.y + 0.02, v.z]); vd.indices = [0, 1, 2, 0, 2, 3, 0, 2, 1, 0, 3, 2]; vd.applyToMesh(m);
+        m.parent = K.root; m.isVisible = false; m.checkCollisions = true; m.isPickable = false; }
+    }
+    O.doors = doors;
     progress(92, 'Setting up the views…');
     // lights, camera, the sky and its weather
     const hemi = new HemisphericLight('hemi', new Vector3(0, 1, 0), sc); hemi.intensity = 0.8;
@@ -218,6 +241,12 @@ const Site$: Section = {
 </div>
       <div class="wx-updown site-ud" ${IS_TOUCH ? '' : 'hidden'}><button class="wx-b" data-ud="up">▲</button><button class="wx-b" data-ud="down">▼</button></div>`);
     const CAM = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, speed: 40, up: 0, down: 0 }; O.CAM = CAM;
+    if (walkMode) { hud.classList.add('site-walk'); (hud.querySelector('.site-dock') as HTMLElement).style.display = 'none'; (hud.querySelector('.site-ud') as HTMLElement).style.display = 'none'; }
+    // the body you walk in: feet at its position, 1.8 m tall, 0.6 m across
+    const body = MeshBuilder.CreateBox('player', { size: 0.5 }, sc); body.isVisible = false; body.isPickable = false; body.checkCollisions = false; body.ellipsoid = new Vector3(0.3, 0.9, 0.3); body.ellipsoidOffset = new Vector3(0, 0.9, 0);
+    const toWorld = (x: number, y: number, z: number) => Vector3.TransformCoordinates(new Vector3(PX(x), y, PV(z)), ap.computeWorldMatrix(true));
+    const W = { vy: 0, ground: false }; O.W = W;
+    if (walkMode) { const p = toWorld(79, 0.3, -9); body.position.copyFrom(p); const f = toWorld(79, 0.3, 20).subtract(p).normalize(); CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = 0; }
     const place = (id: string) => { const v = VIEWS.find(q => q.id === id) || VIEWS[0], at = Vector3.TransformCoordinates(new Vector3(v.at[0], v.at[1], v.at[2]), ap.computeWorldMatrix(true)), lk = Vector3.TransformCoordinates(new Vector3(v.look[0], v.look[1], v.look[2]), ap.getWorldMatrix());
       const d = lk.subtract(at).normalize(); CAM.x = at.x; CAM.y = at.y; CAM.z = at.z; CAM.yaw = Math.atan2(d.x, d.z); CAM.pitch = Math.asin(d.y); CAM.speed = id === 'air' || id === 'flyby' ? 220 : id === 'gate' ? 8 : 40;
       hud.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.getAttribute('data-view') === id)); hud.querySelectorAll('[data-sp2]').forEach(b => b.classList.toggle('on', Number(b.getAttribute('data-sp2')) === CAM.speed)); };
@@ -227,18 +256,29 @@ const Site$: Section = {
       if (b.hasAttribute('data-site')) { const other = SITES.find(s => s !== site)!; if (ctx.back) { /* open again at the other site */ } O.reopen = other.id; Site$.close(); Site$.open(Object.assign({}, ctx, { opts: Object.assign({}, ctx.opts || {}, { site: other.id }) })); } });
     for (const k of ['up', 'down'] as const) { const b = hud.querySelector(`[data-ud="${k}"]`) as HTMLElement; b.addEventListener('pointerdown', e => { e.stopPropagation(); CAM[k] = 1; }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { CAM[k] = 0; }); }
     const keys = new Set<string>(); O.kd = (e: KeyboardEvent) => keys.add(e.key.toLowerCase()); O.ku = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase()); window.addEventListener('keydown', O.kd); window.addEventListener('keyup', O.ku);
-    place((ctx.opts && ctx.opts.view) || 'gate');
+    if (!walkMode) place((ctx.opts && ctx.opts.view) || 'gate');
     perfAttach(engine, sc, hud); perfShow();
-    toast(IS_TOUCH ? 'Pick a view · left thumb: fly · right: look · ▲ ▼ up and down' : 'Pick a view · W A S D fly · mouse look · Space / R up · C / F down · Shift faster · P photo');
+    if (walkMode) toast(IS_TOUCH ? 'Your airport · left thumb: walk · right: look' : 'Your airport · W A S D walk · mouse look · Shift run · P photo'); else toast(IS_TOUCH ? 'Pick a view · left thumb: fly · right: look · ▲ ▼ up and down' : 'Pick a view · W A S D fly · mouse look · Space / R up · C / F down · Shift faster · P photo');
     progress(100, 'Ready');
     runLoop(() => {
       perfBegin();
       const dt = Math.min(0.05, engine.getDeltaTime() / 1000), now = performance.now() / 1000, inp = inputFrame(dt);
       CAM.yaw += inp.lx; CAM.pitch = Math.max(-1.55, Math.min(1.55, CAM.pitch - inp.ly));
+      if (walkMode) {
+        const cp0 = Math.cos(CAM.pitch), fw = new Vector3(Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw)), rt = new Vector3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw)), spd = (inp.run || keys.has('shift') ? 4.2 : 1.6) * dt;
+        W.vy = W.ground ? -0.5 : Math.max(-30, W.vy - 9.81 * dt);
+        const want = fw.scale(inp.my * spd).add(rt.scale(inp.mx * spd)); want.y = W.vy * dt; const y0 = body.position.y;
+        body.moveWithCollisions(want); W.ground = body.position.y > y0 + want.y + 0.001; if (W.ground) W.vy = 0;
+        if (body.position.y < elev - 40) { body.position.copyFrom(toWorld(79, 0.5, -9)); W.vy = 0; }
+        cam.position.set(body.position.x, body.position.y + 1.65, body.position.z); cam.setTarget(cam.position.add(new Vector3(Math.sin(CAM.yaw) * cp0, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp0)));
+        // the doors open as you come to them
+        const lp = Vector3.TransformCoordinates(body.position, K.root.getWorldMatrix().clone().invert()); try { stepDoors(doors, lp.x, lp.z, lp.y > 3 ? 2 : 1, dt, now); } catch (e) { /* still */ }
+      } else {
       const sp = CAM.speed * (inp.run || keys.has('shift') ? 4 : 1) * dt, cp = Math.cos(CAM.pitch), f = new Vector3(Math.sin(CAM.yaw) * cp, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp), r = new Vector3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
       const mv = f.scale(inp.my).add(r.scale(inp.mx)), vert = (keys.has(' ') || keys.has('r') || CAM.up ? 1 : 0) - (keys.has('c') || keys.has('f') || CAM.down ? 1 : 0);
       CAM.x += mv.x * sp; CAM.z += mv.z * sp; CAM.y = Math.max(elev + 0.6, Math.min(12000, CAM.y + mv.y * sp + vert * sp));
       cam.position.set(CAM.x, CAM.y, CAM.z); cam.setTarget(cam.position.add(f));
+      }
       wx.frame(dt, now);
       sc.render(); perfEnd();
     });

@@ -236,7 +236,7 @@ const Viewer: Section = {
       if (b.hasAttribute('data-view')) setView(b.getAttribute('data-view') as string);
       else if (b.hasAttribute('data-speed')) setSpeed(Number(b.getAttribute('data-speed')));
       else if (b.getAttribute('data-v') === 'game' && ctx.toGame) ctx.toGame();
-      else if (b.getAttribute('data-v') === 'site' && ctx.goTo) ctx.goTo('site', { site: 'myrdalssandur', view: 'gate' });
+      else if (b.getAttribute('data-v') === 'site' && ctx.goTo) ctx.goTo('site', { site: 'myrdalssandur', view: 'carpark' });
       else if ((b.getAttribute('data-v') === 'prev' || b.getAttribute('data-v') === 'next') && V.live) { const l = V.live.list || [], i = l.findIndex((x: any) => x.id === V.live.id); if (l.length) follow(l[(i + (b.getAttribute('data-v') === 'next' ? 1 : l.length - 1) + l.length) % l.length].id); }
     });
     const sl = hud.querySelector('.v3d-slider') as HTMLInputElement; V.slider = sl;

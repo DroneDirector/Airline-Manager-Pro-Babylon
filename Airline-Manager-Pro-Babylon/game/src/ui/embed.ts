@@ -71,7 +71,8 @@ if (EMBED) {
   ACTIONS['office-open'] = () => { closeAll(); building('office'); };
   ACTIONS['ops-room'] = () => { closeAll(); building('ops'); };
   ACTIONS['lounge-visit'] = () => { closeAll(); building('lounge'); };
-  ACTIONS['airport-open'] = () => { closeAll(); building('concourse'); };
+  // Airport: your own airport at its site, on foot from the kerb outside the main entrance
+  ACTIONS['airport-open'] = () => { closeAll(); embedTell('room', { room: 'site', data: { walk: true } }); };
   ACTIONS['mus-open'] = () => { closeAll(); building('museum'); };
   // the water salute, on Babylon.js: the airline's aircraft taxiing under the fire trucks' arch at that airport, now
   W.saluteOpen = (o: any) => {
