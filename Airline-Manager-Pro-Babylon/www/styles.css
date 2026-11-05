@@ -321,3 +321,5 @@ body.game-on .gear, body.game-on .exit, body.game-on .to-title, body.game-on .pl
 .site-speed { display: flex; align-items: center; gap: 6px; color: #DDE6F7; font: 600 11px 'Inter', sans-serif; }
 .site-speed small { margin-right: 4px; }
 .site-ud { bottom: 30%; }
+.site-moves { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 34px); display: grid; grid-template-columns: repeat(2, auto); gap: 8px; pointer-events: auto; }
+.site-moves .wx-b { min-width: 86px; justify-content: center; padding: 10px 12px; }

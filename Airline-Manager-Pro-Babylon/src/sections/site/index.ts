@@ -6,7 +6,7 @@
 // stands and aircraft on them, the apron, the parallel taxiway, two parallel 3,500 m runways 2,000 m apart with the
 // taxiways between them, a tower, and the fence round about 21 km². Ready-made views (from a gate, the apron, the
 // runways, the air) and a free drone camera, the time of day and the weather, and the photo button.
-import { Scene, Vector3, Color3, Color4, UniversalCamera, HemisphericLight, DirectionalLight, ShadowGenerator, GlowLayer, DefaultRenderingPipeline, ImageProcessingConfiguration, MeshBuilder, Mesh, VertexData, TransformNode, PBRMaterial, StandardMaterial, DynamicTexture, Texture, AbstractMesh } from '@babylonjs/core';
+import { Ray, Scene, Vector3, Color3, Color4, UniversalCamera, HemisphericLight, DirectionalLight, ShadowGenerator, GlowLayer, DefaultRenderingPipeline, ImageProcessingConfiguration, MeshBuilder, Mesh, VertexData, TransformNode, PBRMaterial, StandardMaterial, DynamicTexture, Texture, AbstractMesh } from '@babylonjs/core';
 import { registerSection, Section, SectionCtx } from '../../core/sections';
 import { runLoop } from '../../core/engine';
 import { inputFrame } from '../../core/input';
@@ -241,21 +241,32 @@ const Site$: Section = {
 </div>
       <div class="wx-updown site-ud" ${IS_TOUCH ? '' : 'hidden'}><button class="wx-b" data-ud="up">▲</button><button class="wx-b" data-ud="down">▼</button></div>`);
     const CAM = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, speed: 40, up: 0, down: 0 }; O.CAM = CAM;
+    if (walkMode) hud.insertAdjacentHTML('beforeend', `<div class="site-moves">${[['jump', 'Jump'], ['crouch', 'Crouch'], ['prone', 'Prone'], ['sprint', 'Sprint']].map(([k, l]) => `<button class="wx-b" data-mv="${k}">${l}</button>`).join('')}</div>`);
     if (walkMode) { hud.classList.add('site-walk'); (hud.querySelector('.site-dock') as HTMLElement).style.display = 'none'; (hud.querySelector('.site-ud') as HTMLElement).style.display = 'none'; }
     // the body you walk in: feet at its position, 1.8 m tall, 0.6 m across
     const body = MeshBuilder.CreateBox('player', { size: 0.5 }, sc); body.isVisible = false; body.isPickable = false; body.checkCollisions = false; body.ellipsoid = new Vector3(0.3, 0.9, 0.3); body.ellipsoidOffset = new Vector3(0, 0.9, 0);
     const toWorld = (x: number, y: number, z: number) => Vector3.TransformCoordinates(new Vector3(PX(x), y, PV(z)), ap.computeWorldMatrix(true));
-    const W = { vy: 0, ground: false }; O.W = W;
+    // the stances: standing, crouching, lying prone; the eye's height, the body's half height, the speeds (walk, sprint)
+    const STANCE: { [k: string]: { eye: number; half: number; r: number; walk: number; sprint: number } } = {
+      stand: { eye: 1.65, half: 0.9, r: 0.3, walk: 1.6, sprint: 6.2 }, crouch: { eye: 1.0, half: 0.58, r: 0.3, walk: 0.9, sprint: 1.6 }, prone: { eye: 0.32, half: 0.24, r: 0.36, walk: 0.35, sprint: 0.5 } };
+    const W = { vy: 0, ground: false, stance: 'stand', eye: 1.65, jump: false, sprint: false }; O.W = W;
+    /** Room overhead for a stance (its body's full height) where you are? */
+    const roomFor = (k: string) => { const h = STANCE[k].half * 2, cur = STANCE[W.stance].half * 2; if (h <= cur) return true;
+      const hit = sc.pickWithRay(new Ray(body.position.add(new Vector3(0, cur - 0.05, 0)), Vector3.Up(), h - cur + 0.1), (m: any) => !!m.checkCollisions && m !== body); return !(hit && hit.hit); };
+    const setStance = (k: string) => { if (k === W.stance) k = 'stand'; if (!roomFor(k)) { toast('No room to stand up here'); return; } W.stance = k; const st = STANCE[k];
+      body.ellipsoid = new Vector3(st.r, st.half, st.r); body.ellipsoidOffset = new Vector3(0, st.half, 0); hud.querySelectorAll('[data-mv]').forEach(b => b.classList.toggle('on', b.getAttribute('data-mv') === k)); };
+    O.setStance = setStance;
     if (walkMode) { const p = toWorld(79, 0.3, -9); body.position.copyFrom(p); const f = toWorld(79, 0.3, 20).subtract(p).normalize(); CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = 0; }
     const place = (id: string) => { const v = VIEWS.find(q => q.id === id) || VIEWS[0], at = Vector3.TransformCoordinates(new Vector3(v.at[0], v.at[1], v.at[2]), ap.computeWorldMatrix(true)), lk = Vector3.TransformCoordinates(new Vector3(v.look[0], v.look[1], v.look[2]), ap.getWorldMatrix());
       const d = lk.subtract(at).normalize(); CAM.x = at.x; CAM.y = at.y; CAM.z = at.z; CAM.yaw = Math.atan2(d.x, d.z); CAM.pitch = Math.asin(d.y); CAM.speed = id === 'air' || id === 'flyby' ? 220 : id === 'gate' ? 8 : 40;
       hud.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.getAttribute('data-view') === id)); hud.querySelectorAll('[data-sp2]').forEach(b => b.classList.toggle('on', Number(b.getAttribute('data-sp2')) === CAM.speed)); };
     hud.addEventListener('click', e => { const b = (e.target as HTMLElement).closest('button') as HTMLElement | null; if (!b) return;
+      if (b.hasAttribute('data-mv')) { const k = b.getAttribute('data-mv'); if (k === 'jump') O.W.jump = true; else if (k === 'sprint') { O.W.sprint = !O.W.sprint; b.classList.toggle('on', O.W.sprint); } else O.setStance(k); }
       if (b.hasAttribute('data-view')) place(b.getAttribute('data-view') as string);
       if (b.hasAttribute('data-sp2')) { CAM.speed = Number(b.getAttribute('data-sp2')); hud.querySelectorAll('[data-sp2]').forEach(q => q.classList.toggle('on', q === b)); }
       if (b.hasAttribute('data-site')) { const other = SITES.find(s => s !== site)!; if (ctx.back) { /* open again at the other site */ } O.reopen = other.id; Site$.close(); Site$.open(Object.assign({}, ctx, { opts: Object.assign({}, ctx.opts || {}, { site: other.id }) })); } });
     for (const k of ['up', 'down'] as const) { const b = hud.querySelector(`[data-ud="${k}"]`) as HTMLElement; b.addEventListener('pointerdown', e => { e.stopPropagation(); CAM[k] = 1; }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { CAM[k] = 0; }); }
-    const keys = new Set<string>(); O.kd = (e: KeyboardEvent) => keys.add(e.key.toLowerCase()); O.ku = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase()); window.addEventListener('keydown', O.kd); window.addEventListener('keyup', O.ku);
+    const keys = new Set<string>(); O.kd = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); keys.add(k); if (!O.walkMode || e.repeat) return; if (k === ' ') O.W.jump = true; else if (k === 'c' || k === 'control') O.setStance('crouch'); else if (k === 'z') O.setStance('prone'); }; O.ku = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase()); window.addEventListener('keydown', O.kd); window.addEventListener('keyup', O.ku);
     if (!walkMode) place((ctx.opts && ctx.opts.view) || 'gate');
     perfAttach(engine, sc, hud); perfShow();
     if (walkMode) toast(IS_TOUCH ? 'Your airport · left thumb: walk · right: look' : 'Your airport · W A S D walk · mouse look · Shift run · P photo'); else toast(IS_TOUCH ? 'Pick a view · left thumb: fly · right: look · ▲ ▼ up and down' : 'Pick a view · W A S D fly · mouse look · Space / R up · C / F down · Shift faster · P photo');
@@ -265,12 +276,15 @@ const Site$: Section = {
       const dt = Math.min(0.05, engine.getDeltaTime() / 1000), now = performance.now() / 1000, inp = inputFrame(dt);
       CAM.yaw += inp.lx; CAM.pitch = Math.max(-1.55, Math.min(1.55, CAM.pitch - inp.ly));
       if (walkMode) {
-        const cp0 = Math.cos(CAM.pitch), fw = new Vector3(Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw)), rt = new Vector3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw)), spd = (inp.run || keys.has('shift') ? 4.2 : 1.6) * dt;
+        const st = STANCE[W.stance], sprinting = (inp.run || keys.has('shift') || W.sprint) && inp.my > 0.1;
+        const cp0 = Math.cos(CAM.pitch), fw = new Vector3(Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw)), rt = new Vector3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw)), spd = (sprinting ? st.sprint : st.walk) * (W.ground ? 1 : 0.85) * dt;
+        // a jump: up at 4.4 m/s (about a metre), from standing or crouching, only from the ground; landing from a crouch or prone stands you up first
+        if (W.jump) { W.jump = false; if (W.ground) { if (W.stance !== 'stand') setStance(W.stance); else W.vy = 4.4, W.ground = false; } }
         W.vy = W.ground ? -0.5 : Math.max(-30, W.vy - 9.81 * dt);
         const want = fw.scale(inp.my * spd).add(rt.scale(inp.mx * spd)); want.y = W.vy * dt; const y0 = body.position.y;
         body.moveWithCollisions(want); W.ground = body.position.y > y0 + want.y + 0.001; if (W.ground) W.vy = 0;
         if (body.position.y < elev - 40) { body.position.copyFrom(toWorld(79, 0.5, -9)); W.vy = 0; }
-        cam.position.set(body.position.x, body.position.y + 1.65, body.position.z); cam.setTarget(cam.position.add(new Vector3(Math.sin(CAM.yaw) * cp0, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp0)));
+        W.eye += (st.eye - W.eye) * Math.min(1, dt * 9); cam.position.set(body.position.x, body.position.y + W.eye, body.position.z); cam.setTarget(cam.position.add(new Vector3(Math.sin(CAM.yaw) * cp0, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp0)));
         // the doors open as you come to them
         const lp = Vector3.TransformCoordinates(body.position, K.root.getWorldMatrix().clone().invert()); try { stepDoors(doors, lp.x, lp.z, lp.y > 3 ? 2 : 1, dt, now); } catch (e) { /* still */ }
       } else {
