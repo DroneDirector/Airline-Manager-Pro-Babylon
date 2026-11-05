@@ -23,6 +23,9 @@
   come to the edition, its 3D places say they are coming to the Babylon.js edition until each is rebuilt here as a
   section (then its entry in `embed.ts` opens the section instead), and the 3D view of a flight opens the 3D viewer.
   There is no other 3D library in it. Whenever a part is built here, update the interface so it opens it.
+- The joined building (`src/sections/building`): your office and the Operations office off the staff corridor, the
+  concourse and the Business lounge, each room by its own builder. My office, Operations, Lounges and Airport (in the
+  game's menu) open it where they say; arriving is always onto open floor (freeNear).
 - The gear is always on screen; its settings: Graphics, Controls, Updates (check, see what the new version holds,
   install it from inside the game on Android and the PC) and What's new (the three newest release notes, built in from
   `release-notes/`; also shown once as a pop-up after an update).

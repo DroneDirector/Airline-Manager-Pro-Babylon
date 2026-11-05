@@ -269,3 +269,4 @@ body.game-on .gear, body.game-on .exit, body.game-on .to-title, body.game-on .pl
 .of-hint[hidden] { display: none; }
 .ops-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(34px, calc(env(safe-area-inset-bottom) + 28px)); display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .ops-bar .v3d-b { padding: 9px 16px; font-size: 13.5px; }
+.ops-bar[hidden] { display: none; }

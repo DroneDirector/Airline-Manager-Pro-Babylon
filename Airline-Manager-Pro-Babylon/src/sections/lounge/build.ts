@@ -17,7 +17,7 @@ export interface Lounge {
   root: TransformNode; blocks: number[][]; spawn: { x: number; z: number; yaw: number };
   metals: PBRMaterial[]; casters: AbstractMesh[]; mirror: Mesh | null; mirrorMat: StandardMaterial | null;
   fire: { ps: ParticleSystem | null; light: PointLight; spot: SpotLight | null; at: Vector3; tex: Texture };
-  boards: { tex: DynamicTexture; c: HTMLCanvasElement; kind: 'dep' | 'arr' }[]; door: Mesh; sun: number;
+  boards: { tex: DynamicTexture; c: HTMLCanvasElement; kind: 'dep' | 'arr' }[]; door: Mesh; sun: number; leaves: AbstractMesh[]; backdrop: AbstractMesh | null;
 }
 
 export function buildLounge(scene: Scene, progress: (p: number, s: string) => void): Lounge {
@@ -211,13 +211,15 @@ export function buildLounge(scene: Scene, progress: (p: number, s: string) => vo
 
   progress(88, 'Opening the doors…');
   // ---- the way in: sliding glass doors (shut in this edition), the exit sign, the welcome mat where you arrive ----
-  let door: Mesh;
+  let door: Mesh; let leaves: AbstractMesh[] = [], backdrop: AbstractMesh | null = null;
   { const dx = DOOR_X, dw = DOOR_W, dh = DOOR_H, z = Z1;
     box(0.09, dh, 0.16, black, dx - dw / 2 - 0.045, dh / 2, z - 0.06, 0, false); box(0.09, dh, 0.16, black, dx + dw / 2 + 0.045, dh / 2, z - 0.06, 0, false); box(dw + 0.18, 0.22, 0.2, black, dx, dh + 0.11, z - 0.08, 0, false);
     const glassD = pbr({ col: 0xCFE2F2, alpha: 0.25, rough: 0.05 });
+    const n0 = root.getChildMeshes(true).length;
     for (const s of [-1, 1]) { box(dw / 2 - 0.02, dh - 0.06, 0.03, glassD, dx + s * dw / 4, (dh - 0.06) / 2, z - 0.16, 0, false); box(0.04, dh - 0.06, 0.04, black, dx + s * (dw / 2 - 0.02), (dh - 0.06) / 2, z - 0.16, 0, false); box(dw / 2 - 0.06, 0.1, 0.035, pbr({ col: 0xEDEDED, alpha: 0.8, rough: 0.6 }), dx + s * dw / 4, 1.2, z - 0.16, 0, false); }
+    leaves = root.getChildMeshes(true).slice(n0);
     plane(0.46, 0.17, picMat(P.sign('EXIT', '#0E8A43', '#FFFFFF', 256, 96, '700 52px Arial, sans-serif'), 1), dx, dh + 0.42, z - 0.02, 0, -1);
-    plane(dw + 3, 3.2, picMat(P.sign('', '#2B2F35', '#000'), 0), dx, 1.6, z + 2.5, 0, -1);
+    const nb = root.getChildMeshes(true).length; plane(dw + 3, 3.2, picMat(P.sign('', '#2B2F35', '#000'), 0), dx, 1.6, z + 2.5, 0, -1); backdrop = root.getChildMeshes(true)[nb] || null;
     door = MeshBuilder.CreateBox('door-hit', { width: dw, height: dh, depth: 0.4 }, scene); door.position = V(dx, dh / 2, z - 0.2); door.isVisible = false; door.isPickable = true; door.metadata = { act: 'door' }; door.parent = root;
     box(2.0, 0.01, 1.2, pbr({ tex: tex(P.welcomeMat()), rough: 1 }), dx, 0.005, z - 1.9, 0, false); }
   // ---- the lights ----
@@ -231,7 +233,7 @@ export function buildLounge(scene: Scene, progress: (p: number, s: string) => vo
   // where you arrive: on the welcome mat inside the doors, facing the windows (as in the main game)
   const spawn = { x: DOOR_X, z: Z1 - 2.3, yaw: 0.15 };
   void Color4; void Plane;
-  return { root, blocks, spawn, metals, casters, mirror, mirrorMat, fire, boards, door, sun: P.daylight() };
+  return { root, blocks, spawn, metals, casters, mirror, mirrorMat, fire, boards, door, sun: P.daylight(), leaves, backdrop };
 }
 /** Can you stand there (the walls and everything in the way, with a person's half-width)? */
 export function blockedAt(L: Lounge, x: number, z: number): boolean {

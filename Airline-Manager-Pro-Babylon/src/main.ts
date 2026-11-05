@@ -19,6 +19,7 @@ import './sections/viewer3d/index';
 import './sections/office/index';
 import './sections/ops/index';
 import './sections/hangar/index';
+import './sections/building/index';
 
 const canvas = document.getElementById('bjs') as HTMLCanvasElement, ui = document.getElementById('ui') as HTMLElement;
 let inPlace = false;
@@ -86,7 +87,7 @@ function pickPlace(id: string) {
 }
 splashOpen(pickPlace);
 // a 3D place opened from the game (your office…): the game waits behind it
-onGameRoom(d => { if (d.room === 'office') enter('office', 'Your office', { data: d.data || {} }); else if (d.room === 'lounge') enter('lounge', 'Business lounge', { data: d.data || {} }); else if (d.room === 'ops') enter('ops', 'The Operations office', { data: d.data || {} }); else if (d.room === 'hangar') enter('hangar', 'The hangar', { data: d.data || {} }); });
+onGameRoom(d => { if (d.room === 'building') enter('building', ({ office: 'Your office', ops: 'The Operations office', lounge: 'The Business lounge' } as any)[d.at] || 'The airport', { at: d.at || 'concourse', data: d.data || {} }); else if (d.room === 'office') enter('office', 'Your office', { data: d.data || {} }); else if (d.room === 'lounge') enter('lounge', 'Business lounge', { data: d.data || {} }); else if (d.room === 'ops') enter('ops', 'The Operations office', { data: d.data || {} }); else if (d.room === 'hangar') enter('hangar', 'The hangar', { data: d.data || {} }); });
 // after an update: what's new, once; and a quiet look for a newer version now and then
 whatsNewOnStart();
 updateInit(v => toast(`Version ${v} is ready: Settings → Updates`));

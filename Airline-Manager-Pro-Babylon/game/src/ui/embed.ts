@@ -47,22 +47,25 @@ if (EMBED) {
   ACTIONS['title-open'] = () => leaveAsk('title', () => { closeAll(); try { saveNow(true); } catch (e) { /* saved already */ } embedTell('title'); });
   // the 3D places: coming on Babylon.js
   const soon = (name: string) => () => { try { Sound.tick(); } catch (e) { /* muted */ } toast(`${name}: coming to the Babylon.js edition`, 'info'); return false; };
-  // your office: on Babylon.js, with the airline's own details on its laptop, monitor, route map and nameplate
-  OfficeRoom.open = () => {
-    try { saveNow(true); } catch (e) { /* saved */ }
+  // the joined building on Babylon.js: your office and the Operations office off the staff corridor, the concourse and
+  // the Business lounge. My office, Operations, Lounges and Airport (in the menu) each bring you in where they say.
+  const officeData = (): any => {
     try {
       const c: any = company(), me: any = myPilot(), routes: number[][][] = [];
       for (const r of (State as any).routes || []) { if (r.companyId !== State.companyId) continue; const legs: string[] = r.legs || []; for (let i = 0; i + 1 < legs.length; i++) { const A = apt(legs[i]), B = apt(legs[i + 1]); if (A && B) routes.push([A.pos, B.pos]); } if (routes.length > 300) break; }
-      embedTell('room', { room: 'office', data: { airline: c.name, icao: c.icao, color: c.color, color2: c.color2, hub: c.hub, pilot: me ? me.name : '', balance: money(c.balance, { compact: true }), flying: liveOf().length, fleet: fleetOf().length, routes,
-        reports: (((State as any).incidents || []) as any[]).filter(x => x && x.status !== 'closed').length } });
-    } catch (e) { embedTell('room', { room: 'office', data: {} }); }
+      return { airline: c.name, icao: c.icao, color: c.color, color2: c.color2, hub: c.hub, pilot: me ? me.name : '', balance: money(c.balance, { compact: true }), flying: liveOf().length, fleet: fleetOf().length, routes,
+        reports: (((State as any).incidents || []) as any[]).filter(x => x && x.status !== 'closed').length };
+    } catch (e) { return {}; }
   };
-  // the lounges: the Business lounge on Babylon.js (its doors lead back here)
-  LoungeRoom.open = () => { try { saveNow(true); } catch (e) { /* saved */ } embedTell('room', { room: 'lounge', data: {} }); };
-  ACTIONS['lounge-visit'] = () => LoungeRoom.open();
-  // the Operations office: on Babylon.js; its monitor shows the schedule as this page draws it
-  OpsRoom.open = () => { try { saveNow(true); } catch (e) { /* saved */ } let col = '#2C8CFF'; try { col = company().color; } catch (e) { /* default */ } embedTell('room', { room: 'ops', data: { color: col } }); };
-  ACTIONS['ops-room'] = () => { closeAll(); OpsRoom.open(); };
+  const building = (at: string) => { try { saveNow(true); } catch (e) { /* saved */ } embedTell('room', { room: 'building', at, data: officeData() }); };
+  OfficeRoom.open = () => building('office');
+  OpsRoom.open = () => building('ops');
+  LoungeRoom.open = () => building('lounge');
+  ACTIONS['office-open'] = () => { closeAll(); building('office'); };
+  ACTIONS['ops-room'] = () => { closeAll(); building('ops'); };
+  ACTIONS['lounge-visit'] = () => { closeAll(); building('lounge'); };
+  ACTIONS['airport-open'] = () => { closeAll(); building('concourse'); };
+  // the Operations monitor: drawn here, shown there
   let monT: any = 0; const monCv = document.createElement('canvas'); monCv.width = 2048; monCv.height = Math.round(2048 * 0.32 / 1.08);
   const monSend = () => { try { opsMonitorDraw({ monCv, monTex: {} }); embedTell('monitor', { url: monCv.toDataURL('image/jpeg', 0.88) }); } catch (e) { /* the next time */ } };
   // the hangars: on Babylon.js, with the aircraft in for work, what is being fixed, how far it is and who is on it
