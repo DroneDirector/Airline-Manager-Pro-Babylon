@@ -1,0 +1,50 @@
+name: Airport layouts – one-off build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node .github/layouts/fetch.mjs ${{ matrix.shard }} 6 shard-${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shard-${{ matrix.shard }}
+          path: shard-${{ matrix.shard }}.json
+  pack:
+    needs: fetch
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          path: shards
+          merge-multiple: true
+      - run: node .github/layouts/pack.mjs shards Airline-Manager-Pro-Babylon/game/www/layouts
+      - name: Commit to the layout-data branch
+        run: |
+          git config user.name DroneDirector
+          git config user.email simon@dronedirector.fo
+          git checkout -b layout-data
+          git add Airline-Manager-Pro-Babylon/game/www/layouts
+          git commit -m "Airport layouts from OpenStreetMap (ODbL), built once for the game"
+          git push -f origin layout-data
