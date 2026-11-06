@@ -94,7 +94,10 @@ export function buildOffice(sc: Scene, D: OfficeData, progress: (p: number, s: s
   flat(OW, WY, plaster, 0, WY / 2, Z1, 0); flat(OW, OH - WY - WH, plaster, 0, WY + WH + (OH - WY - WH) / 2, Z1, 0);
   flat((OW - WW) / 2, WH, plaster, -(WW / 2 + (OW - WW) / 4), WY + WH / 2, Z1, 0); flat((OW - WW) / 2, WH, plaster, WW / 2 + (OW - WW) / 4, WY + WH / 2, Z1, 0);
   flat(OW, Math.min(WY, 0.85), walnut, 0, WY / 2, Z1 - 0.01, 0);
-  wall(OW, OH, 0, OH / 2, Z0, Math.PI); wall(OD, OH, X1, OH / 2, 0, Math.PI / 2);
+  wall(OW, OH, 0, OH / 2, Z0, Math.PI);
+  // the right-hand wall, with the door to your suite (z 2.05 … 2.95) north of the bookshelves
+  if ((D as any).suite) { wall(2.05 - Z0, OH, X1, OH / 2, (Z0 + 2.05) / 2, Math.PI / 2); wall(Z1 - 2.95, OH, X1, OH / 2, (2.95 + Z1) / 2, Math.PI / 2); flat(0.9, OH - 2.15, plaster, X1, 2.15 + (OH - 2.15) / 2, 2.5, Math.PI / 2); }
+  else wall(OD, OH, X1, OH / 2, 0, Math.PI / 2);
   // the left wall with the door (z −3.1 … −2.1)
   wall(OD - 1.2, OH, X0, OH / 2, 0.6, -Math.PI / 2); flat(0.1, OH, plaster, X0, OH / 2, Z0 + 0.05, -Math.PI / 2); flat(1.05, OH - 2.15, plaster, X0, 2.15 + (OH - 2.15) / 2, -2.6, -Math.PI / 2);
   const door = box(0.05, 2.12, 0.98, darkWood, X0 + 0.03, 1.06, -2.6, 0, 'door'); void door;

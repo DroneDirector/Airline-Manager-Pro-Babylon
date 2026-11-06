@@ -153,6 +153,7 @@ if (EMBED) {
   window.addEventListener('message', (e: MessageEvent) => {
     const d: any = e.data; if (!d || !d.ampb) return;
     if (d.ampb === 'petprev' && d.url) { if (d.id !== petPrevN) return; const cv = document.querySelector('[data-pet-prev]') as HTMLCanvasElement; if (!cv) return; const im = new Image(); im.onload = () => { const x = cv.getContext('2d'); if (x) { x.clearRect(0, 0, cv.width, cv.height); x.drawImage(im, 0, 0, cv.width, cv.height); } }; im.src = d.url; return; }
+    if (d.ampb === 'wardrobe') { try { closeAll(); osWardrobe(); } catch (err) { /* later */ } return; }
     if (d.ampb === 'pet') { try { const p: any = petData(); if (typeof d.food === 'number') p.food = d.food; if (typeof d.water === 'number') p.water = d.water; Store.soon(); } catch (err) { /* later */ } return; }
     if (d.ampb === 'save') { try { saveNow(true); } catch (err) { /* saved */ } embedTell('saved'); }
     else if (d.ampb === 'monitor') { clearInterval(monT); if (d.on) { monSend(); monT = setInterval(monSend, 5000); } }

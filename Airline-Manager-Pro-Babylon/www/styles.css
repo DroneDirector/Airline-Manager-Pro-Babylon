@@ -362,3 +362,10 @@ body.photo-on .site-lift { display: none; }
 .cab-say { position: absolute; left: 0; top: 0; max-width: 240px; padding: 8px 10px; border-radius: 12px 12px 12px 3px; background: rgba(250,250,247,.95); color: #14202E; font-size: 13px; line-height: 1.35; box-shadow: 0 6px 18px rgba(0,0,0,.35); pointer-events: auto; display: flex; flex-direction: column; gap: 2px; }
 .cab-say b { font-size: 11px; color: #5A6573; } .cab-play { align-self: flex-end; border: 0; background: #14202E; color: #fff; border-radius: 999px; width: 26px; height: 26px; font-size: 11px; cursor: pointer; }
 body.photo-on .cab-says { display: none; }
+
+/* the bar in the lounge */
+.bar-menu { position: absolute; right: 14px; top: 70px; width: min(360px, 90vw); max-height: 70vh; overflow: auto; padding: 12px; border-radius: 14px; background: rgba(12,10,8,.88); color: #F4EEE4; backdrop-filter: blur(8px); z-index: 8; }
+.bar-mh { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; } .bar-mh b { font-size: 16px; } .bar-mh small { flex: 1; color: #C9B99E; }
+.bar-list { display: flex; flex-direction: column; gap: 6px; } .bar-it { text-align: left; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); color: inherit; display: flex; flex-direction: column; gap: 2px; cursor: pointer; }
+.bar-it small { color: #C9B99E; font-size: 11.5px; } .bar-it:hover { background: rgba(212,175,55,.16); }
+.bar-hold { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%); display: flex; gap: 8px; z-index: 7; }
