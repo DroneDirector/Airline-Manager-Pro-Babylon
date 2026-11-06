@@ -20,6 +20,7 @@ import { toast } from '../../ui/icons';
 import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core/perf-meter';
 import { buildAirliner, setGear } from '../viewer3d/airliner';
 import { makeWeather, Weather } from '../terminal/weather';
+import { applyLook } from '../../core/look';
 import { makeKit } from '../terminal/kit';
 import { buildShell } from '../terminal/shell';
 import { buildDoors, stepDoors, DoorObj } from '../terminal/doors';
@@ -242,8 +243,9 @@ const Site$: Section = {
     const cam = new UniversalCamera('cam', new Vector3(0, 10, 0), sc); cam.minZ = 0.5; cam.maxZ = 120000; cam.fov = 0.9; cam.inertia = 0; O.cam = cam; sc.activeCamera = cam;
     const glow = new GlowLayer('glow', sc, { mainTextureRatio: 0.4 }); glow.intensity = 0.3; glow.isEnabled = S.gfx.glow !== false; for (const g of [inner.m, outer.m, sea].concat(O.AFB.exclude)) glow.addExcludedMesh(g); for (const m of sc.meshes) if (m.material && (m.material as any)._soft) glow.addExcludedMesh(m as any); sc.onNewMeshAddedObservable.add(m => { setTimeout(() => { if (m.material && (m.material as any)._soft) glow.addExcludedMesh(m as any); }, 0); });
     const ULTRA = S.gfx.preset === 'ultra', HIGH = ULTRA || S.gfx.preset === 'high';
-    if (S.gfx.shadows !== 'off' && ULTRA && IS_PC) { const csm = new CascadedShadowGenerator(4096, sun); csm.numCascades = 4; csm.lambda = 0.85; csm.stabilizeCascades = true; csm.usePercentageCloserFiltering = true; csm.filteringQuality = CascadedShadowGenerator.QUALITY_HIGH; csm.bias = 0.002; csm.normalBias = 0.02; csm.shadowMaxZ = 420; for (const m of casters) csm.addShadowCaster(m, false); }
-    else if (S.gfx.shadows !== 'off') { const sg = new ShadowGenerator(S.gfx.shadows === 'high' ? (IS_PC ? 4096 : 2048) : 1024, sun); sg.usePercentageCloserFiltering = true; sg.bias = 0.0006; sg.normalBias = 0.02; for (const m of casters) sg.addShadowCaster(m, false); }
+    const SG: any[] = [];
+    if (S.gfx.shadows !== 'off' && ULTRA && IS_PC) { const csm = new CascadedShadowGenerator(4096, sun); csm.numCascades = 4; csm.lambda = 0.85; csm.stabilizeCascades = true; csm.usePercentageCloserFiltering = true; csm.filteringQuality = CascadedShadowGenerator.QUALITY_HIGH; csm.bias = 0.002; csm.normalBias = 0.02; csm.shadowMaxZ = 420; for (const m of casters) csm.addShadowCaster(m, false); SG.push(csm); }
+    else if (S.gfx.shadows !== 'off') { const sg = new ShadowGenerator(S.gfx.shadows === 'high' ? (IS_PC ? 4096 : 2048) : 1024, sun); sg.usePercentageCloserFiltering = true; sg.bias = 0.0006; sg.normalBias = 0.02; for (const m of casters) sg.addShadowCaster(m, false); SG.push(sg); }
     const dp = new DefaultRenderingPipeline('dp', true, sc, [cam]); dp.fxaaEnabled = true; dp.imageProcessingEnabled = true; dp.imageProcessing.toneMappingEnabled = true; dp.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES; dp.imageProcessing.exposure = 1.05; dp.imageProcessing.contrast = 1.08;
     // the look, by graphics quality: bloom on the lights, filmic grading, a light vignette, sharpening, fine grain (Ultra on the PC)
     dp.samples = S.gfx.aa === 'msaa' ? 4 : 1; dp.imageProcessing.exposure = 1.06 * (S.gfx.exposure || 1); dp.imageProcessing.contrast = HIGH ? 1.15 : 1.08;
@@ -259,6 +261,8 @@ const Site$: Section = {
     if (S.gfx.probe !== false) { try { const pr = new ReflectionProbe('look-probe', ULTRA && IS_PC ? 256 : 128, sc); pr.position = ap.position.add(new Vector3(0, 12, 0)); const dome = sc.getMeshByName('sky'); if (dome) pr.renderList!.push(dome);
       for (const m of O.AFB.exclude || []) if (m && /GROUND/.test(m.name)) pr.renderList!.push(m); pr.refreshRate = IS_PC ? 120 : 600; sc.environmentTexture = pr.cubeTexture; sc.environmentIntensity = HIGH ? 0.75 : 0.55; O.probe = pr; } catch (e) { /* not on this device */ } }
     for (const ps of sc.particleSystems) ps.renderingGroupId = 1;
+    // the extra graphics, each its own switch in Settings
+    const lookStep = applyLook({ sc, cam, sun, dp, shadows: SG, ground: sc.meshes.filter(m => /GROUND|APRON|apron|TAXI|RWY|road|ROAD/.test(m.name)), base: ap.position.y, casters });
     // what the panel shows: the site, its numbers, the views, the drone's speed
     const kx = 111320 * Math.cos(site.lat * D2R);
     hud.insertAdjacentHTML('beforeend', `<div class="site-top"><b>${site.name}</b><small>${site.lat.toFixed(3)}° ${site.lat >= 0 ? 'N' : 'S'} · ${Math.abs(site.lon).toFixed(3)}° ${site.lon < 0 ? 'W' : 'E'} ${site.icao ? `· ${site.icao} / ${site.iata} ` : ''}· runway ${site.rwy[0]}/${site.rwy[1]} true ${String(site.hdg).padStart(3, '0')}°/${String((site.hdg + 180) % 360).padStart(3, '0')}° · gates face ${String(site.gates).padStart(3, '0')}° · ground ${Math.round(elev)} m</small></div>
@@ -306,7 +310,7 @@ const Site$: Section = {
     progress(100, 'Ready'); applyReplacements(sc).catch(() => { /* none */ });
     runLoop(() => {
       perfBegin();
-      const dt = Math.min(0.05, engine.getDeltaTime() / 1000), now = performance.now() / 1000, inp = inputFrame(dt);
+      const dt = Math.min(0.05, engine.getDeltaTime() / 1000), now = performance.now() / 1000, inp = inputFrame(dt); lookStep(dt);
       CAM.yaw += inp.lx; CAM.pitch = Math.max(-1.55, Math.min(1.55, CAM.pitch - inp.ly));
       if (walkMode) {
         // a controller: Cross / A jumps, Circle / B crouches, Triangle / Y lies prone, Square / X uses a lift, R3 sprints (L3 too, while held)

@@ -1,0 +1,91 @@
+// The airport's extra graphics, each its own switch in Settings → Graphics (on by default where the device can carry it):
+//  sky shadows (light and shade from the whole sky), many real lights (every light panel lights its surroundings),
+//  volumetric light (sun rays and haze), height fog, real-time reflections, softer contact shadows, temporal
+//  anti-aliasing, eye adaptation (indoors and out), lens flares, depth of field, motion blur, surface depth (relief on
+//  floors, cladding and tyres), rain on the ground (wet, darker and glossy while it rains).
+// applyLook() sets them up once the place is built and returns the step to run every frame.
+import { Scene, Camera, Vector3, Color3, Color4, Mesh, MeshBuilder, StandardMaterial, DynamicTexture, Texture, PostProcess, Effect, Light, PointLight, Ray,
+  ClusteredLightContainer, IblShadowsRenderPipeline, TAARenderingPipeline, SSRRenderingPipeline, MotionBlurPostProcess, VolumetricLightScatteringPostProcess,
+  LensFlareSystem, LensFlare, DefaultRenderingPipeline, ShadowGenerator, PBRMaterial, AbstractMesh, Constants } from '@babylonjs/core';
+import { S } from './settings';
+import { IS_PC } from './app';
+
+/** The lights that would like to join the many-lights container (the jetways' panels and the like), added by their builders. */
+export const EXTRA_LIGHTS: PointLight[] = [];
+import { SUN } from '../sections/terminal/weather';
+const WX = { get rain() { return SUN.rain; }, get sunAlt() { return SUN.alt; } };
+
+Effect.ShadersStore.heightFogFragmentShader = `
+precision highp float; varying vec2 vUV; uniform sampler2D textureSampler; uniform sampler2D depthSampler;
+uniform mat4 invView; uniform vec3 camPos; uniform vec3 fogColor; uniform float tanHalf; uniform float aspect; uniform float density; uniform float falloff; uniform float base;
+void main(void) { vec4 c = texture2D(textureSampler, vUV); float z = texture2D(depthSampler, vUV).r; if (z <= 0.0) { gl_FragColor = c; return; }
+  vec2 p = vUV * 2.0 - 1.0; vec3 vp = vec3(p.x * tanHalf * aspect, p.y * tanHalf, 1.0) * z; vec3 wp = (invView * vec4(vp, 1.0)).xyz;
+  vec3 d = wp - camPos; float dist = length(d); float h0 = camPos.y - base, dh = d.y; float k = falloff;
+  float integ = abs(dh) > 0.01 ? (exp(-k * h0) - exp(-k * (h0 + dh))) / (k * dh) : exp(-k * h0);
+  float f = 1.0 - exp(-density * dist * max(integ, 0.0)); f = clamp(f, 0.0, 0.92);
+  gl_FragColor = vec4(mix(c.rgb, fogColor, f), c.a); }`;
+
+const glowDot = (sz: number, a: number, col: string) => { const c = document.createElement('canvas'); c.width = c.height = sz; const x = c.getContext('2d')!, g = x.createRadialGradient(sz / 2, sz / 2, 0, sz / 2, sz / 2, sz / 2);
+  g.addColorStop(0, col.replace('A', String(a))); g.addColorStop(1, col.replace('A', '0')); x.fillStyle = g; x.fillRect(0, 0, sz, sz); return c; };
+
+export interface LookParts { sc: Scene; cam: Camera; sun: { direction: Vector3 }; dp: DefaultRenderingPipeline; shadows: (ShadowGenerator | null)[]; ground: AbstractMesh[]; base: number; casters: AbstractMesh[] }
+
+export function applyLook(P: LookParts): (dt: number) => void {
+  const g: any = S.gfx, { sc, cam, dp } = P, steps: ((dt: number) => void)[] = [], E = sc.getEngine();
+  const tryIt = (f: () => void) => { try { f(); } catch (e) { console.warn('look', e); } };
+
+  // softer contact shadows: sharp where things meet the ground, softer further from it
+  for (const sg of P.shadows) if (sg) tryIt(() => { if (g.pcss) { (sg as any).useContactHardeningShadow = true; (sg as any).contactHardeningLightSizeUVRatio = 0.04; } });
+
+  // surface depth: relief (parallax occlusion) on every material with a relief map
+  if (g.parallax) for (const m of sc.materials) if (m instanceof PBRMaterial && m.bumpTexture) { m.useParallax = true; m.useParallaxOcclusion = true; m.parallaxScaleBias = 0.025; }
+
+  // many real lights: the light panels and the like light their surroundings (in a clustered container: cheap per light)
+  if (g.manyLights && EXTRA_LIGHTS.length) tryIt(() => { const cl = new ClusteredLightContainer('look-lights', EXTRA_LIGHTS.filter(l => !l.isDisposed()), sc); cl.horizontalTiles = 32; cl.verticalTiles = 32; });
+
+  // sky shadows: shade and light from the whole sky (voxelised scene; heavy)
+  if (g.iblShadows && sc.environmentTexture) tryIt(() => { const ib = new IblShadowsRenderPipeline('look-sky-shadows', sc, { resolutionExp: IS_PC ? 7 : 6, sampleDirections: IS_PC ? 3 : 1, shadowOpacity: 0.85, shadowRemanence: 0.85, triPlanarVoxelization: true, ssShadowsEnabled: true } as any, [cam]);
+    ib.addShadowCastingMesh(P.casters.filter(m => m instanceof Mesh) as Mesh[]); ib.addShadowReceivingMaterial(); ib.updateVoxelization(); });
+
+  // real-time reflections: glossy floors, glass and the wet apron reflect what is round them (heavy)
+  if (g.ssr) tryIt(() => { const ssr = new SSRRenderingPipeline('look-ssr', sc, [cam], false, Constants.TEXTURETYPE_UNSIGNED_BYTE); ssr.strength = 0.9; ssr.reflectionSpecularFalloffExponent = 2; ssr.thickness = 0.6; ssr.maxDistance = 240; ssr.step = IS_PC ? 1 : 3; ssr.maxSteps = IS_PC ? 500 : 160; ssr.blurDispersionStrength = 0.03; ssr.roughnessFactor = 0.15; ssr.enableAutomaticThicknessComputation = false; ssr.selfCollisionNumSkip = 2; });
+
+  // temporal anti-aliasing: no shimmer on handrails, trusses and fences
+  if (g.taa) tryIt(() => { const taa = new TAARenderingPipeline('look-taa', sc, [cam]); taa.samples = 8; });
+
+  // motion blur
+  if (g.mblur) tryIt(() => { const mb = new MotionBlurPostProcess('look-mblur', sc, 1, cam); mb.motionStrength = 0.6; mb.motionBlurSamples = IS_PC ? 32 : 12; });
+
+  // depth of field: focused on what the camera looks at
+  if (g.dof) tryIt(() => { dp.depthOfFieldEnabled = true; dp.depthOfField.fStop = 2.4; dp.depthOfField.focalLength = 50; let t = 0;
+    steps.push(dt => { t += dt; if (t < 0.2) return; t = 0; const hit = sc.pickWithRay(new Ray(cam.globalPosition, cam.getDirection(Vector3.Forward()), 2000), m => m.isPickable && m.isVisible); const d = hit && hit.hit ? hit.distance : 400; dp.depthOfField.focusDistance += (d * 1000 - dp.depthOfField.focusDistance) * 0.5; }); });
+
+  // the sun's disc for the rays and the flares: kept far out along the sun's direction, hidden below the horizon
+  let sunDisc: Mesh | null = null;
+  if (g.volLight || g.flares) { sunDisc = MeshBuilder.CreateSphere('look-sun', { diameter: 40, segments: 12 }, sc); const sm = new StandardMaterial('look-sun', sc); sm.emissiveColor = new Color3(1, 0.86, 0.62); sm.disableLighting = true; sunDisc.material = sm; sunDisc.isPickable = false; sunDisc.applyFog = false;
+    steps.push(() => { const d = P.sun.direction; sunDisc!.position.copyFrom(cam.globalPosition.subtract(d.scale(780))); const up = -d.y; sunDisc!.setEnabled(up > -0.03); sm.emissiveColor.set(1, 0.72 + 0.2 * Math.min(1, up * 4), 0.45 + 0.3 * Math.min(1, up * 4)); }); }
+  // volumetric light: rays from the sun past the buildings, the jetways and through the glass
+  if (g.volLight && sunDisc) tryIt(() => { const vls = new VolumetricLightScatteringPostProcess('look-rays', IS_PC ? 0.75 : 0.5, cam, sunDisc!, IS_PC ? 90 : 40, Texture.BILINEAR_SAMPLINGMODE, E, false); vls.exposure = 0.18; vls.decay = 0.965; vls.weight = 0.55; vls.density = 0.92;
+    steps.push(() => { vls.exposure = 0.18 * Math.max(0, Math.min(1, (-P.sun.direction.y + 0.03) * 6)); }); });
+  // lens flares on the sun
+  if (g.flares && sunDisc) tryIt(() => { const fs = new LensFlareSystem('look-flares', sunDisc, sc); const tx = (a: number, c: string) => { const t = new DynamicTexture('flare', glowDot(128, a, c), sc, false); t.hasAlpha = true; t.update(); return t as any as Texture; };
+    new LensFlare(0.32, 0, new Color3(1, 0.95, 0.85), null as any, fs).texture = tx(0.9, 'rgba(255,240,220,A)'); for (const [s, p, c] of [[0.06, 0.25, 'rgba(255,200,140,A)'], [0.1, 0.5, 'rgba(180,220,255,A)'], [0.05, 0.75, 'rgba(255,180,120,A)'], [0.14, 1.1, 'rgba(160,200,255,A)']] as [number, number, string][]) new LensFlare(s, p, new Color3(1, 1, 1), null as any, fs).texture = tx(0.35, c); });
+
+  // height fog: a low haze over the ground that thins with height (the distance gets depth)
+  if (g.heightFog) tryIt(() => { const dr = sc.enableDepthRenderer(cam, false, true, Texture.NEAREST_SAMPLINGMODE, true); const pp = new PostProcess('look-fog', 'heightFog', ['invView', 'camPos', 'fogColor', 'tanHalf', 'aspect', 'density', 'falloff', 'base'], ['depthSampler'], 1, cam);
+    pp.onApply = ef => { ef.setTexture('depthSampler', dr.getDepthMap()); const inv = cam.getViewMatrix().clone().invert(); ef.setMatrix('invView', inv); ef.setVector3('camPos', cam.globalPosition);
+      const fc = sc.fogColor || new Color3(0.7, 0.75, 0.82), day = Math.max(0.15, Math.min(1, (WX.sunAlt + 6) / 20)); ef.setColor3('fogColor', new Color3(fc.r * day, fc.g * day, fc.b * day)); ef.setFloat('tanHalf', Math.tan((cam as any).fov / 2)); ef.setFloat('aspect', E.getAspectRatio(cam));
+      ef.setFloat('density', 0.0016 + 0.004 * WX.rain); ef.setFloat('falloff', 0.035); ef.setFloat('base', P.base); }; });
+
+  // eye adaptation: brighter indoors (under a roof), back down outside, eased like an eye
+  if (g.eyeAdapt) { let target = 1, cur = 1, t = 0; const ip = dp.imageProcessing, baseExp = ip.exposure;
+    steps.push(dt => { t += dt; if (t > 0.3) { t = 0; const hit = sc.pickWithRay(new Ray(cam.globalPosition, Vector3.Up(), 25), m => m.isPickable && m.isVisible && !/sky|look-/i.test(m.name)); target = hit && hit.hit ? 1.32 : 1; }
+      cur += (target - cur) * Math.min(1, dt * (target > cur ? 0.6 : 1.4)); ip.exposure = baseExp * cur; }); }
+
+  // rain on the ground: wet, darker and glossier while it rains, drying slowly after
+  if (g.wetRain) { const mats = new Map<any, { r: number; c: Color3 | null }>(); for (const m of P.ground) { const mt: any = m.material; if (mt && 'roughness' in mt && !mats.has(mt)) mats.set(mt, { r: mt.roughness ?? 0.9, c: mt.albedoColor ? mt.albedoColor.clone() : null }); }
+    let wet = 0; steps.push(dt => { wet += ((WX.rain > 0.05 ? 1 : 0) - wet) * Math.min(1, dt * (WX.rain > 0.05 ? 0.08 : 0.02)); for (const [mt, b] of mats) { mt.roughness = b.r * (1 - 0.65 * wet); if (b.c && mt.albedoColor) mt.albedoColor.copyFrom(b.c.scale(1 - 0.32 * wet)); } }); }
+
+  void Color4; void Light;
+  return (dt: number) => { for (const s of steps) s(dt); };
+}

@@ -23,6 +23,8 @@ import { Geo } from './jw-geo';
 import * as JX from './jw-tex';
 import { slot, textureSlot, mediaSlot } from '../../core/replace';
 import { IS_PC } from '../../core/app';
+import { S as SET } from '../../core/settings';
+import { EXTRA_LIGHTS } from '../../core/look';
 
 /** The aircraft's front door (plan x, height, z) at a stand: 2.4 m left of the centre line, 5.5 m behind the nose, sill at 3.3 m. */
 export const DOOR = (standX: number, nz: number) => [standX + 2.4, 3.3, nz + 5.5];
@@ -612,7 +614,7 @@ export function buildJetway(K: Kit, n: number, gateX: number, stand: { x: number
   const moving = [boom, bp, ...secNodes, cabN, bog, legIn, stair, land];
   // real lights inside (the PC): the corridor, the rotunda, the tunnel and the cab, each lighting only this jetway
   const PL: PointLight[] = [];
-  if (IS_PC) { const add = (par: TransformNode, x: number, y: number, z: number, i: number) => { const l = new PointLight(`J-${n}/LIGHT`, V(x, y, z), sc); l.parent = par; l.diffuse = new Color3(1, 0.97, 0.92); l.specular = new Color3(0.4, 0.4, 0.4); l.intensity = i; l.range = 7; l.shadowEnabled = false; l.renderPriority = -1; (l as any)._base = i; PL.push(l); };
+  if (IS_PC || SET.gfx.manyLights) { const add = (par: TransformNode, x: number, y: number, z: number, i: number) => { const l = new PointLight(`J-${n}/LIGHT`, V(x, y, z), sc); l.parent = par; l.diffuse = new Color3(1, 0.97, 0.92); l.specular = new Color3(0.4, 0.4, 0.4); l.intensity = i; l.range = 7; l.shadowEnabled = false; l.renderPriority = -1; (l as any)._base = i; PL.push(l); EXTRA_LIGHTS.push(l); };
     add(o, 0, CH - 0.35 - ZC * 0.5 * k, ZC * 0.5, 9); add(tR, 0, IH - 0.2, 0, 7); add(secNodes[1], 0, IH - 0.3, SEC[1].l / 2, 8); add(cabN, -0.6, IH - 0.2, 0, 6);
     const mine = o.getChildMeshes(false); for (const l of PL) l.includedOnlyMeshes = mine; sc.requireLightSorting = true; }
   function lights() { GNUM.emissiveColor.set(signK, signK, signK); LED.emissiveColor.set(1, 1, 1).scaleInPlace(1.1 * lightK); for (const l of PL) l.intensity = (l as any)._base * lightK; }

@@ -18,7 +18,7 @@ import { savePhoto } from '../../core/photo';
 import { toast } from '../../ui/icons';
 
 /** The sun's height above the horizon at the airport now (degrees), for lights that come on at dusk (kept up by the weather each frame). */
-export const SUN = { alt: 30 };
+export const SUN = { alt: 30, rain: 0 };
 const D2R = Math.PI / 180, LAT = 62.06, LON = -7.28;            // the airport's place on the Earth (for the sun, moon and stars)
 const CLOUDQ: { [k: string]: [number, number] } = { low: [18, 2], medium: [30, 3], high: [46, 4], ultra: [72, 6] };
 /** The kinds of sky: cloud cover, how dark the day, the haze, how hard it rains, lightning. */
@@ -133,7 +133,7 @@ export function makeWeather(h: WxHooks) {
       for (const p of ['cover', 'dark', 'fog', 'bolts'] as const) c[p] += (tgt[p] - c[p]) * k;
       const wantRain = W.precip === 'rain' ? Math.max(0.5, tgt.wet) : 0, wantSnow = W.precip === 'snow' ? Math.max(0.5, tgt.wet * 0.8) : 0; c.rain += (wantRain - c.rain) * k; c.snow += (wantSnow - c.snow) * k;
       // the sun, the moon, the stars
-      const s = sunAt(W.t, LAT, LON), m = moonAt(W.t, LAT, LON), sd = dirOf(s), md = dirOf(m), gl = groundLight(s.alt); SUN.alt = s.alt;
+      const s = sunAt(W.t, LAT, LON), m = moonAt(W.t, LAT, LON), sd = dirOf(s), md = dirOf(m), gl = groundLight(s.alt); SUN.alt = s.alt; SUN.rain = c.rain;
       const phase = (1 - (sd[0] * md[0] + sd[1] * md[1] + sd[2] * md[2])) / 2, moonK = m.alt > -1 ? 0.06 * phase * Math.min(1, (m.alt + 1) / 6) : 0, nightK = Math.max(0, Math.min(1, (-s.alt - 1) / 7));
       const lit = s.alt > -3 || moonK < 0.002 ? sd : md; let lc: number[] = s.alt > -3 ? gl : [moonK * 0.75, moonK * 0.85, moonK * 1.1];
       const dim = 1 - c.dark * 0.8; lc = lc.map(v => v * dim);
