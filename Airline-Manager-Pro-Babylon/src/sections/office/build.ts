@@ -4,6 +4,10 @@
 // your nameplate; a big window over the airport; bookshelves with trophies, aviation posters, your route map, a
 // propeller on the wall, a leather sofa and a globe. Everything is our own: drawn textures and simple shapes.
 // Babylon.js's coordinates: x to the right, y up, z towards the window; the room's middle at the origin.
+import { placePet, Pet, PetData } from './pet';
+import './pet-preview';
+import { gameSend } from '../../ui/game-frame';
+import { toast } from '../../ui/icons';
 import { Scene, Vector3, Color3, MeshBuilder, Mesh, PBRMaterial, StandardMaterial, DynamicTexture, Texture, TransformNode, AbstractMesh, PointLight } from '@babylonjs/core';
 import * as P from '../lounge/pictures';
 import { IS_PC } from '../../core/app';
@@ -11,8 +15,8 @@ import { buildAirliner, repaint } from '../viewer3d/airliner';
 
 export const OW = 6.4, OD = 6.4, OH = 3.0;
 const X0 = -OW / 2, X1 = OW / 2, Z0 = -OD / 2, Z1 = OD / 2;
-export interface OfficeData { airline: string; icao: string; color: string; color2: string; hub: string; pilot: string; balance: string; flying: number; fleet: number; routes: number[][][]; reports: number }
-export interface Office { root: TransformNode; blocks: number[][]; casters: AbstractMesh[]; metals: PBRMaterial[]; lamp: PointLight; spawn: { x: number; z: number; yaw: number }; seat: { x: number; z: number; yaw: number }; sun: number; screens: { tex: DynamicTexture; draw: (c: CanvasRenderingContext2D, w: number, h: number) => void }[] }
+export interface OfficeData { pet?: PetData; airline: string; icao: string; color: string; color2: string; hub: string; pilot: string; balance: string; flying: number; fleet: number; routes: number[][][]; reports: number }
+export interface Office { root: TransformNode; blocks: number[][]; casters: AbstractMesh[]; metals: PBRMaterial[]; lamp: PointLight; pet: Pet | null; spawn: { x: number; z: number; yaw: number }; seat: { x: number; z: number; yaw: number }; sun: number; screens: { tex: DynamicTexture; draw: (c: CanvasRenderingContext2D, w: number, h: number) => void }[] }
 
 /** The laptop's screen: the airline at a glance. */
 function laptopScreen(D: OfficeData) {
@@ -159,9 +163,16 @@ export function buildOffice(sc: Scene, D: OfficeData, progress: (p: number, s: s
   { const gx = X0 + 0.6, gz = 2.5; cyl(0.2, 0.26, 0.06, darkWood, gx, 0.03, gz); cyl(0.03, 0.04, 0.62, darkWood, gx, 0.35, gz); const g = MeshBuilder.CreateSphere(nm('globe'), { diameter: 0.5, segments: 32 }, sc); g.position.set(gx, 0.92, gz); g.rotation.z = 0.41; g.material = pbr({ tex: tex(globeTex()), rough: 0.35 }); g.parent = root; g.metadata = { act: 'globe' }; casters.push(g); block(gx - 0.3, gz - 0.3, gx + 0.3, gz + 0.3); }
   // ceiling lights
   for (const [x, z] of [[-1.4, -1.2], [1.4, -1.2], [0, 1.4]]) { cyl(0.12, 0.12, 0.02, pbr({ col: '#FFF6E6', emis: '#FFF1D8', emisK: 1.4 }), x, OH - 0.01, z, 20); }
+  // your pet, asleep in its bed by the right-hand bookshelf, its bowls beside it
+  let pet: Pet | null = null;
+  try { if (D.pet) { pet = placePet(sc, root, D.pet, [X1 - 0.75, -1.6], Math.PI / 2, { door: [X1 - 1.7, -1.6], box: [X0 + 0.4, Z0 + 1.6, X1 - 0.4, Z1 - 0.4],
+      free: (x, z) => { const r = 0.18; if (x < X0 + 0.3 || x > X1 - 0.3 || z < Z0 + 0.3 || z > Z1 - 0.3) return false; for (const b of blocks) if (x > b[0] - r && x < b[2] + r && z > b[1] - r && z < b[3] + r) return false; return true; },
+      save: (food, water) => gameSend({ ampb: 'pet', food, water }), toast: (t) => toast(t), fine: IS_PC });
+    if (pet) for (const b of pet.blocks) blocks.push(b); } } catch (e) { console.error(e); pet = null; }
   progress(90, 'Opening the blinds…');
   root.getChildMeshes().forEach(m => { m.isPickable = !!(m.metadata && m.metadata.act); });
-  return { root, blocks, casters, metals, lamp, sun, screens, spawn: { x: X0 + 0.9, z: -2.6, yaw: Math.PI / 2 + 0.35 }, seat: { x: 0, z: chZ, yaw: Math.PI } };
+  if (pet) for (const m of pet.hits) m.isPickable = true;
+  return { root, blocks, casters, metals, lamp, pet, sun, screens, spawn: { x: X0 + 0.9, z: -2.6, yaw: Math.PI / 2 + 0.35 }, seat: { x: 0, z: chZ, yaw: Math.PI } };
 }
 /** Can you stand there (the walls and the furniture, with a person's half-width)? */
 export function officeBlocked(O: Office, x: number, z: number): boolean {

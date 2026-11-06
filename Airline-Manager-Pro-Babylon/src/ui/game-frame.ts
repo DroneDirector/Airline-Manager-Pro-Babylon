@@ -5,7 +5,7 @@
 let frame: HTMLIFrameElement | null = null;
 let handlers: { title: () => void; exit: () => void; viewer: (id: string) => void } | null = null;
 const flightSubs: ((d: any) => void)[] = [], airportSubs: ((d: any) => void)[] = [];
-const wxSubs: ((d: any) => void)[] = [];
+const wxSubs: ((d: any) => void)[] = [], petSubs: ((d: any) => void)[] = [];
 const roomSubs: ((d: any) => void)[] = [], monSubs: ((d: any) => void)[] = [], courtSubs: ((d: any) => void)[] = [];
 /** A hearing in the courtroom, as the game runs it: who speaks, who stands, the exhibits, looking round, the end. */
 export function onGameCourt(f: (d: any) => void) { courtSubs.push(f); }
@@ -21,6 +21,8 @@ export function onGameRoom(f: (d: any) => void) { roomSubs.push(f); }
 /** An airport's layout, as the game sends it when the 3D viewer asks. */
 export function onGameAirport(f: (d: any) => void) { airportSubs.push(f); }
 /** The real weather where the 3D viewer is: the nearest airport report, as the game sends it when asked. */
+/** The game's pet editor asking for a picture of your pet. */
+export function onGamePetPreview(f: (d: any) => void) { petSubs.push(f); }
 export function onGameWx(f: (d: any) => void) { wxSubs.push(f); }
 /** The flight the 3D viewer follows, as the game sends it (several times a second). */
 export function onGameFlight(f: (d: any) => void) { flightSubs.push(f); }
@@ -57,6 +59,7 @@ window.addEventListener('message', (e: MessageEvent) => {
   else if (d.amp === 'court') { for (const f of courtSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'monitor') { for (const f of monSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'airport') { for (const f of airportSubs) { try { f(d); } catch (err) { console.error(err); } } }
+  else if (d.amp === 'petprev') { for (const f of petSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'wx') { for (const f of wxSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'flight') { for (const f of flightSubs) { try { f(d); } catch (err) { console.error(err); } } }
 });

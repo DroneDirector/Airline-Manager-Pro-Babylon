@@ -18,7 +18,7 @@ import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core
 const EYE = 1.65, SIT = 1.2;
 const O: any = { scene: null as Scene | null };
 const HINTS: { [k: string]: string } = { laptop: 'Laptop: open the game at the Overview', planner: 'Monitor: the Flight planner', map: 'Route map: your routes', reports: 'Conduct reports: your crew',
-  door: 'Door: back to the game', chair: 'Your chair: sit down', phone: 'The phone', window: 'The view over the airport', poster: 'An aviation poster', globe: 'The globe', model: 'A model of one of your aircraft' };
+  door: 'Door: back to the game', chair: 'Your chair: sit down', phone: 'The phone', window: 'The view over the airport', poster: 'An aviation poster', globe: 'The globe', pet: 'Your pet', 'bowl-food': 'The food bowl: fill it up', 'bowl-water': 'The water bowl: fill it up', model: 'A model of one of your aircraft' };
 
 function apply(what: string) {
   const sc: Scene = O.scene; if (!sc) return; const g = S.gfx, cam: UniversalCamera = O.cam, of: Office = O.of, all = what === 'all' || what === 'preset';
@@ -87,6 +87,7 @@ const Office$: Section = {
       // what you are looking at (the middle of the view), within reach: its name
       if (now > hintT) { hintT = now + 0.15; const h = aimAt(); const el = hud.querySelector('.of-hint') as HTMLElement; const t = h ? HINTS[h] || '' : ''; el.hidden = !t || IS_TOUCH; if (t) el.textContent = F.sit && h === 'chair' ? 'Your chair: stand up' : t; }
       (hud.querySelector('.aim') as HTMLElement).hidden = !(IS_PC && document.pointerLockElement);
+      if (O.of && O.of.pet) O.of.pet.step(now, dt);
       sc.render(); perfEnd();
     });
     void esc;
@@ -119,6 +120,8 @@ function use(px?: number, py?: number) {
   if (a === 'door') return toGame('');
   if (a === 'phone') { toast('No calls right now'); return; }
   if (a === 'window') { toast('The airport, below the mountains'); return; }
+  if (a === 'pet' && O.of.pet) { O.of.pet.stir(); return; }
+  if ((a === 'bowl-water' || a === 'bowl-food') && O.of.pet) { if (!O.of.pet.refill(a === 'bowl-food' ? 'food' : 'water')) toast(a === 'bowl-food' ? 'The bowl is full' : 'The water bowl is full'); return; }
   if (a === 'globe') { toast('The world your airline flies'); return; }
   if (a === 'model') { toast('A model of one of your aircraft, in the company colours'); return; }
 }

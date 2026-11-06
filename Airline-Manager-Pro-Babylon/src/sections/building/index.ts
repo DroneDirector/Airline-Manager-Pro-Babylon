@@ -30,7 +30,7 @@ const LG = { x: 37, z: -7.3 };   // the lounge's middle; turned a quarter so its
 const B: any = { scene: null as Scene | null };
 const HINTS: { [k: string]: string } = {
   laptop: 'Laptop: open the game at the Overview', planner: 'Monitor: the Flight planner', map: 'Route map: your routes', reports: 'Conduct reports: your crew', phone: 'The phone',
-  globe: 'The globe', model: 'A model of one of your aircraft', poster: 'An aviation poster', window: 'The view', monitor: 'Monitor: your schedule', files: 'The archive',
+  globe: 'The globe', pet: 'Your pet', 'bowl-food': 'The food bowl: fill it up', 'bowl-water': 'The water bowl: fill it up', model: 'A model of one of your aircraft', poster: 'An aviation poster', window: 'The view', monitor: 'Monitor: your schedule', files: 'The archive',
   piece: 'Take it in your hands', museumdoor: 'The museum', trndoor: 'The door', trn: 'Who is this?', whiteboard: 'The whiteboard: today\'s lesson', teacherdesk: 'The instructor\'s desk',
   desk: 'A student\'s desk', books: 'Aviation books', clock: 'The clock',
   chair: 'A chair: sit down', door: 'The door', staffdoor: 'The staff door', shop: 'A shop', seat: 'A seat by the window', board: 'The flight boards',
@@ -226,6 +226,7 @@ const Building: Section = {
       if (now > boardT) { boardT = now + 30; for (const b of [...lounge.boards, ...halls.boards]) { P.board(b.c, b.kind); (b.tex.getContext() as any).drawImage(b.c, 0, 0); b.tex.update(true); } }
       if (lounge.fire.light) lounge.fire.light.intensity = 2.6 + 0.9 * Math.sin(now * 9) * Math.sin(now * 4.7);
       (hud.querySelector('.aim') as HTMLElement).hidden = !(IS_PC && document.pointerLockElement);
+      if (B.office && B.office.pet) B.office.pet.step(now, dt);
       sc.render(); perfEnd();
     });
   },
@@ -288,6 +289,8 @@ function use(px?: number, py?: number) {
   if (a === 'seat') { toast('A seat by the window, onto the apron'); return; }
   if (a === 'board') { toast('Departures and Arrivals'); return; }
   if (a === 'phone') { toast('No calls right now'); return; }
+  if (a === 'pet' && B.office.pet) { B.office.pet.stir(); return; }
+  if ((a === 'bowl-water' || a === 'bowl-food') && B.office.pet) { if (!B.office.pet.refill(a === 'bowl-food' ? 'food' : 'water')) toast(a === 'bowl-food' ? 'The bowl is full' : 'The water bowl is full'); return; }
   if (a === 'globe') { toast('The world your airline flies'); return; }
   if (a === 'model') { toast('A model of one of your aircraft, in the company colours'); return; }
 }

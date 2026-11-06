@@ -54,7 +54,7 @@ if (EMBED) {
       const c: any = company(), me: any = myPilot(), routes: number[][][] = [];
       for (const r of (State as any).routes || []) { if (r.companyId !== State.companyId) continue; const legs: string[] = r.legs || []; for (let i = 0; i + 1 < legs.length; i++) { const A = apt(legs[i]), B = apt(legs[i + 1]); if (A && B) routes.push([A.pos, B.pos]); } if (routes.length > 300) break; }
       return { airline: c.name, icao: c.icao, color: c.color, color2: c.color2, hub: c.hub, pilot: me ? me.name : '', balance: money(c.balance, { compact: true }), flying: liveOf().length, fleet: fleetOf().length, routes,
-        reports: (((State as any).incidents || []) as any[]).filter(x => x && x.status !== 'closed').length };
+        reports: (((State as any).incidents || []) as any[]).filter(x => x && x.status !== 'closed').length, pet: (() => { try { return petData(); } catch (e) { return null; } })() };
     } catch (e) { return {}; }
   };
   // what stands in the museum: every gift and award received, and the best badges (as on the main game's museum)
@@ -139,8 +139,13 @@ if (EMBED) {
       embedTell('flight', { t: Date.now(), me, near, list });
     } catch (e) { /* the next time */ }
   };
+  // the pet editor's picture: drawn by the edition (this page has no 3D of its own), shown when it comes back
+  let petPrevN = 0;
+  W.petPreviewDraw = (P: any) => { const cv = document.querySelector('[data-pet-prev]') as HTMLCanvasElement; if (!cv || !P || P.kind === 'none') return; petPrevN++; embedTell('petprev', { pet: JSON.parse(JSON.stringify(P)), w: cv.width, h: cv.height, id: petPrevN }); };
   window.addEventListener('message', (e: MessageEvent) => {
     const d: any = e.data; if (!d || !d.ampb) return;
+    if (d.ampb === 'petprev' && d.url) { if (d.id !== petPrevN) return; const cv = document.querySelector('[data-pet-prev]') as HTMLCanvasElement; if (!cv) return; const im = new Image(); im.onload = () => { const x = cv.getContext('2d'); if (x) { x.clearRect(0, 0, cv.width, cv.height); x.drawImage(im, 0, 0, cv.width, cv.height); } }; im.src = d.url; return; }
+    if (d.ampb === 'pet') { try { const p: any = petData(); if (typeof d.food === 'number') p.food = d.food; if (typeof d.water === 'number') p.water = d.water; Store.soon(); } catch (err) { /* later */ } return; }
     if (d.ampb === 'save') { try { saveNow(true); } catch (err) { /* saved */ } embedTell('saved'); }
     else if (d.ampb === 'monitor') { clearInterval(monT); if (d.on) { monSend(); monT = setInterval(monSend, 5000); } }
     else if (d.ampb === 'go' && d.screen) { try { closeAll(); go(d.screen); } catch (err) { /* stays */ } }
