@@ -4612,3 +4612,21 @@ html.court-over #app { visibility: hidden !important; }
 .court3d.over { background: transparent; }
 .court3d.over .ct-drag { position: absolute; inset: 0; touch-action: none; cursor: grab; }
 .court3d.over .ct-drag:active { cursor: grabbing; }
+
+/* car rental: Airport → Services and concessions */
+.cr-cos { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+.cr-co { border-top: 3px solid var(--co); display: flex; flex-direction: column; gap: 8px; }
+.cr-co-h { display: flex; align-items: center; gap: 10px; } .cr-co-h > div { flex: 1; display: flex; flex-direction: column; } .cr-co-h small { color: var(--ink-3); }
+.cr-dot { width: 12px; height: 12px; border-radius: 4px; background: var(--co); flex: none; }
+.cr-rates { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; } .cr-rates > div { display: flex; flex-direction: column; padding: 8px; border-radius: 10px; background: var(--bg-2); }
+.cr-rates b { font: 700 17px/1.2 var(--display); } .cr-rates b span { font: 500 11px 'Inter'; color: var(--ink-3); } .cr-rates small { color: var(--ink-3); font-size: 11px; }
+.cr-sign { display: flex; flex-wrap: wrap; gap: 6px; } .cr-sign .btn { flex-direction: column; align-items: flex-start; height: auto; padding: 6px 10px; } .cr-sign small { font-size: 10.5px; opacity: .8; }
+.cr-list { display: flex; flex-direction: column; gap: 6px; }
+.cr-row { display: grid; grid-template-columns: 14px 1fr 1.3fr 1fr 1.4fr; gap: 10px; align-items: center; text-align: left; padding: 10px 12px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+.cr-row span { display: flex; flex-direction: column; min-width: 0; } .cr-row small { color: var(--ink-3); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-terms { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--ink-2); }
+.cr-inc { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; } .cr-inc.tot { font-weight: 700; }
+.cr-agr-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 60; }
+.cr-agr { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(640px, 94vw); max-height: 88vh; overflow: auto; z-index: 61; border-top: 3px solid var(--co); display: flex; flex-direction: column; gap: 10px; }
+.cr-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; } .cr-grid > div { display: flex; flex-direction: column; padding: 8px; border-radius: 10px; background: var(--bg-2); } .cr-grid small { color: var(--ink-3); font-size: 11px; }
+@media (max-width: 700px) { .cr-row { grid-template-columns: 12px 1fr 1fr; } .cr-row span:nth-child(4), .cr-row span:nth-child(5) { grid-column: span 1; } .cr-cos { grid-template-columns: 1fr; } }

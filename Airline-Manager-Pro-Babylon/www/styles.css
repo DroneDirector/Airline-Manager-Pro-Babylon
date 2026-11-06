@@ -350,3 +350,6 @@ body.photo-on .v3d-wxchip { display: none; }
 .trn-box { position: absolute; right: 14px; top: 70px; width: min(300px, 80vw); padding: 14px 16px; border-radius: 14px; background: rgba(8,14,28,.82); color: #eef3fa; backdrop-filter: blur(8px); }
 .trn-box .trn-n { display: block; font-size: 16px; padding-right: 30px; } .trn-box .trn-r { color: #9fb0c8; } .trn-box .trn-c { margin: 8px 0 0; font-size: 13px; line-height: 1.4; }
 .trn-box .trn-x { position: absolute; right: 8px; top: 8px; padding: 2px 8px; }
+
+.site-services { position: absolute; right: 12px; top: 64px; z-index: 6; }
+body.photo-on .site-services { display: none; }

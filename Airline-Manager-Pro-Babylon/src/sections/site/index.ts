@@ -22,7 +22,7 @@ import { buildDoors, stepDoors, DoorObj } from '../terminal/doors';
 import { STAIRS, F2Y } from '../terminal/plan';
 import { furnish } from '../terminal/furnish';
 import { buildFixtures } from '../terminal/fixtures';
-import { buildRental } from '../terminal/rental';
+import { buildRental, rentalCars } from '../terminal/rental';
 import { addFlatZone, clearFlatZones, flatHeight, onFlatChange, zoneForModel } from '../../core/flatten';
 
 const D2R = Math.PI / 180, R = 6371000, HEIGHT_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/';
@@ -196,7 +196,12 @@ const Site$: Section = {
     progress(86, 'Building your terminal…'); await new Promise(r => setTimeout(r, 0));
     const before = new Set(sc.transformNodes.concat(sc.meshes as any[]));
     const K = makeKit(sc); buildShell(K, () => { /* its own steps */ }); const doors = buildDoors(K) as DoorObj[]; furnish(K, () => { /* */ }); K.clearWalls();
-    buildFixtures(K, '#1C3A8A', '#3FD3E6', 'Airline Manager Pro', () => { /* */ }); buildRental(K); (K.struct as any).finish();
+    buildFixtures(K, '#1C3A8A', '#3FD3E6', 'Airline Manager Pro', () => { /* */ }); buildRental(K);
+    // the rental car centre's cars as the game has them: only the companies signed at your airport, and a car that is out is not in its bay
+    try { const RC = ctx.opts && ctx.opts.data && ctx.opts.data.rental; if (RC) { const seen: { [k: string]: number } = {};
+      for (const c of rentalCars(K)) { const k = c.company + '/' + c.type, n = seen[k] = (seen[k] || 0) + 1, on = RC.signed.indexOf(c.company) >= 0 && n > ((RC.out[c.company] || {})[c.type] || 0);
+        c.node.setEnabled(on); if (c.node.metadata && c.node.metadata.rental) c.node.metadata.rental.status = on ? 'ready' : RC.signed.indexOf(c.company) >= 0 ? 'rented' : 'not at the airport'; } } } catch (e) { /* every car in its bay */ }
+    (K.struct as any).finish();
     for (const n of (sc.transformNodes as any[]).concat(sc.meshes as any[])) if (!before.has(n) && !n.parent && n !== K.root) n.parent = K.root;   // anything built loose goes with it
     K.root.parent = ap; K.root.position.set(PX(0), 0, PV(0)); O.K = K;
     for (const m of K.casters) casters.push(m);
@@ -241,6 +246,7 @@ const Site$: Section = {
 </div>
       <div class="wx-updown site-ud" ${IS_TOUCH ? '' : 'hidden'}><button class="wx-b" data-ud="up">▲</button><button class="wx-b" data-ud="down">▼</button></div>`);
     const CAM = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, speed: 40, up: 0, down: 0 }; O.CAM = CAM;
+    if (ctx.toGame) hud.insertAdjacentHTML('beforeend', `<button class="wx-b site-services" data-services>Services and concessions</button>`);
     if (walkMode) hud.insertAdjacentHTML('beforeend', `<div class="site-moves">${[['jump', 'Jump'], ['crouch', 'Crouch'], ['prone', 'Prone'], ['sprint', 'Sprint']].map(([k, l]) => `<button class="wx-b" data-mv="${k}">${l}</button>`).join('')}</div>`);
     if (walkMode) { hud.classList.add('site-walk'); (hud.querySelector('.site-dock') as HTMLElement).style.display = 'none'; (hud.querySelector('.site-ud') as HTMLElement).style.display = 'none'; }
     // the body you walk in: feet at its position, 1.8 m tall, 0.6 m across
@@ -263,6 +269,7 @@ const Site$: Section = {
       hud.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.getAttribute('data-view') === id)); hud.querySelectorAll('[data-sp2]').forEach(b => b.classList.toggle('on', Number(b.getAttribute('data-sp2')) === CAM.speed)); };
     hud.addEventListener('click', e => { const b = (e.target as HTMLElement).closest('button') as HTMLElement | null; if (!b) return;
       if (b.hasAttribute('data-mv')) { const k = b.getAttribute('data-mv'); if (k === 'jump') O.W.jump = true; else if (k === 'sprint') { O.W.sprint = !O.W.sprint; b.classList.toggle('on', O.W.sprint); } else O.setStance(k); }
+      if (b.hasAttribute('data-services') && ctx.toGame) { ctx.toGame('rental'); return; }
       if (b.hasAttribute('data-view')) place(b.getAttribute('data-view') as string);
       if (b.hasAttribute('data-sp2')) { CAM.speed = Number(b.getAttribute('data-sp2')); hud.querySelectorAll('[data-sp2]').forEach(q => q.classList.toggle('on', q === b)); }
       if (b.hasAttribute('data-site')) { const other = SITES.find(s => s !== site)!; if (ctx.back) { /* open again at the other site */ } O.reopen = other.id; Site$.close(); Site$.open(Object.assign({}, ctx, { opts: Object.assign({}, ctx.opts || {}, { site: other.id }) })); } });

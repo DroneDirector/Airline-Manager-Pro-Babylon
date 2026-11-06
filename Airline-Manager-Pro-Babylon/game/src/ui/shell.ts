@@ -26,6 +26,7 @@ function renderShell() {
         <button class="rail-btn" data-act="go" data-screen="hangars" aria-label="Hangars">${icon('wrench')}<span>Hangars</span></button>
         <button class="rail-btn" data-act="go" data-screen="lounges" aria-label="Lounges">${icon('star')}<span>Lounges</span></button>
         <button class="rail-btn" data-act="airport-open" aria-label="The airport: the concourse">${icon('land')}<span>Airport</span></button>
+        <button class="rail-btn" data-act="go" data-screen="rental" aria-label="Airport services and concessions: car rental">${icon('key')}<span>Services</span></button>
         <button class="rail-btn" data-act="court-enter" aria-label="The courtroom">${icon('shield')}<span>Court</span><i class="rail-dot" data-court-dot hidden></i></button>
       </div>
       <button class="rail-more down" data-act="rail-scroll" data-d="1" aria-label="More in the menu below">${icon('down')}</button>

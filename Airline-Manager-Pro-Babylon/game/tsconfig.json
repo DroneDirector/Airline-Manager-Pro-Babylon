@@ -112,6 +112,7 @@
     "src/screens/dispatch.ts",
     "src/screens/planner.ts",
     "src/screens/logbook.ts",
+    "src/screens/car-rental.ts",
     "src/screens/maintenance.ts",
     "src/screens/finance.ts",
     "src/screens/settings.ts",

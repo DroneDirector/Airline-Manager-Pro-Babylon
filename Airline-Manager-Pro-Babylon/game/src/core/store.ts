@@ -22,7 +22,7 @@ const Mode = {
 };
 const SAVE_VERSION = 1;
 // Parts of State that are saved. Screen position and the like start fresh each launch.
-const SAVED_KEYS = ['companyId', 'divisionId', 'myReg', 'settings', 'profiles', 'companies', 'pilots', 'candidates',
+const SAVED_KEYS = ['companyId', 'carRental', 'divisionId', 'myReg', 'settings', 'profiles', 'companies', 'pilots', 'candidates',
   'fleet', 'live', 'today', 'routes', 'logbook', 'issues', 'notices', 'txns', 'fines',
   'staff', 'staffCandidates', 'incidents', 'coPilot', 'birthdayGreeted', 'simDate', 'myLoad', 'salaryV2',
   'linkPc', 'linkedOnce', 'knownAirports', 'lastTouchdown', 'aiNext', 'aiDay', 'cases', 'screen', 'badges', 'progress', 'popLog', 'ratingDay', 'condTick', 'groundedUntil', 'payNext', 'poolNext', 'conductPausedAt', 'seenVersion', 'wnClosed', 'coop', 'favs', 'licence', 'bank', 'jobs', 'landRecs', 'ofp', 'plans', 'acars', 'simInstalled', 'usedMarket', 'payV3', 'unions', 'moraleNext', 'paxRecords', 'noFly', 'paxReviews', 'groundV1', 'groundWarned', 'news', 'whistle', 'wbDay', 'thanksDue', 'thanks', 'newsSeen', 'newsCool', 'newsWatchV1', 'newsWx', 'conductDrama', 'difficulty', 'conductPlan', 'pet', 'family', 'finHold', 'regNext', 'fresh', 'visited', 'gifts', 'giftSeen', 'briefDay', 'life', 'rides', 'photoNewsDay', 'mkt', 'stock', 'bookings', 'challenges', 'gevents', 'briefings', 'mktReal', 'faCrew', 'birthdayBowed', 'loyalty', 'achv', 'firstWeek', 'freeCrew', 'poolFill', 'hangarItems'];
