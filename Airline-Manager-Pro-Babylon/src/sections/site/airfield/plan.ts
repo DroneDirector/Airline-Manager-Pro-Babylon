@@ -128,12 +128,12 @@ export const TERMINAL: any = (() => {
   PAIRS.forEach((a, i) => { mon('M-F2-G' + (i + 1), 2, a + 26, PG + 1, 'gate screen', 'F2-GATE-' + (i + 1)); mon('M-F1-G' + (i + 5), 1, a + 58, PG + 1, 'gate screen', 'F1-GATE-' + (i + 5)); });
 
   // ---------------- jetways and stands ----------------
-  PAIRS.forEach((a, i) => { const cx = a + 20;
+  PAIRS.forEach((a, i) => { const cx = Math.round((-62 + i * 2 * 286 / 7) * 100) / 100, cw = Math.round((-62 + (i * 2 + 1) * 286 / 7) * 100) / 100;   // 40.86 m apart, as in the 3D terminal
     // as in the Babylon terminal (fixtures.ts): out of the gate at x0 + 22, the rotunda 5.2 m out on its column, the moving
     // tunnel from 6.6 m out down to the aircraft's front door
     J.push({ id: 'J-' + (i + 1), gate: 'F2-GATE-' + (i + 1), door: 'D-F2-GATE-' + (i + 1) + '-JW', x: a + 28, y: PN, rotunda: [a + 28, PN + 5.2], cab: [cx + 2.4, PN + 6 + 5.5] });
     S.push({ id: 'STAND-' + (i + 1), gate: 'F2-GATE-' + (i + 1), kind: 'jetway stand', x: cx, nose: PN + 6 });
-    S.push({ id: 'STAND-' + (i + 5), gate: 'F1-GATE-' + (i + 5), kind: 'walk-out stand', x: a + 60, nose: PN + 8 }); });
+    S.push({ id: 'STAND-' + (i + 5), gate: 'F1-GATE-' + (i + 5), kind: 'walk-out stand', x: cw, nose: PN + 8 }); });
 
   // ---------------- the wave roof over the Grand Hall and the kerb ----------------
   // A leaf-shaped roof: its front edge swings out over the kerb, three long waves run across it, each crest carrying a
