@@ -25,6 +25,8 @@
     "src/data/real-airlines.ts",
     "src/data/world-airports.ts",
     "src/data/airport-layouts.ts",
+    "src/data/own-airport-layout.ts",
+    "src/data/own-airport.ts",
     "src/data/aircraft.ts",
     "src/data/speeds.ts",
     "src/data/demo.ts",

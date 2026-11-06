@@ -48,7 +48,7 @@ const World = {
 
   loadRunways(): Promise<{ [ident: string]: any[] }> {
     if (this.runways) return Promise.resolve(this.runways);
-    return fetch('runways-world.json').then(r => r.json()).then(d => (this.runways = d)).catch(() => (this.runways = {}));
+    return fetch('runways-world.json').then(r => r.json()).then(d => (this.runways = ownAirportRunways(d))).catch(() => (this.runways = ownAirportRunways({})));
   },
 
   /** The simulator's own airports (ident, latitude, longitude): every one becomes available in the app. */

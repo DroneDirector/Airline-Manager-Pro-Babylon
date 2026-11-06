@@ -93,7 +93,7 @@ class AirportView {
   }
   labelSource() {
     const src = $('#apv-src'), L = this.L; if (!src || !L) return;
-    src.innerHTML = L.source === 'sim' ? 'Layout from your simulator' : L.source === 'osm' ? (L.gen ? 'Real runways · taxiways and apron laid out to the standard dimensions · © OpenStreetMap contributors' : (L as any).genStands ? 'Real airport layout, stands laid out on the aprons · © OpenStreetMap contributors' : 'Real airport layout · © OpenStreetMap contributors')
+    src.innerHTML = (L as any).own ? 'Your airport · laid out from its plan' : L.source === 'sim' ? 'Layout from your simulator' : L.source === 'osm' ? (L.gen ? 'Real runways · taxiways and apron laid out to the standard dimensions · © OpenStreetMap contributors' : (L as any).genStands ? 'Real airport layout, stands laid out on the aprons · © OpenStreetMap contributors' : 'Real airport layout · © OpenStreetMap contributors')
       : this.fetching ? '<span class="apv-spin"></span>Real runways · getting the full layout…' : L.runways.length ? (L.gen ? 'Real runways · taxiways and apron laid out to the standard dimensions' : 'Real runways · taxiways and apron drawn simplified') : 'No runway data for this airport';
     src.classList.toggle('sim', L.source !== 'runways');
   }
@@ -646,6 +646,7 @@ class AirportView {
       c.textAlign = 'left';
     }
     c.globalAlpha = 1;
+    this.drawHoldsTo(c);
     // runways
     for (const r of L.runways) {
       const cc = this.xy(r.lat, r.lon), h = r.hdg * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h), px = Math.cos(h), py = -Math.sin(h);
@@ -771,6 +772,7 @@ class AirportView {
     c.save(); c.globalAlpha = fade;
     // runways (a handful: drawn directly), stand names (only those on screen), approach line
     this.drawRunwaysTo(c, s, col);
+    this.drawHoldsTo(c);
     if (s > 0.45) {
       const g = this.graph, m = this.map;
       c.fillStyle = col.dim; c.font = `600 ${s > 1.5 ? 11 : 9.5}px Inter, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -783,6 +785,30 @@ class AirportView {
       c.textBaseline = 'alphabetic'; c.textAlign = 'left';
     }
     c.restore();
+  }
+
+  /** The holding positions (a red bar across the taxiway, as on the airport's sheets) and the names on the ground:
+   *  taxiways as their location signs (yellow on black), holding positions as mandatory signs (white on red). */
+  drawHoldsTo(c: CanvasRenderingContext2D) {
+    const L: any = this.L, s = this.s; if (!L || (!L.holds && !L.labels)) return;
+    const W = this.embedded ? this.map.w : this.w, H = this.embedded ? this.map.h : this.h;
+    c.lineCap = 'butt';
+    for (const h of L.holds || []) { const a = h[2] * Math.PI / 180, ux = Math.sin(a), uy = Math.cos(a), w = h[3];
+      const p = this.scr(h[0] - ux * w, h[1] - uy * w), q = this.scr(h[0] + ux * w, h[1] + uy * w);
+      c.strokeStyle = '#FF4A3D'; c.lineWidth = Math.max(2, 3 * s); c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke(); }
+    if (s < 0.1) return;
+    const fs = s > 1.2 ? 12 : 10, th = fs + 6; c.font = `800 ${fs}px Inter, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    const holdBy: any = {}; for (const h of L.holds || []) holdBy[h[0] + ',' + h[1]] = h;
+    for (const lb of L.labels || []) {
+      let e = lb[0], n = lb[1]; const h = lb[3] === 1 ? holdBy[e + ',' + n] : null;
+      if (h) { const a = h[2] * Math.PI / 180, k = h[3] + Math.max(8, 14 / s); e += Math.sin(a) * k; n += Math.cos(a) * k; }
+      const t = this.scr(e, n); if (t[0] < -30 || t[1] < -30 || t[0] > W + 30 || t[1] > H + 30) continue;
+      const tw = c.measureText(lb[2]).width + 8;
+      c.fillStyle = lb[3] === 1 ? '#C8231C' : '#111111'; c.fillRect(t[0] - tw / 2, t[1] - th / 2, tw, th);
+      if (lb[3] !== 1) { c.strokeStyle = '#F2C230'; c.lineWidth = 1; c.strokeRect(t[0] - tw / 2 + 1.5, t[1] - th / 2 + 1.5, tw - 3, th - 3); }
+      c.fillStyle = lb[3] === 1 ? '#FFFFFF' : '#F2C230'; c.fillText(lb[2], t[0], t[1] + 0.5);
+    }
+    c.textBaseline = 'alphabetic'; c.textAlign = 'left';
   }
 
   drawRunwaysTo(c: CanvasRenderingContext2D, s: number, col: any) {

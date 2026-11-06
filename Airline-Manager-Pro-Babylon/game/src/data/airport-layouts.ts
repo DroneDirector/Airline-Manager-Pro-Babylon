@@ -16,6 +16,9 @@ interface AirportLayout {
   parkNames?: string[];                                  // stand names ("A12", "214") where known
   areas?: { k: 'apron' | 'terminal'; pts: number[][] }[]; // aprons and terminal buildings (metres)
   source: 'sim' | 'osm' | 'runways';
+  own?: boolean; iata?: string;                         // your own airport, built from its plan
+  holds?: number[][];                                    // holding positions [east, north, bar heading, half width]
+  labels?: any[][];                                      // names on the ground [east, north, text, kind: 0 taxiway, 1 holding position]
   gen?: boolean;                                         // taxiways laid out from the runways (not mapped)
 }
 
@@ -45,6 +48,8 @@ const AirportLayouts = {
    *  or with null when there is nothing better to come. */
   get(icao: string, better?: (l: AirportLayout) => void): Promise<AirportLayout> {
     icao = String(icao || '').toUpperCase();
+    // your own airport: its layout from its own plan, and nothing better to come
+    const own = ownAirportLayout(icao); if (own) { this.cache[icao] = own; if (better) setTimeout(() => better(null), 0); return Promise.resolve(own); }
     let c0 = this.cache[icao] || this.kept(icao);
     if (c0 && !layoutFits(icao, c0, 'kept')) { c0 = null; this.forget(icao); }
     if (c0) return this.getWith(icao, c0, better);
@@ -73,6 +78,7 @@ const AirportLayouts = {
 
   /** A layout kept on the device from an earlier download. */
   kept(icao: string): AirportLayout {
+    { const own = ownAirportLayout(icao); if (own) return (this.cache[icao] = own); }
     // the simulator's layout (saved when the app was linked) first, then OpenStreetMap's
     for (const key of ['amp-sim:' + icao, 'amp-osm:' + icao]) {
       try { const k = JSON.parse(localStorage.getItem(key) || 'null'); if (k && k.l && (key.indexOf('amp-sim') === 0 || Date.now() - k.at < this.OSM_KEEP_MS)) return (this.cache[icao] = k.l); } catch (e) { /* none */ }
@@ -130,6 +136,7 @@ const AirportLayouts = {
   OSM_KEEP_MS: 90 * 864e5,
 
   fromOsm(icao: string): Promise<AirportLayout> {
+    { const own = ownAirportLayout(icao); if (own) return Promise.resolve(this.cache[icao] = own); }
     const key = 'amp-osm:' + icao;
     const kept = this.kept(icao); if (kept) return Promise.resolve(kept);
     if (navigator.onLine === false) return Promise.resolve(null);

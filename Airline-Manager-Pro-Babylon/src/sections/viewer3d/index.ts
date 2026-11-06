@@ -21,6 +21,7 @@ import { makeRealWx } from './realwx';
 import { buildCabin, seatAt, FLOOR as CFLOOR, CABIN_VIEW_ROW, CABIN_AISLE_ROW, CABIN_Z } from './cabin';
 import { buildAirliner, Airliner, repaint, setGear } from './airliner';
 import { buildAirport, placeAirport, Airport } from './airport';
+import { buildOwnAirport, isOwnLayout } from './own-airport';
 import { buildCrash, Crash } from './crash';
 import { buildTerrain, placeTerrain, terrainStale, Terrain } from './terrain';
 import { gameSend, onGameFlight, onGameAirport } from '../../ui/game-frame';
@@ -61,7 +62,7 @@ onGameFlight((d: any) => {
 function wantAirports(me: Sample) { const A = V.apts || (V.apts = {}); for (const k of [me.from, me.to]) if (k && !(k in A)) { A[k] = null; gameSend({ ampb: 'airport', icao: k }); } }
 onGameAirport((d: any) => {
   if (!V.scene || !V.apts || !d.L || !(d.icao in V.apts)) return;
-  try { const old: Airport = V.apts[d.icao]; if (old) old.dispose(); const A = buildAirport(V.scene, d.L); V.apts[d.icao] = A;
+  try { const old: Airport = V.apts[d.icao]; if (old) old.dispose(); const A = isOwnLayout(d.L) ? buildOwnAirport(V.scene, d.L) : buildAirport(V.scene, d.L); V.apts[d.icao] = A;
     if (d.crash) { try { const c: Crash = buildCrash(V.scene, A.root, d.L, d.crash, { elev: A.elev, sea: (la: number, lo: number) => { try { const hh = V.ter ? V.ter.heightAt(la, lo) : null; return hh != null && hh < 0.6 && A.elev < 60 && !!(V.ter && (V.ter as any).isSea ? (V.ter as any).isSea(la, lo) : hh <= 0.1); } catch (e) { return false; } } }); (V.crashes = V.crashes || {})[d.icao] = c; const dis = A.dispose.bind(A); A.dispose = () => { try { c.dispose(); } catch (e) { /* gone */ } delete V.crashes[d.icao]; dis(); }; if (V.crashFocus === d.icao) V.crashAt = { A, c }; } catch (e) { console.error(e); } }
     else if (V.crashFocus === d.icao) toast('The crash site there has been cleared'); farDiscs(); for (const l of A.lights) V.glow.addIncludedOnlyMesh(l); if (V.sg) A.root.getChildMeshes().forEach(m => m.receiveShadows = true); } catch (e) { console.error(e); }
 });

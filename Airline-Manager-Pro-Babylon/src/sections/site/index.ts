@@ -2,10 +2,13 @@
 // heights (Terrain Tiles on AWS, from SRTM and others; no satellite pictures) round the site: fine detail for 18 km
 // round it and coarser out to about 70 km, on the curve of the Earth, coloured by height and slope (black sand or
 // fields low down, moss and grass, scree, rock on the steep faces, snow and ice up high), with the sea, the sky,
-// its clouds and the haze of the distance. On it, the airport as planned: the terminal and its pier with eight
-// stands and aircraft on them, the apron, the parallel taxiway, two parallel 3,500 m runways 2,000 m apart with the
-// taxiways between them, a tower, and the fence round about 21 km². Ready-made views (from a gate, the apron, the
-// runways, the air) and a free drone camera, the time of day and the weather, and the photo button.
+// its clouds and the haze of the distance. On it, your airport, Mýrdalssandur (BIAP / VTX), as on its architect sheets
+// (airfield/): the terminal and its pier with eight stands and aircraft on them, the asphalt apron with the A380 stand,
+// the 4,000 m runway 08/26 (Code 4F, displaced thresholds), the parallel taxiways A and B with their curved ends and
+// links, the holding positions with their signs and guard lights, the cargo apron and terminal, a tower, and the fence
+// on the airport boundary. Inside the boundary the ground is levelled (blending into the real ground only within its
+// outer 100 m); outside it the real ground and its mountains are untouched. Ready-made views (from a gate, the apron,
+// the runway, the holding point, the air) and a free drone camera, the time of day and the weather, the photo button.
 import { Ray, Scene, Vector3, Color3, Color4, UniversalCamera, HemisphericLight, DirectionalLight, ShadowGenerator, GlowLayer, DefaultRenderingPipeline, ImageProcessingConfiguration, MeshBuilder, Mesh, VertexData, TransformNode, PBRMaterial, StandardMaterial, DynamicTexture, Texture, AbstractMesh } from '@babylonjs/core';
 import { registerSection, Section, SectionCtx } from '../../core/sections';
 import { runLoop } from '../../core/engine';
@@ -25,17 +28,22 @@ import { furnish } from '../terminal/furnish';
 import { buildFixtures } from '../terminal/fixtures';
 import { buildRental, rentalCars } from '../terminal/rental';
 import { addFlatZone, clearFlatZones, flatHeight, onFlatChange, zoneForModel } from '../../core/flatten';
+import { STANDS as T_STANDS } from '../terminal/plan';
+import { buildAirfield, AIRFIELD_VIEWS } from './airfield/build';
+import { AIRFIELD, designate } from './airfield/plan';
 
 const D2R = Math.PI / 180, R = 6371000, HEIGHT_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/';
-/** The sites: the airport's reference point (the middle between the runways), the runways' true heading (the gates
- *  face 90° to the left of it, towards the mountains), the snow line, the colours of the low ground. */
+/** The sites: the frame's reference point (the terminal's plan origin is 1,482 m from it, south of the runway), the
+ *  runway's true heading (the gates face 90° to the left of it, towards the mountains), its designators (west end
+ *  first), the snow line, the colours of the low ground. Mýrdalssandur is your airport, BIAP / VTX. */
 export const SITES = [
-  { id: 'myrdalssandur', name: 'Mýrdalssandur, Iceland', lat: 63.465, lon: -18.72, hdg: 68, rwy: ['07', '25'], gates: 338, snow: 950, low: 'sand' },
+  { id: 'myrdalssandur', name: 'Mýrdalssandur Airport, Iceland', icao: 'BIAP', iata: 'VTX', lat: 63.465, lon: -18.72, hdg: 68, rwy: ['08', '26'], gates: 338, snow: 950, low: 'sand' },
   { id: 'matanuska', name: 'Matanuska Valley, Alaska', lat: 61.53, lon: -149.02, hdg: 292, rwy: ['29', '11'], gates: 202, snow: 1350, low: 'green' },
 ];
-// the airport in its own frame: u along the runways (the heading), v to their left (towards the gates' view)
-const RWY = { len: 3500, wid: 60, vA: -1000, vB: 1000 }, TWY = { vA: -1182, w: 23 }, FENCE = { u0: -3000, u1: 3000, v0: -1700, v1: 1800 };
-const PX = (x: number) => x - 81, PV = (z: number) => z - 1482;          // the terminal's plan (x, z) into the airport's (u, v)
+// the airport in its own frame: u along the runway (the heading), v to its left (towards the gates' view); the plan
+// (the terminal's and the airfield's: x along the runway, y towards it) has its origin at (u, v) = (-81, -1482)
+const PX = (x: number) => x + AIRFIELD.airport.planU, PV = (z: number) => z + AIRFIELD.airport.planV;
+const B = AIRFIELD.boundary, RWY0 = AIRFIELD.runway;
 const PN = 82, MOD = [0, 1, 2, 3].map(i => -72.6 + 80.55 * i);
 
 const O: any = { scene: null as Scene | null };
@@ -66,7 +74,7 @@ async function loadArea(z: number, lat: number, lon: number, halfM: number, prog
 }
 
 // ---- the ground: a grid of heights, coloured by height and slope, with a fine detail texture ----
-function groundMesh(sc: Scene, site: any, half: number, n: number, z: number, detail: Texture, sink = 0, hole = 0) {
+function groundMesh(sc: Scene, site: any, half: number, n: number, z: number, detail: Texture, sink = 0, hole = 0, sinkIn: ((e: number, nn: number) => number) | null = null) {
   const lat0 = site.lat, lon0 = site.lon, kx = 111320 * Math.cos(lat0 * D2R), kz = 110540, step = half * 2 / n;
   const raw = new Float32Array((n + 1) * (n + 1));
   for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) { const e = -half + i * step, nn = -half + j * step; let h = hAt(z, lat0 + nn / kz, lon0 + e / kx); if (h == null) h = hAt(11, lat0 + nn / kz, lon0 + e / kx) ?? 0; raw[j * (n + 1) + i] = h; }
@@ -83,7 +91,7 @@ function groundMesh(sc: Scene, site: any, half: number, n: number, z: number, de
     const e = -half + i * step, nn = -half + j * step, h = hs[j * (n + 1) + i], d2 = e * e + nn * nn;
     const hl = hs[j * (n + 1) + Math.max(0, i - 1)], hr = hs[j * (n + 1) + Math.min(n, i + 1)], hd = hs[Math.max(0, j - 1) * (n + 1) + i], hu = hs[Math.min(n, j + 1) * (n + 1) + i];
     const sl = Math.min(1, Math.hypot(hr - hl, hu - hd) / (2 * step)), nz = rnd();
-    pos.push(e, h - d2 / (2 * R) * (1 - fl[j * (n + 1) + i]) - (hole && Math.abs(e) < hole && Math.abs(nn) < hole ? sink : 0), nn); uv.push(e / 40, nn / 40);
+    pos.push(e, h - d2 / (2 * R) * (1 - fl[j * (n + 1) + i]) - (hole && Math.abs(e) < hole && Math.abs(nn) < hole ? sink : 0) - (sinkIn ? sinkIn(e, nn) : 0), nn); uv.push(e / 40, nn / 40);
     let c: Color3;
     if (h < 0.6) c = WET; else {
       const low = site.low === 'sand' ? (h < 140 ? SAND : Color3.Lerp(SAND, MOSS, Math.min(1, (h - 140) / 200))) : Color3.Lerp(GRASS, MOSS, Math.min(1, h / 500));
@@ -103,64 +111,41 @@ function groundMesh(sc: Scene, site: any, half: number, n: number, z: number, de
 }
 
 // ---- the airport ----
-function airport(sc: Scene, site: any, elev: number, casters: AbstractMesh[]) {
+/** The airport: the airfield from its plan (ground, markings, signs, lights, cargo terminal, fence), a tower, a fire
+ *  station and a hangar landside, the access road (inside the boundary on the levelled ground, outside it on the real
+ *  ground). heightAt(u, v): the levelled ground's height there, from the airport's. */
+function airport(sc: Scene, site: any, elev: number, casters: AbstractMesh[], heightAt: (u: number, v: number) => number, rawAt: (u: number, v: number) => number) {
   const root = new TransformNode('AIRPORT', sc); root.position.y = elev; root.rotation.y = (site.hdg - 90) * D2R;
+  root.metadata = { id: 'AIRPORT', kind: 'airport', icao: site.icao || '' };
   const mat = (hex: string, rough = 0.6, metal = 0) => { const m = new PBRMaterial('am', sc); m.albedoColor = Color3.FromHexString(hex); m.roughness = rough; m.metallic = metal; return m; };
-  const tex = (draw: (x: CanvasRenderingContext2D, w: number, h: number) => void, w = 512, h = 512) => { const t = new DynamicTexture('at', { width: w, height: h }, sc, true); draw(t.getContext() as any, w, h); t.update(); t.wrapU = t.wrapV = Texture.WRAP_ADDRESSMODE; t.anisotropicFilteringLevel = 8; return t; };
-  const noise = (base: string, amt: number) => tex((x, w, h) => { x.fillStyle = base; x.fillRect(0, 0, w, h); for (let i = 0; i < 26000; i++) { const v = Math.random() - 0.5; x.fillStyle = v > 0 ? `rgba(255,255,255,${v * amt})` : `rgba(0,0,0,${-v * amt})`; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); } });
-  const asphalt = new PBRMaterial('asphalt', sc); asphalt.albedoTexture = noise('#34373B', 0.3); asphalt.roughness = 0.85; asphalt.zOffset = -2; const concrete = new PBRMaterial('concrete', sc); concrete.albedoTexture = noise('#A9A8A3', 0.18); concrete.roughness = 0.85; concrete.zOffset = -1;
-  const white = mat('#F2F3F5', 0.5), yellow = mat('#E7B92E', 0.5), glass = mat('#2E4252', 0.08, 0.5), roofW = mat('#F4F6F8', 0.2), timber = mat('#B87443', 0.6), steel = mat('#9AA2AC', 0.35, 0.6); yellow.zOffset = -4; const mark = mat('#F2F3F5', 0.5); mark.zOffset = -4;
-  const part: Mesh[] = [];
-  const box = (w: number, h: number, d: number, m: any, u: number, y: number, v: number, cast = false, ry = 0) => { const b = MeshBuilder.CreateBox('ab', { width: w, height: h, depth: d }, sc); b.position.set(u, y, v); b.rotation.y = ry; b.material = m; b.parent = root; b.receiveShadows = true; b.renderingGroupId = 1; b.isPickable = false; if (cast) casters.push(b); part.push(b); return b; };
-  const pave = (u0: number, v0: number, u1: number, v1: number, m: any, y = 0.05, uvk = 30) => { const g = MeshBuilder.CreateGround('ap', { width: u1 - u0, height: v1 - v0 }, sc); g.position.set((u0 + u1) / 2, y, (v0 + v1) / 2); g.material = m; g.parent = root; g.receiveShadows = true; g.renderingGroupId = 1; g.isPickable = false;
-    const t = (m.albedoTexture as Texture); if (t) { const uvs = g.getVerticesData('uv') as any; for (let i = 0; i < uvs.length; i += 2) { uvs[i] *= (u1 - u0) / uvk; uvs[i + 1] *= (v1 - v0) / uvk; } g.setVerticesData('uv', uvs); } return g; };
-  // the runways: asphalt, the edge and centre lines, the thresholds' piano keys, the numbers, the touchdown marks
-  const numTex = (t: string) => { const d = tex((x, w, h) => { x.clearRect(0, 0, w, h); x.fillStyle = '#F2F3F5'; x.font = '700 300px Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(t, w / 2, h / 2); }, 512, 512); d.hasAlpha = true; const m = new StandardMaterial('num', sc); m.diffuseTexture = d; m.useAlphaFromDiffuseTexture = true; m.specularColor = Color3.Black(); return m; };
-  for (const [v, side] of [[RWY.vA, 'R'], [RWY.vB, 'L']] as [number, string][]) {
-    pave(-RWY.len / 2 - 60, v - RWY.wid / 2 - 7, RWY.len / 2 + 60, v + RWY.wid / 2 + 7, asphalt, 0.06);
-    for (const s of [-1, 1]) box(RWY.len, 0.02, 0.9, mark, 0, 0.08, v + s * (RWY.wid / 2 - 1));
-    for (let u = -RWY.len / 2 + 400; u < RWY.len / 2 - 400; u += 50) box(30, 0.02, 0.9, mark, u, 0.08, v);
-    for (const end of [-1, 1]) { const uE = end * (RWY.len / 2 - 12);
-      for (let k = 0; k < 16; k++) { const off = -RWY.wid / 2 + 3 + k * 3.6 + (k >= 8 ? 2.4 : 0); box(30, 0.02, 1.8, mark, uE - end * 15, 0.08, v + off); }
-      for (const d of [150, 300, 450]) for (const s of [-1, 1]) box(22, 0.02, 3, mark, uE - end * (d + 11), 0.08, v + s * 9);
-      for (const s of [-1, 1]) box(45, 0.02, 10, mark, uE - end * 400, 0.08, v + s * 11);
-      const nm = end < 0 ? site.rwy[0] : site.rwy[1], sd = end < 0 ? (side === 'L' ? 'L' : 'R') : (side === 'L' ? 'R' : 'L');
-      const p = MeshBuilder.CreatePlane('rn', { width: 18, height: 36 }, sc); p.material = numTex(nm + sd); p.parent = root; p.rotation.x = Math.PI / 2; p.rotation.y = end < 0 ? Math.PI / 2 : -Math.PI / 2; p.position.set(uE - end * 70, 0.09, v); p.renderingGroupId = 1; }
-  }
-  // the taxiways: the parallel one south of runway A, links from the apron, the exits, the crossings to runway B; yellow centre lines
-  const twy = (u0: number, v0: number, u1: number, v1: number) => { const alongU = Math.abs(u1 - u0) > Math.abs(v1 - v0); const lo = alongU ? Math.min(u0, u1) : Math.min(v0, v1), hi = alongU ? Math.max(u0, u1) : Math.max(v0, v1), c = alongU ? v0 : u0;
-    if (alongU) { pave(lo, c - TWY.w / 2 - 5, hi, c + TWY.w / 2 + 5, asphalt, 0.055); box(hi - lo, 0.02, 0.3, yellow, (lo + hi) / 2, 0.075, c); } else { pave(c - TWY.w / 2 - 5, lo, c + TWY.w / 2 + 5, hi, asphalt, 0.055); box(0.3, 0.02, hi - lo, yellow, c, 0.075, (lo + hi) / 2); } };
-  twy(-RWY.len / 2, TWY.vA, RWY.len / 2, TWY.vA);
-  for (const u of [-1500, -700, -250, 250, 700, 1500]) twy(u, PV(PN + 70), u, TWY.vA);
-  for (const u of [-RWY.len / 2 + 40, -900, 0, 900, RWY.len / 2 - 40]) twy(u, TWY.vA, u, RWY.vA);
-  for (const u of [-RWY.len / 2 + 40, 0, RWY.len / 2 - 40]) twy(u, RWY.vA, u, RWY.vB);
-  twy(-RWY.len / 2, RWY.vB - 182, RWY.len / 2, RWY.vB - 182);
-  // the apron in concrete, its stand lines, a wider apron east and west for more stands later
-  pave(PX(260), PV(PN), PX(900), PV(PN + 70), concrete, 0.05, 20); pave(PX(-700), PV(PN), PX(-100), PV(PN + 70), concrete, 0.05, 20); // the terminal's own apron is between these
-  pave(-1700, PV(PN + 70), 1700, TWY.vA - 16, concrete, 0.045, 20);
+  const white = mat('#F2F3F5', 0.5), glass = mat('#2E4252', 0.08, 0.5);
+  const box = (w: number, h: number, d: number, m: any, u: number, y: number, v: number, cast = false, id = 'ab') => { const b = MeshBuilder.CreateBox(id, { width: w, height: h, depth: d }, sc); b.position.set(u, y, v); b.material = m; b.parent = root; b.receiveShadows = true; b.renderingGroupId = 1; b.isPickable = false; b.metadata = { id, kind: 'building' }; if (cast) casters.push(b); return b; };
+  // the runway's designators as this site has them (west end first)
+  designate(site.rwy[0], site.rwy[1]);
+  const AFB = buildAirfield(sc, root, { low: !IS_PC, heightAt });
+  for (const m of AFB.casters) casters.push(m);
   // the tower and its cab, a fire station, a hangar
-  { const tx = PX(-180), tz = PV(30); const t = MeshBuilder.CreateCylinder('tower', { diameterTop: 5, diameterBottom: 7, height: 48, tessellation: 24 }, sc); t.position.set(tx, 24, tz); t.material = white; t.parent = root; t.renderingGroupId = 1; casters.push(t);
-    const cab = MeshBuilder.CreateCylinder('cab', { diameterTop: 13, diameterBottom: 10, height: 5, tessellation: 12 }, sc); cab.position.set(tx, 50.5, tz); cab.material = glass; cab.parent = root; cab.renderingGroupId = 1;
-    const cap = MeshBuilder.CreateCylinder('cap', { diameter: 14, height: 1.2, tessellation: 12 }, sc); cap.position.set(tx, 53.6, tz); cap.material = white; cap.parent = root; cap.renderingGroupId = 1; }
-  box(80, 14, 50, mat('#C9CED5', 0.5, 0.3), 1200, 7, PV(10), true); box(90, 0.5, 60, concrete, 1200, 0.05, PV(70)); box(40, 9, 30, mat('#B3261E', 0.5), -1250, 4.5, PV(20), true);
-  // the fence round the airport
-  const fm = new PBRMaterial('fence', sc); fm.albedoColor = Color3.FromHexString('#8A9097'); fm.alpha = 0.55; fm.roughness = 0.6; fm.backFaceCulling = false;
-  for (const [a, b, c, d] of [[FENCE.u0, FENCE.v0, FENCE.u1, FENCE.v0], [FENCE.u1, FENCE.v0, FENCE.u1, FENCE.v1], [FENCE.u1, FENCE.v1, FENCE.u0, FENCE.v1], [FENCE.u0, FENCE.v1, FENCE.u0, FENCE.v0]]) {
-    const L = Math.hypot(c - a, d - b), p = MeshBuilder.CreatePlane('fn', { width: L, height: 2.4, sideOrientation: Mesh.DOUBLESIDE }, sc); p.material = fm; p.parent = root; p.position.set((a + c) / 2, 1.2, (b + d) / 2); p.rotation.y = -Math.atan2(d - b, c - a); p.renderingGroupId = 1; }
-  // the road to the kerb
-  pave(-14, FENCE.v0 - 400, 14, PV(-34), asphalt, 0.05);
-  return root;
+  { const tx = PX(-180), tz = PV(30); const t = MeshBuilder.CreateCylinder('TOWER', { diameterTop: 5, diameterBottom: 7, height: 48, tessellation: 24 }, sc); t.position.set(tx, 24, tz); t.material = white; t.parent = root; t.renderingGroupId = 1; t.metadata = { id: 'TOWER', kind: 'building' }; casters.push(t);
+    const cab = MeshBuilder.CreateCylinder('TOWER/CAB', { diameterTop: 13, diameterBottom: 10, height: 5, tessellation: 12 }, sc); cab.position.set(tx, 50.5, tz); cab.material = glass; cab.parent = root; cab.renderingGroupId = 1;
+    const cap = MeshBuilder.CreateCylinder('TOWER/CAP', { diameter: 14, height: 1.2, tessellation: 12 }, sc); cap.position.set(tx, 53.6, tz); cap.material = white; cap.parent = root; cap.renderingGroupId = 1; }
+  box(80, 14, 50, mat('#C9CED5', 0.5, 0.3), PX(1281), 7, PV(10), true, 'HANGAR-1'); box(40, 9, 30, mat('#B3261E', 0.5), PX(-1169), 4.5, PV(20), true, 'FIRE-STATION');
+  // the access road: from the terminal's road south to the boundary on the levelled ground, then on along the real ground
+  { const asph = new PBRMaterial('ROAD', sc); asph.albedoColor = Color3.FromHexString('#2B2D30'); asph.roughness = 0.88; asph.metallic = 0; asph.zOffset = -2;
+    const pos: number[] = [], idx: number[] = [], X = 170, half = 6; let vi = 0;
+    for (let y = -34; y >= B.y0 - 1400; y -= 10) { const u = PX(X), v = PV(y), inside = y >= B.y0 + 100, h = inside ? heightAt(u, v) + 0.03 : Math.max(heightAt(u, v), rawAt(u, v)) + 0.18;
+      pos.push(u - half, h, v, u + half, h, v); if (vi) idx.push(vi - 2, vi, vi - 1, vi - 1, vi, vi + 1); vi += 2; }
+    const m = new Mesh('ROAD/ACCESS', sc), vd = new VertexData(), nr: number[] = []; vd.positions = pos; vd.indices = idx; VertexData.ComputeNormals(pos, idx, nr); vd.normals = nr; vd.applyToMesh(m);
+    m.material = asph; m.parent = root; m.receiveShadows = true; m.renderingGroupId = 1; m.isPickable = false; m.metadata = { id: 'ROAD/ACCESS', kind: 'road' }; asph.backFaceCulling = false; }
+  return { root, AFB };
 }
 /** The ready-made views: where (in the airport's frame: u, height, v) and what it looks at. */
 const VIEWS: { id: string; name: string; at: [number, number, number]; look: [number, number, number] }[] = [
   // gate 4 (upper floor): standing between the second and third rows of seats, the gate desk and its sign to the right, looking straight out over the seats to the aircraft and the mountains
   { id: 'gate', name: 'Gate 4', at: [PX(MOD[3] + 11), 7.62, PV(75.6)], look: [PX(MOD[3] + 11), 7.62, PV(75.6) + 200] },
   { id: 'carpark', name: 'Over the car park', at: [PX(75), 26, PV(-135)], look: [PX(75), 9, PV(15)] },
-  { id: 'apron', name: 'On the apron', at: [PX(MOD[2] + 40), 1.7, PV(PN + 45)], look: [-600, 120, 3000] },
-  { id: 'runway', name: 'Runway threshold', at: [-RWY.len / 2 - 20, 3, RWY.vA - 20], look: [RWY.len / 2, 80, RWY.vA + 1600] },
-  { id: 'between', name: 'Between the runways', at: [400, 2, 0], look: [-400, 150, 4000] },
-  { id: 'air', name: 'From the air', at: [-2400, 900, -5200], look: [600, 200, 1500] },
-  { id: 'flyby', name: 'Low fly-by', at: [2600, 140, -2200], look: [-300, 40, -600] },
+  { id: 'apron', name: 'On the apron', at: [PX(MOD[2] + 40), 1.7, PV(PN + 45)], look: [PX(-600), 120, PV(3000)] },
+  // the airfield's own views (as its photo renders)
+  ...AIRFIELD_VIEWS.map(v => ({ id: v.id, name: v.name, at: [PX(v.at[0]), v.at[2], PV(v.at[1])] as [number, number, number], look: [PX(v.look[0]), v.look[2], PV(v.look[1])] as [number, number, number] })),
 ];
 
 const Site$: Section = {
@@ -174,15 +159,23 @@ const Site$: Section = {
     await loadArea(11, site.lat, site.lon, 36000, k => progress(50 + Math.round(k * 20), 'Loading the mountains further out…'));
     progress(72, 'Shaping the ground…'); await new Promise(r => setTimeout(r, 0));
     // the airport's height: the ground under its middle, levelled
-    let sum = 0, cnt = 0; for (let a = -1500; a <= 1500; a += 300) for (let b = -1500; b <= 1500; b += 300) { const h = hAt(13, site.lat + b / 110540, site.lon + a / (111320 * Math.cos(site.lat * D2R))); if (h != null) { sum += h; cnt++; } }
+    const kx0 = 111320 * Math.cos(site.lat * D2R), hd = site.hdg * D2R, at = (u: number, v: number) => ({ lat: site.lat + (u * Math.cos(hd) + v * Math.sin(hd)) / 110540, lon: site.lon + (u * Math.sin(hd) - v * Math.cos(hd)) / kx0 });
+    let sum = 0, cnt = 0; for (let x = B.x0 + 150; x <= B.x1 - 150; x += 200) for (let y = B.y0 + 150; y <= B.y1 - 150; y += 150) { const c = at(PX(x), PV(y)), h = hAt(13, c.lat, c.lon); if (h != null) { sum += h; cnt++; } }
     const elev = Math.max(2, cnt ? sum / cnt : 10); O.elev = elev;
     const detail = new DynamicTexture('detail', { width: 512, height: 512 }, sc, true); { const x = detail.getContext() as any; x.fillStyle = '#B8B8B8'; x.fillRect(0, 0, 512, 512); for (let i = 0; i < 60000; i++) { const v = Math.random(); x.fillStyle = `rgba(${v > 0.5 ? '255,255,255' : '0,0,0'},${0.08 + Math.random() * 0.18})`; x.fillRect(Math.random() * 512, Math.random() * 512, 1 + Math.random() * 3, 1 + Math.random() * 2); } detail.update(); detail.wrapU = detail.wrapV = Texture.WRAP_ADDRESSMODE; }
-    // the ground under the airport, levelled at its height: the fenced area (and a margin), the road in
-    clearFlatZones('SITE/'); const kx0 = 111320 * Math.cos(site.lat * D2R), hd = site.hdg * D2R, at = (u: number, v: number) => ({ lat: site.lat + (u * Math.cos(hd) + v * Math.sin(hd)) / 110540, lon: site.lon + (u * Math.sin(hd) - v * Math.cos(hd)) / kx0 });
-    { const c = at(0, (FENCE.v0 + FENCE.v1) / 2); addFlatZone({ id: 'SITE/AIRPORT', lat: c.lat, lon: c.lon, hdg: site.hdg, hu: FENCE.u1 + 150, hv: (FENCE.v1 - FENCE.v0) / 2 + 150, elev, blend: 700 }); }
-    { const c = at(0, FENCE.v0 - 225); addFlatZone({ id: 'SITE/ROAD', lat: c.lat, lon: c.lon, hdg: site.hdg, hu: 30, hv: 260, elev, blend: 120 }); }
+    // the ground inside the airport boundary, levelled at its height: fully inside, blending into the real ground only
+    // within the boundary's outer 100 m; outside it the ground and its mountains are untouched
+    clearFlatZones('SITE/');
+    { const fl = AIRFIELD.flatten.blendInsideM, c = at(PX((B.x0 + B.x1) / 2), PV((B.y0 + B.y1) / 2)); addFlatZone({ id: 'SITE/AIRPORT', lat: c.lat, lon: c.lon, hdg: site.hdg, hu: (B.x1 - B.x0) / 2 - fl, hv: (B.y1 - B.y0) / 2 - fl, elev, blend: fl }); }
+    // the levelled ground's height (from the airport's) at (u, v), and the real ground's
+    const rawH = (u: number, v: number) => { const c = at(u, v); let h = hAt(13, c.lat, c.lon); if (h == null) h = hAt(11, c.lat, c.lon) ?? elev; return h; };
+    const levelH = (u: number, v: number) => { const c = at(u, v); return Math.max(-25, flatHeight(c.lat, c.lon, rawH(u, v)).h) - elev; };
+    const rawRel = (u: number, v: number) => Math.max(-25, rawH(u, v)) - elev;
+    // the real ground's own mesh goes down a little inside the boundary, under the airfield's ground
+    const sinkIn = (e: number, nn: number) => { const u = e * Math.sin(hd) + nn * Math.cos(hd), v = -e * Math.cos(hd) + nn * Math.sin(hd), x = u - AIRFIELD.airport.planU, y = v - AIRFIELD.airport.planV;
+      return x > B.x0 + 25 && x < B.x1 - 25 && y > B.y0 + 25 && y < B.y1 - 25 ? 1.5 : 0; };
     O.zoneForModel = zoneForModel;
-    const inner = groundMesh(sc, site, 9000, IS_PC ? 560 : 380, 13, detail);
+    const inner = groundMesh(sc, site, 9000, IS_PC ? 560 : 380, 13, detail, 0, 0, sinkIn);
     // the outer ground goes down under the inner, so only the fine one shows there
     const outer = groundMesh(sc, site, 36000, IS_PC ? 300 : 200, 11, detail, 60, 8800);
     // a model placed later with its own zone: the ground is laid out again under it
@@ -190,7 +183,7 @@ const Site$: Section = {
     // the sea
     const sea = MeshBuilder.CreateGround('sea', { width: 160000, height: 160000 }, sc); sea.position.y = 0.3 - 0; const sm = new PBRMaterial('seaM', sc); sm.albedoColor = Color3.FromHexString('#1D3443'); sm.roughness = 0.12; sm.metallic = 0.1; sea.material = sm; sea.renderingGroupId = 1; sea.isPickable = false;
     progress(84, 'Laying out the airport…');
-    const casters: AbstractMesh[] = []; const ap = airport(sc, site, elev, casters); O.ap = ap;
+    const casters: AbstractMesh[] = []; const AP = airport(sc, site, elev, casters, levelH, rawRel), ap = AP.root; O.ap = ap; O.AFB = AP.AFB;
     // your terminal itself, built by its own builders (they are not changed): its rooms, walls, glass, roofs, stairs,
     // doors, furniture, screens, its own grounds and apron with the aircraft and jet bridges, and the rental car centre;
     // then set into the airport frame, the plan's origin at (u, v) = (-81, -1482), on the levelled ground
@@ -205,6 +198,17 @@ const Site$: Section = {
     (K.struct as any).finish();
     for (const n of (sc.transformNodes as any[]).concat(sc.meshes as any[])) if (!before.has(n) && !n.parent && n !== K.root) n.parent = K.root;   // anything built loose goes with it
     K.root.parent = ap; K.root.position.set(PX(0), 0, PV(0)); O.K = K;
+    // the terminal's own grass, apron and stand lines give way to the airfield's (its ground and markings, the same stands)
+    const hidden = new Set<any>();
+    for (const id of ['SITE/GRASS', 'SITE/APRON']) for (const m of sc.meshes) if (m.name === id && (m.metadata && m.metadata.room === 'SITE')) hidden.add(m);
+    { const lane = K.objects.get('APRON/TAXI-LANE'); if (lane) for (const m of lane.node.getChildMeshes()) hidden.add(m); }
+    for (const st of T_STANDS) { const o = K.objects.get(st.id); if (o) for (const m of o.node.getChildMeshes()) if (m.material === K.M.yellow) hidden.add(m); }
+    for (const m of hidden) { m.setEnabled(false); m.checkCollisions = false; }
+    // big aircraft on the A380 stand and the cargo stands (PC)
+    if (IS_PC) for (const [id, k] of [['STAND-9', 1.85], ['C1', 1.95], ['C3', 1.95]] as [string, number][]) { const st = AIRFIELD.stands.find((q: any) => q.id === id); if (!st) continue;
+      try { const ac = buildAirliner(sc); setGear(ac, 1); for (const m of [...ac.strobes, ...ac.beacons]) m.setEnabled(false);
+        const holder = new TransformNode(id + '/AIRCRAFT', sc); holder.parent = ap; holder.position.set(PX(st.x), 3.9 * k, PV(st.nose - st.dir * 18.8 * k)); holder.rotation.y = st.dir < 0 ? Math.PI : 0; holder.scaling.setAll(k); holder.metadata = { id: id + '/AIRCRAFT', kind: 'aircraft' };
+        ac.root.parent = holder; for (const m of ac.casters) casters.push(m); } catch (e) { /* the stand stays empty */ } }
     for (const m of K.casters) casters.push(m);
     const liftParts = new Set<any>(); for (const l of O.lifts as LiftCtl[]) for (const m of l.moving_parts) liftParts.add(m);
     for (const m of sc.meshes) { if (!before.has(m)) { m.renderingGroupId = 1; m.computeWorldMatrix(true); if (!liftParts.has(m)) { m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true; } } }
@@ -216,7 +220,9 @@ const Site$: Section = {
       const skip = new Set<any>(); for (const d of doors) for (const m of d.node.getChildMeshes()) skip.add(m);
       for (const m of K.groups.STAIRS.getChildMeshes()) skip.add(m); for (const m of K.groups.SCREENS.getChildMeshes()) skip.add(m);
       for (const m of sc.meshes) if (!before.has(m) && !skip.has(m) && m.getTotalVertices() > 0) m.checkCollisions = true;
-      for (const m of ap.getChildMeshes()) if (m.getTotalVertices() > 0 && !/fn|num|rn/.test(m.name)) m.checkCollisions = true;
+      for (const m of ap.getChildMeshes()) { if (m.getTotalVertices() <= 0 || hidden.has(m)) continue; const kind = m.metadata && m.metadata.kind;
+        if (/^AIRFIELD\//.test(m.name) ? kind === 'ground' || kind === 'building' || kind === 'signs' : kind !== 'road') m.checkCollisions = true; }
+      O.AFB.ground.subdivide(64);
       inner.m.checkCollisions = true; inner.m.subdivide(64);
       // the stairs as invisible ramps, from the lower floor up to the upper
       for (const st of STAIRS) { const r = (x: number, z: number, y: number) => new Vector3(x, y, z); let p: Vector3[];
@@ -233,7 +239,7 @@ const Site$: Section = {
     const hemi = new HemisphericLight('hemi', new Vector3(0, 1, 0), sc); hemi.intensity = 0.8;
     const sun = new DirectionalLight('sun', new Vector3(-0.4, -1, 0.3), sc); sun.intensity = 2.2; sun.shadowMinZ = 1; sun.shadowMaxZ = 9000;
     const cam = new UniversalCamera('cam', new Vector3(0, 10, 0), sc); cam.minZ = 0.5; cam.maxZ = 120000; cam.fov = 0.9; cam.inertia = 0; O.cam = cam; sc.activeCamera = cam;
-    const glow = new GlowLayer('glow', sc, { mainTextureRatio: 0.4 }); glow.intensity = 0.3; glow.isEnabled = S.gfx.glow !== false; for (const g of [inner.m, outer.m, sea]) glow.addExcludedMesh(g);
+    const glow = new GlowLayer('glow', sc, { mainTextureRatio: 0.4 }); glow.intensity = 0.3; glow.isEnabled = S.gfx.glow !== false; for (const g of [inner.m, outer.m, sea].concat(O.AFB.exclude)) glow.addExcludedMesh(g);
     if (S.gfx.shadows !== 'off') { const sg = new ShadowGenerator(S.gfx.shadows === 'high' ? (IS_PC ? 4096 : 2048) : 1024, sun); sg.usePercentageCloserFiltering = true; sg.bias = 0.0006; sg.normalBias = 0.02; for (const m of casters) sg.addShadowCaster(m, false); }
     const dp = new DefaultRenderingPipeline('dp', true, sc, [cam]); dp.fxaaEnabled = true; dp.imageProcessingEnabled = true; dp.imageProcessing.toneMappingEnabled = true; dp.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES; dp.imageProcessing.exposure = 1.05; dp.imageProcessing.contrast = 1.08;
     dp.bloomEnabled = true; dp.bloomThreshold = 0.9; dp.bloomWeight = 0.15;
@@ -242,7 +248,7 @@ const Site$: Section = {
     for (const ps of sc.particleSystems) ps.renderingGroupId = 1;
     // what the panel shows: the site, its numbers, the views, the drone's speed
     const kx = 111320 * Math.cos(site.lat * D2R);
-    hud.insertAdjacentHTML('beforeend', `<div class="site-top"><b>${site.name}</b><small>${site.lat.toFixed(3)}° ${site.lat >= 0 ? 'N' : 'S'} · ${Math.abs(site.lon).toFixed(3)}° ${site.lon < 0 ? 'W' : 'E'} · runways ${site.rwy[0]}/${site.rwy[1]} true ${String(site.hdg).padStart(3, '0')}°/${String((site.hdg + 180) % 360).padStart(3, '0')}° · gates face ${String(site.gates).padStart(3, '0')}° · ground ${Math.round(elev)} m</small></div>
+    hud.insertAdjacentHTML('beforeend', `<div class="site-top"><b>${site.name}</b><small>${site.lat.toFixed(3)}° ${site.lat >= 0 ? 'N' : 'S'} · ${Math.abs(site.lon).toFixed(3)}° ${site.lon < 0 ? 'W' : 'E'} ${site.icao ? `· ${site.icao} / ${site.iata} ` : ''}· runway ${site.rwy[0]}/${site.rwy[1]} true ${String(site.hdg).padStart(3, '0')}°/${String((site.hdg + 180) % 360).padStart(3, '0')}° · gates face ${String(site.gates).padStart(3, '0')}° · ground ${Math.round(elev)} m</small></div>
       <div class="site-dock"><div class="site-speed"><small>Drone speed</small>${[[8, 'Walk'], [40, 'Fast'], [220, 'Plane']].map(([k, l]) => `<button class="wx-o" data-sp2="${k}">${l}</button>`).join('')}</div>
       <div class="site-views">${VIEWS.map(v => `<button class="wx-b" data-view="${v.id}">${v.name}</button>`).join('')}<button class="wx-b" data-site>${SITES.filter(s => s !== site).map(s => 'Go to ' + s.name.split(',')[0]).join('')}</button></div>
 </div>
@@ -313,6 +319,7 @@ const Site$: Section = {
       CAM.x += mv.x * sp; CAM.z += mv.z * sp; CAM.y = Math.max(elev + 0.6, Math.min(12000, CAM.y + mv.y * sp + vert * sp));
       cam.position.set(CAM.x, CAM.y, CAM.z); cam.setTarget(cam.position.add(f));
       }
+      try { O.AFB.step(now); } catch (e) { /* still */ }
       wx.frame(dt, now);
       sc.render(); perfEnd();
     });
