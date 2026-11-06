@@ -49,7 +49,13 @@ export function inputInit(canvas: HTMLCanvasElement, ui: HTMLElement) {
   // the middle button (pressing the wheel down): between looking round and a free mouse pointer to click on things
   document.addEventListener('mousedown', e => { if (e.button !== 1 || !play || IS_TOUCH) return; e.preventDefault();
     if (!cursorMode) { cursorMode = true; try { if (document.pointerLockElement) document.exitPointerLock(); } catch (err) { /* no lock */ } toast('Mouse pointer: click on things · press the wheel again to look round'); }
-    else { cursorMode = false; try { (canvas as any).requestPointerLock(); } catch (err) { /* drag instead */ } toast('Looking round with the mouse'); } });
+    else { cursorMode = false; lockNow(true); } });
+  // taking the mouse back for looking round: the browser may refuse it on the press, so it is asked again on the
+  // release; if it still says no, one click in the game takes it (and a note says so)
+  const lockNow = (say: boolean) => { const ok = () => { if (say) toast('Looking round with the mouse'); };
+    try { const r: any = (canvas as any).requestPointerLock(); if (r && r.then) r.then(ok, () => { /* asked again on the release */ }); else ok(); } catch (err) { /* asked again on the release */ } };
+  document.addEventListener('mouseup', e => { if (e.button !== 1 || !play || IS_TOUCH || cursorMode || document.pointerLockElement) return; e.preventDefault(); lockNow(true);
+    setTimeout(() => { if (play && !cursorMode && !document.pointerLockElement) toast('Click once in the game to look round with the mouse'); }, 400); });
   document.addEventListener('auxclick', e => { if (e.button === 1 && play) e.preventDefault(); });
   document.addEventListener('mousemove', e => { if (!play) return; if (document.pointerLockElement === canvas) { lookX += e.movementX * 0.0022 * S.ctl.mouseLook; lookY += e.movementY * 0.0022 * S.ctl.mouseLook * (S.ctl.mouseInvert ? -1 : 1); } });
   // touch: the stick on the left, looking on the right
