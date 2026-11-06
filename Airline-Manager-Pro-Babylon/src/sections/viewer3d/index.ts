@@ -18,6 +18,7 @@ import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core
 import { makeSky, skyFrame, Sky } from './sky';
 import { makePhotoMode } from './photo';
 import { makeRealWx } from './realwx';
+import { buildCabin, seatAt, FLOOR as CFLOOR, CABIN_VIEW_ROW, CABIN_AISLE_ROW, CABIN_Z } from './cabin';
 import { buildAirliner, Airliner, repaint, setGear } from './airliner';
 import { buildAirport, placeAirport, Airport } from './airport';
 import { buildTerrain, placeTerrain, terrainStale, Terrain } from './terrain';
@@ -27,15 +28,18 @@ import { FROM, TO, ROUTE_M, gcAt, gcBrg, gcDist, D2R } from './route';
 
 const FL = 9144, TAS = 231, MACH = 0.78;   // 30,000 ft, 449 knots
 const CLOUDQ: { [k: string]: [number, number] } = { low: [18, 2], medium: [30, 3], high: [46, 4], ultra: [72, 6] };
-interface View { id: string; label: string; orbit?: [number, number, number]; eye?: number[]; at?: number[]; flyby?: boolean }
+interface View { id: string; label: string; orbit?: [number, number, number]; eye?: number[]; at?: number[]; flyby?: boolean; cabin?: boolean; walk?: boolean }
+const SW = seatAt(CABIN_VIEW_ROW, 0), SA = seatAt(CABIN_AISLE_ROW, 2), EYE = CFLOOR + 1.17;
 const VIEWS: View[] = [
   { id: 'chase', label: 'Behind', orbit: [0, 0.14, 64] },
   { id: 'side', label: 'Side', orbit: [Math.PI / 2, 0.04, 60] },
   { id: 'front', label: 'Front', orbit: [Math.PI * 0.9, 0.07, 54] },
   { id: 'top', label: 'Above', orbit: [0.5, 1.2, 72] },
   { id: 'below', label: 'Below', orbit: [0.7, -0.42, 48] },
-  { id: 'winL', label: 'Left window', eye: [-2.12, 0.55, 3.6], at: [-15, -1.6, -3.5] },
-  { id: 'winR', label: 'Right window', eye: [2.12, 0.55, 3.6], at: [15, -1.6, -3.5] },
+  { id: 'winL', label: 'Left window', cabin: true, eye: [SW.x + 0.06, EYE, SW.z + 0.02], at: [-6, EYE - 0.55, SW.z + 1.6] },
+  { id: 'winR', label: 'Right window', cabin: true, eye: [-SW.x - 0.06, EYE, SW.z + 0.02], at: [6, EYE - 0.55, SW.z + 1.6] },
+  { id: 'aisle', label: 'Aisle seat', cabin: true, eye: [SA.x + 0.05, EYE, SA.z + 0.02], at: [-0.1, EYE - 0.25, SA.z + 12] },
+  { id: 'cabin', label: 'Walk the cabin', cabin: true, walk: true },
   { id: 'tail', label: 'Tail', eye: [0, 8.6, -16.2], at: [0, 1.5, 14] },
   { id: 'flyby', label: 'Fly-by', flyby: true },
 ];
@@ -50,7 +54,7 @@ onGameFlight((d: any) => {
   const me: Sample = Object.assign({}, d.me, { at: performance.now() });
   if (me.id !== L.id) return;
   L.s0 = L.s1 || me; L.s1 = me; wantAirports(me); L.list = d.list || []; L.near = d.near || []; L.goneSaid = false;
-  const key = me.color + me.color2; if (L.painted !== key) { L.painted = key; try { repaint(V.ac, me.color, me.color2); } catch (e) { /* its own colours */ } }
+  const key = me.color + me.color2; if (L.painted !== key) { L.painted = key; try { repaint(V.ac, me.color, me.color2); if (V.cabin) V.cabin.paint(me.color, me.color2); } catch (e) { /* its own colours */ } }
 });
 /** The airports of the flight followed: asked of the game once each, built when their layout comes. */
 function wantAirports(me: Sample) { const A = V.apts || (V.apts = {}); for (const k of [me.from, me.to]) if (k && !(k in A)) { A[k] = null; gameSend({ ampb: 'airport', icao: k }); } }
@@ -223,6 +227,7 @@ const Viewer: Section = {
     V.hemi = new HemisphericLight('hemi', new Vector3(0, 1, 0), sc);
     V.sun = new DirectionalLight('sun', new Vector3(0, -1, 0), sc); V.sun.autoUpdateExtends = true; V.sun.shadowMinZ = 1; V.sun.shadowMaxZ = 260;
     const ll = new SpotLight('logo', new Vector3(0, 1.0, -15.6), new Vector3(0, 0.75, 0.66).normalize(), 1.1, 2, sc); ll.diffuse = Color3.FromHexString('#FFF1D6'); ll.range = 14; ll.parent = ac.root; V.logoLight = ll;
+    V.cabin = buildCabin(sc, ac.root, [V.hemi, V.sun, ll]); V.fuse = ac.root.getChildMeshes().filter(m => m.name === 'fuselage');
     // the landing and taxi lights, ahead of the nose
     const tl = new SpotLight('taxiL', new Vector3(0, -1.7, 13.5), new Vector3(0, -0.1, 1).normalize(), 0.7, 6, sc); tl.intensity = 90; tl.range = 900; tl.diffuse = Color3.FromHexString('#FFF6E6'); tl.parent = ac.root; tl.setEnabled(false); V.taxiL = tl;
     setGear(ac, 0);
@@ -330,6 +335,14 @@ const Viewer: Section = {
         const yaw = v.orbit[0] + V.uYaw, p = Math.max(-1.45, Math.min(1.45, v.orbit[1] + V.uPitch)), d = v.orbit[2] * V.zoom;
         const loc = new Vector3(Math.sin(yaw) * Math.cos(p) * d, Math.sin(p) * d, -Math.cos(yaw) * Math.cos(p) * d);
         at = Vector3.TransformCoordinates(new Vector3(0, 0.5, -1.5), wm); eye = at.add(Vector3.TransformNormal(loc, Matrix.RotationY(h)));
+      } else if (v.walk) {
+        // walking the cabin: forward and back along the aisle (and across at the galleys), looking round as you like
+        const cw = V.cw || (V.cw = { x: 0, z: CABIN_Z.front - 1.5 }), yaw = V.uYaw, pt = V.uPitch * 0.8;
+        const sp = (inp.run ? 1.6 : 0.9) * dt, fx = Math.sin(yaw), fz = Math.cos(yaw);
+        cw.x += (fx * inp.my + fz * inp.mx) * sp; cw.z += (fz * inp.my - fx * inp.mx) * sp;
+        cw.z = Math.max(CABIN_Z.back, Math.min(CABIN_Z.front, cw.z)); const galley = cw.z > CABIN_Z.front - 0.7 || cw.z < CABIN_Z.back + 0.7; cw.x = Math.max(galley ? -1.2 : -0.2, Math.min(galley ? 1.2 : 0.2, cw.x));
+        const e = new Vector3(cw.x, CFLOOR + 1.62, cw.z), d = new Vector3(Math.sin(yaw) * Math.cos(pt), Math.sin(pt), Math.cos(yaw) * Math.cos(pt));
+        eye = Vector3.TransformCoordinates(e, wm); at = Vector3.TransformCoordinates(e.add(d), wm); V.zoom = 1;
       } else if (v.eye) {
         eye = Vector3.TransformCoordinates(Vector3.FromArray(v.eye), wm);
         const lt = Vector3.FromArray(v.at as number[]), ly = Matrix.RotationYawPitchRoll(V.uYaw * 0.8, V.uPitch * 0.8, 0);
@@ -340,9 +353,12 @@ const Viewer: Section = {
         const ahead = Vector3.Dot(V.fb, new Vector3(Math.sin(h), 0, Math.cos(h))); if (ahead < -420 && fbPrev >= -420) placeFlyby(); fbPrev = ahead;
         at = Vector3.TransformCoordinates(new Vector3(0, 0, 0), wm);
       }
-      V.blend = Math.min(1, V.blend + dt * 2.2);
+      V.blend = v.cabin || V.inCabin ? 1 : Math.min(1, V.blend + dt * 2.2);   // straight into the cabin and out, no glide through the fuselage
       if (V.blend < 1 && V.lastEye) { const k = V.blend * V.blend * (3 - 2 * V.blend); eye = Vector3.Lerp(V.lastEye, eye, k); at = Vector3.Lerp(V.lastAt, at, k); }
       if (V.blend >= 1) { V.lastEye = eye.clone(); V.lastAt = at.clone(); }
+      if (!!v.cabin !== !!V.inCabin) { V.inCabin = !!v.cabin; if (V.cabin) V.cabin.show(V.inCabin); for (const m of V.fuse || []) m.setEnabled(!V.inCabin); cam.minZ = V.inCabin ? 0.05 : 0.3; }
+      if (V.cabin && V.inCabin) { const st2: any = V.cur, ph = st2 ? st2.phase || '' : 'Cruise', agl = (V.alt || FL) - (V.gnd || 0);
+        V.cabin.frame(dt, { phase: ph, pax: st2 ? st2.pax || 0 : 0, paxMax: st2 ? st2.paxMax || 0 : 0, onGround: st2 ? !!st2.onGround : false, night: V.sunAlt < -4, cruise: agl > 6000 && Math.abs(st2 ? st2.vs || 0 : 0) < 600, descent: st2 ? (st2.vs || 0) < -600 : false }); }
       cam.position.copyFrom(eye); cam.setTarget(at);
       V.sky.dome.position.copyFrom(cam.position);
       if (V.rwx) V.rwx.frame(dt, { lat: V.pos[0], lon: V.pos[1], alt: (V.alt || FL) + cam.position.y, gnd: V.gnd || 0, drift: V.drift });
@@ -358,6 +374,7 @@ const Viewer: Section = {
   close() {
     const sc: Scene = V.scene; if (!sc) return;
     try { if (V.rwx) { V.rwx.dispose(); V.rwx = null; } } catch (e) { /* gone */ }
+    try { if (V.cabin) { V.cabin.dispose(); V.cabin = null; } V.inCabin = false; V.cw = null; V.fuse = null; } catch (e) { /* gone */ }
     try { if (V.photo) { V.photo.dispose(); V.photo = null; } document.body.classList.remove('photo-on'); } catch (e) { /* gone */ }
     try { V.ctx.canvas.removeEventListener('wheel', V.wheel); } catch (e) { /* gone */ }
     window.removeEventListener('keydown', V.key);
