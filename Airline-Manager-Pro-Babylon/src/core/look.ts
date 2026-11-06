@@ -176,7 +176,7 @@ export function applyLook(P: LookParts): (dt: number) => void {
 
   // eye adaptation: brighter indoors (under a roof), back down outside, eased like an eye
   if (g.eyeAdapt) { let target = 1, cur = 1, t = 0; const ip = dp.imageProcessing, baseExp = ip.exposure;
-    steps.push(dt => { t += dt; if (t > 0.3) { t = 0; const hit = sc.pickWithRay(new Ray(cam.globalPosition, Vector3.Up(), 25), m => m.isPickable && m.isVisible && !/sky|look-/i.test(m.name)); target = hit && hit.hit ? 1.32 : 1; }
+    steps.push(dt => { t += dt; if (t > 0.3) { t = 0; const hit = sc.pickWithRay(new Ray(cam.globalPosition, Vector3.Up(), 25), m => m.isVisible && !(m as any).isAnInstance && isBig(m) && !/sky|look-|COLLIDE/i.test(m.name)); target = hit && hit.hit ? 1.32 : 1; }
       cur += (target - cur) * Math.min(1, dt * (target > cur ? 0.6 : 1.4)); ip.exposure = baseExp * cur; }); }
 
   // rain and snow on the ground, and the sun glinting on it: wet, darker and glossier while it rains, puddles spreading

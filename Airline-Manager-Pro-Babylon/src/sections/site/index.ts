@@ -17,7 +17,7 @@ import { inputFrame } from '../../core/input';
 import { IS_PC, IS_TOUCH } from '../../core/app';
 import { S } from '../../core/settings';
 import { toast } from '../../ui/icons';
-import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core/perf-meter';
+import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd, perfPart } from '../../core/perf-meter';
 import { buildAirliner, setGear } from '../viewer3d/airliner';
 import { makeWeather, Weather } from '../terminal/weather';
 import { applyLook, slimGlow } from '../../core/look';
@@ -228,6 +228,13 @@ const Site$: Section = {
         if (/^AIRFIELD\//.test(m.name) ? kind === 'ground' || kind === 'building' || kind === 'signs' : kind !== 'road') m.checkCollisions = true; }
       O.AFB.ground.subdivide(64);
       inner.m.checkCollisions = true; inner.m.subdivide(64);
+      // walking into the big, detailed shapes (the buildings' walls and floors, the jetways, the aircraft): each gets an
+      // invisible stand-in sharing its shape, cut into small pieces, so only the pieces near you are tested (the shape
+      // you see is not cut: that would cost draw calls)
+      for (const m of sc.meshes.slice()) { if (!m.checkCollisions || (m as any).isAnInstance || !(m instanceof Mesh) || m === inner.m || m === O.AFB.ground) continue;
+        const tris = m.getTotalIndices() / 3; if (tris < 3000) continue;
+        try { const c = m.clone(m.name + '/COLLIDE', m.parent, true, false); if (!c) continue; c.isVisible = false; c.isPickable = false; c.material = null; c.checkCollisions = true;
+          c.subdivide(Math.min(256, Math.ceil(tris / 400))); c.computeWorldMatrix(true); if (m.isWorldMatrixFrozen) c.freezeWorldMatrix(); m.checkCollisions = false; } catch (e) { /* tested as it is */ } }
       // the stairs as invisible ramps, from the lower floor up to the upper
       for (const st of STAIRS) { const r = (x: number, z: number, y: number) => new Vector3(x, y, z); let p: Vector3[];
         if (st.dir === 'x+') p = [r(st.x0, st.z0, 0), r(st.x1, st.z0, F2Y), r(st.x1, st.z1, F2Y), r(st.x0, st.z1, 0)];
@@ -317,7 +324,7 @@ const Site$: Section = {
     progress(100, 'Ready'); applyReplacements(sc).catch(() => { /* none */ });
     runLoop(() => {
       perfBegin();
-      const dt = Math.min(0.05, engine.getDeltaTime() / 1000), now = performance.now() / 1000, inp = inputFrame(dt); lookStep(dt);
+      const dt = Math.min(0.05, engine.getDeltaTime() / 1000), now = performance.now() / 1000, inp = inputFrame(dt); let T = performance.now(); lookStep(dt); const lap = (n: string) => { const t = performance.now(); perfPart(n, t - T); T = t; }; lap('effects');
       CAM.yaw += inp.lx; CAM.pitch = Math.max(-1.55, Math.min(1.55, CAM.pitch - inp.ly));
       if (walkMode) {
         // a controller: Cross / A jumps, Circle / B crouches, Triangle / Y lies prone, Square / X uses a lift, R3 sprints (L3 too, while held)
@@ -331,9 +338,9 @@ const Site$: Section = {
         W.vy = W.ground ? -0.5 : Math.max(-30, W.vy - 9.81 * dt);
         // the step along the floor and the fall (or the jump) are moved separately, so touching the floor doesn't eat the step
         const len = Math.min(1, Math.hypot(inp.mx, inp.my)), dir = fw.scale(inp.my).add(rt.scale(inp.mx)); if (dir.lengthSquared() > 1e-6) dir.normalize();
-        body.moveWithCollisions(dir.scale(len * spd));
+        lap('input'); body.moveWithCollisions(dir.scale(len * spd));
         const y0 = body.position.y, dy = W.vy * dt; body.moveWithCollisions(new Vector3(0, dy, 0)); W.ground = dy < 0 && body.position.y > y0 + dy + 0.001; if (body.position.y < y0 + dy - 0.001 || (dy > 0 && body.position.y < y0 + dy - 0.001)) W.vy = 0; if (W.ground) W.vy = 0;
-        if (body.position.y < elev - 40) { body.position.copyFrom(toWorld(75, 0.5, -21.5)); W.vy = 0; }
+        lap('walking'); if (body.position.y < elev - 40) { body.position.copyFrom(toWorld(75, 0.5, -21.5)); W.vy = 0; }
         W.eye += (st.eye - W.eye) * Math.min(1, dt * 9); cam.position.set(body.position.x, body.position.y + W.eye, body.position.z); cam.setTarget(cam.position.add(new Vector3(Math.sin(CAM.yaw) * cp0, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp0)));
         // the doors open as you come to them
         const lp = Vector3.TransformCoordinates(body.position, K.root.getWorldMatrix().clone().invert()); try { stepDoors(doors, lp.x, lp.z, lp.y > 3 ? 2 : 1, dt, now); } catch (e) { /* still */ }
@@ -346,7 +353,7 @@ const Site$: Section = {
       CAM.x += mv.x * sp; CAM.z += mv.z * sp; CAM.y = Math.max(elev + 0.6, Math.min(12000, CAM.y + mv.y * sp + vert * sp));
       cam.position.set(CAM.x, CAM.y, CAM.z); cam.setTarget(cam.position.add(f));
       }
-      try { O.AFB.step(now); } catch (e) { /* still */ }
+      lap('doors+lifts'); try { O.AFB.step(now); } catch (e) { /* still */ } lap('airfield');
       // the jetways: docking and undocking; on foot on a moving one you are carried with it; the warning beep near one moving
       try { const js: any[] = O.jetways || []; let ride: any = null, m0: any = null;
         if (walkMode && js.some(j => j.state === 'docking' || j.state === 'undocking')) { const hit = sc.pickWithRay(new Ray(body.position.add(new Vector3(0, 0.3, 0)), new Vector3(0, -1, 0), 1.2), (m: any) => !!(m.metadata && /^J-\d/.test(m.metadata.id || '')) && m !== body);
@@ -354,8 +361,8 @@ const Site$: Section = {
         for (const j of js) j.update(dt);
         if (ride) { const m1 = ride.computeWorldMatrix(true), p = Vector3.TransformCoordinates(Vector3.TransformCoordinates(body.position, m0.clone().invert()), m1); body.position.copyFrom(p); }
         if (js.some(j => j.moving && Vector3.Distance(cam.position, j.node.getAbsolutePosition()) < 45)) { if (now - (O.beepT || 0) > 1.1) { O.beepT = now; jwBeep(); } } } catch (e) { /* still */ }
-      wx.frame(dt, now);
-      sc.render(); perfEnd();
+      lap('jetways'); wx.frame(dt, now); lap('weather');
+      sc.render(); lap('drawing'); perfEnd();
     });
     void kx; void Mesh; void StandardMaterial;
   },

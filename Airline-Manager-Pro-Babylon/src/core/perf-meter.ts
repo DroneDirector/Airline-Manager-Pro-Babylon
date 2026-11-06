@@ -20,16 +20,21 @@ export function perfAttach(engine: Engine, scene: Scene, host: HTMLElement) {
 export function perfDetach() { if (el) el.remove(); el = null; try { ei && ei.dispose(); si && si.dispose(); } catch (e) { /* gone */ } ei = null; si = null; eng = null; scn = null; }
 /** Show or hide the overlay's parts as the settings say. */
 export function perfShow() { if (!el) return; const g = S.gfx; el.hidden = !(g.showFps || g.showCpu || g.showGpu || g.showMem); nextShow = 0; }
+/** Where the processor's time goes, part by part (ms per frame, averaged): shown under CPU. */
+const parts: { [k: string]: number } = {}, partsShown: { [k: string]: number } = {};
+export function perfPart(name: string, ms: number) { parts[name] = (parts[name] || 0) + ms; }
 export function perfBegin() { const now = performance.now(); if (last) interval += ((now - last) - interval) * 0.1; last = now; t0 = now; }
 export function perfEnd() { work += performance.now() - t0; frames++; if (performance.now() > nextShow) draw(); }
 const bar = (k: number, warn = 0.7, bad = 0.9) => { const p = Math.max(0, Math.min(1, k)); return `<i class="pb"><i style="width:${(p * 100).toFixed(0)}%;background:${p > bad ? '#FF5A6E' : p > warn ? '#FFC24A' : '#4CFFA0'}"></i></i>`; };
 function draw() {
   if (!el || el.hidden || !eng) { work = 0; frames = 0; return; }
   const g = S.gfx, now = performance.now(); nextShow = now + 500;
-  const fps = eng.getFps(), cpu = frames ? work / frames : 0; work = 0; frames = 0;
+  const fps = eng.getFps(), cpu = frames ? work / frames : 0;
+  for (const k of Object.keys(parts)) { partsShown[k] = frames ? parts[k] / frames : 0; parts[k] = 0; } work = 0; frames = 0;
   const rows: string[] = [];
   if (g.showFps) rows.push(`<div><b>FPS</b><span>${Math.round(fps)}</span><small>${interval.toFixed(1)} ms</small></div>`);
-  if (g.showCpu) { const k = cpu / Math.max(1, interval); rows.push(`<div><b>CPU</b><span>${Math.round(k * 100)}%</span><small>${cpu.toFixed(1)} ms</small>${bar(k)}</div>`); }
+  if (g.showCpu) { const k = cpu / Math.max(1, interval); const pl = Object.keys(partsShown).filter(n => partsShown[n] >= 0.05).sort((a, b) => partsShown[b] - partsShown[a]).map(n => `${n} ${partsShown[n].toFixed(1)}`).join(' · ');
+    rows.push(`<div><b>CPU</b><span>${Math.round(k * 100)}%</span><small>${cpu.toFixed(1)} ms</small>${bar(k)}${pl ? `<small class="sub">${pl} ms</small>` : ''}</div>`); }
   if (g.showGpu) {
     const c: any = ei && ei.gpuFrameTimeCounter, ms = c && c.lastSecAverage ? c.lastSecAverage * 1e-6 : 0;
     const dc = si ? Math.round(si.drawCallsCounter.lastSecAverage || si.drawCallsCounter.current) : 0, tris = scn ? Math.round(scn.getActiveIndices() / 3) : 0;

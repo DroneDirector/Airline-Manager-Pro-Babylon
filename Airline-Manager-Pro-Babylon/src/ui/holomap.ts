@@ -7,6 +7,7 @@
 import { ROOMS, DOORS, STAIRS, LIFTS, OUTSIDE, COLUMNS, Fl } from '../sections/terminal/plan';
 import { IS_TOUCH } from '../core/app';
 import { toast } from './icons';
+import { perfPart } from '../core/perf-meter';
 import { TransformNode, Matrix, Vector3, VertexBuffer, Mesh } from '@babylonjs/core';
 import { F2Y } from '../sections/terminal/plan';
 
@@ -15,7 +16,7 @@ import { F2Y } from '../sections/terminal/plan';
  *  wall is kept (so a wall is one line, not two) and the tiny end pieces are dropped. */
 export function traceWalls(root: TransformNode, y: number, floor?: number): Seg[] {
   const inv = Matrix.Invert(root.computeWorldMatrix(true)), out: Seg[] = [];
-  const meshes = root.getChildMeshes(false).filter(m => m instanceof Mesh && m.getTotalVertices() > 0 && (/STRUCTURE/.test(m.name) || (m.metadata && m.metadata.kind === 'glass')) && !/^(ROOF|STAIRS|DOORS)\b|\/ROOF|STAIR/.test(m.name) && !(m.metadata && /ROOF|STAIR/.test(String(m.metadata.id || ''))));
+  const meshes = root.getChildMeshes(false).filter(m => m instanceof Mesh && m.getTotalVertices() > 0 && (/STRUCTURE/.test(m.name) || (m.metadata && m.metadata.kind === 'glass')) && !/COLLIDE/.test(m.name) && !/^(ROOF|STAIRS|DOORS)\b|\/ROOF|STAIR/.test(m.name) && !(m.metadata && /ROOF|STAIR/.test(String(m.metadata.id || ''))));
   // each wall belongs to the floor of its room (a tall wall rising past the floor above still belongs to its own floor)
   const floorOf = (m: Mesh) => { const id = (m.metadata && m.metadata.room) || m.name.split('/')[0], r = ROOMS.find(q => q.id === id); return r ? r.f : 1; };
   for (const m of meshes as Mesh[]) {
@@ -135,6 +136,7 @@ export function findRoute(from: { x: number; z: number; f: number }, to: { x: nu
 }
 
 export function holoMap(host: HTMLElement, get: () => HoloState | null, root?: TransformNode) {
+  const LIGHT = IS_TOUCH;   // phones and tablets: no glow blur (slow there), drawn 10 times a second
   if (!document.getElementById('holomap-css')) { const st = document.createElement('style'); st.id = 'holomap-css'; st.textContent = `
 .holomap { position: absolute; right: max(14px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top)); width: ${IS_TOUCH ? 150 : 214}px; height: ${IS_TOUCH ? 150 : 214}px;
   pointer-events: auto; cursor: pointer; filter: drop-shadow(0 0 10px rgba(40,150,255,.28)); }
@@ -181,7 +183,8 @@ export function holoMap(host: HTMLElement, get: () => HoloState | null, root?: T
   // ---------- drawing one view of the map ----------
   interface View { cx: number; cz: number; yaw: number; k: number; f: number; full: boolean }
   const t0 = performance.now();
-  const render = (c: CanvasRenderingContext2D, W: number, H: number, dpr: number, V: View, st: HoloState) => {
+  const render = (c0: CanvasRenderingContext2D, W: number, H: number, dpr: number, V: View, st: HoloState) => {
+    const c: CanvasRenderingContext2D = LIGHT ? new Proxy(c0, { set(t: any, k, v) { if (k !== 'shadowBlur') t[k] = v; return true; }, get(t: any, k) { const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; } }) : c0;
     const now = performance.now(), sy = Math.sin(V.yaw), cy = Math.cos(V.yaw), k = V.k, X0 = W / 2, Y0 = H / 2;
     const P = (x: number, z: number): [number, number] => { const dx = x - V.cx, dz = z - V.cz; return [X0 + (dx * cy - dz * sy) * k, Y0 - (dx * sy + dz * cy) * k]; };
     const reach = Math.max(W, H) / k * 0.75, inView = (x: number, z: number) => Math.abs(x - V.cx) < reach && Math.abs(z - V.cz) < reach;
@@ -333,7 +336,15 @@ export function holoMap(host: HTMLElement, get: () => HoloState | null, root?: T
     if (full && fv) { const fc = full.querySelector('canvas') as HTMLCanvasElement, r = full.getBoundingClientRect(), FW = Math.round(full.clientWidth * dpr), FH = Math.round(full.clientHeight * dpr);
       if (r.width > 0 && (fc.width !== FW || fc.height !== FH)) { fc.width = FW; fc.height = FH; } render(fc.getContext('2d')!, FW, FH, dpr, fv, st); }
   };
-  const iv = setInterval(draw, 50);
-  function dispose() { clearInterval(iv); window.removeEventListener('keydown', onKey); box.remove(); if (full) full.remove(); }
+  // out of the way of the place's own buttons: if anything else sits where the map would be, it goes below the left-hand panels
+  const place = () => { if (!box.isConnected || full) return; box.style.top = ''; box.style.left = ''; box.style.right = ''; const a = box.getBoundingClientRect();
+    const others = Array.from(host.querySelectorAll('button, .site-top, .tm-where')).filter(e => !box.contains(e) && !(full && full.contains(e)) && (e as HTMLElement).offsetParent) as HTMLElement[];
+    const hits = (r: DOMRect) => others.some(e => { const b = e.getBoundingClientRect(); return b.width && r.left < b.right && r.right > b.left && r.top < b.bottom + 34 && r.bottom + 34 > b.top; });
+    if (!hits(a)) return;
+    const left = others.filter(e => e.getBoundingClientRect().left < window.innerWidth * 0.4), bottom = Math.max(14, ...left.map(e => e.getBoundingClientRect().bottom));
+    box.style.right = 'auto'; box.style.left = 'max(14px, env(safe-area-inset-left))'; box.style.top = (bottom + 12) + 'px'; };
+  setTimeout(place, 300); const pv = setInterval(place, 3000);
+  const iv = setInterval(() => { const t = performance.now(); draw(); perfPart('map', performance.now() - t); }, LIGHT ? 100 : 50);
+  function dispose() { clearInterval(iv); clearInterval(pv); window.removeEventListener('keydown', onKey); box.remove(); if (full) full.remove(); }
   return { dispose, el: box, open: openFull, close: closeFull };
 }
