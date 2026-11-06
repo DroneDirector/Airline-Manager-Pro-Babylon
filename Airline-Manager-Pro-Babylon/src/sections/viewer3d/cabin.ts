@@ -10,8 +10,9 @@
 //
 // Axes as the aircraft's: x to the right wing, y up, z forward, metres, the middle of the fuselage at the origin.
 // Everything is drawn once for all the seats and people (thin instances), so a full cabin costs a handful of draws.
+import { buildPerson, posePerson, stridePerson, Person } from '../court/people';
 import {
-  Scene, Mesh, MeshBuilder, VertexData, TransformNode, StandardMaterial, Color3, DynamicTexture, Vector3, Matrix, Quaternion, HemisphericLight, Texture, Light,
+  Scene, Mesh, MeshBuilder, PBRMaterial, VertexData, TransformNode, StandardMaterial, Color3, DynamicTexture, Vector3, Matrix, Quaternion, HemisphericLight, Texture, Light,
 } from '@babylonjs/core';
 
 const L = 37.57, RX = 1.86, RY = 1.95;
@@ -132,14 +133,19 @@ const CLOTHES = ['#2C3E50', '#7F8C8D', '#1F4E79', '#8E3B46', '#3E6B48', '#C9B79C
 const SKIN = ['#F1C9A5', '#E0AC86', '#C68863', '#8D5524', '#6B4226', '#FFDBB8', '#D9A47A', '#A86B48'];
 const rnd = (seed: number) => { let s = seed | 0; return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 
-interface Walker { row: number; seat: number; z: number; t: number; dir: 1 | -1; state: 'walk' | 'turn' | 'sit' | 'out'; body: number; skin: number; c: Color3; k: Color3 }
+interface Walker { pi: number; row: number; seat: number; z: number; t: number; dir: 1 | -1; state: 'walk' | 'turn' | 'sit' | 'out'; body: number; skin: number; c: Color3; k: Color3 }
 export interface Cabin {
   root: TransformNode; on: boolean;
   show(on: boolean): void;
   paint(c1: string, c2: string): void;
   frame(dt: number, o: { phase: string; pax: number; paxMax: number; onGround: boolean; night: boolean; cruise: boolean; descent: boolean }): void;
+  /** What someone said who was tapped (a mesh and its thin instance), shown as a bubble over them. */
+  talk(mesh: AbstractMeshLike, instance: number): boolean;
+  /** The bubbles to show now: where (in the cabin's frame), who and what. */
+  bubbles: { at: Vector3; who: string; text: string; until: number }[];
   dispose(): void;
 }
+type AbstractMeshLike = { name: string };
 
 export function buildCabin(sc: Scene, parent: TransformNode, lights: Light[]): Cabin {
   const root = new TransformNode('cabin', sc); root.parent = parent;
@@ -198,7 +204,8 @@ export function buildCabin(sc: Scene, parent: TransformNode, lights: Light[]): C
   const paxMs = new Float32Array(N * 16), paxCol = new Float32Array(N * 4), skinCol = new Float32Array(N * 4);
   const writePax = () => {
     let n = 0;
-    for (let i = 0; i < N; i++) { if (!seated[i]) continue; const r = Math.floor(i / 6), k = i % 6; Matrix.Translation(SEATX[k], FLOOR, zOf(ROWS[r])).copyToArray(paxMs, n * 16);
+    instSeat = [];
+    for (let i = 0; i < N; i++) { if (!seated[i]) continue; instSeat.push(i); const r = Math.floor(i / 6), k = i % 6; Matrix.Translation(SEATX[k], FLOOR, zOf(ROWS[r])).copyToArray(paxMs, n * 16);
       const c = clothes[i], s = skins[i]; paxCol.set([c.r, c.g, c.b, 1], n * 4); skinCol.set([s.r, s.g, s.b, 1], n * 4); n++; }
     pax.body.thinInstanceSetBuffer('matrix', paxMs, 16, false); pax.skin.thinInstanceSetBuffer('matrix', paxMs, 16, false);
     pax.body.thinInstanceSetBuffer('color', paxCol, 4, false); pax.skin.thinInstanceSetBuffer('color', skinCol, 4, false);
@@ -209,10 +216,48 @@ export function buildCabin(sc: Scene, parent: TransformNode, lights: Light[]): C
   own(walk.body, walkM); own(walk.skin, wskinM);
   const MAXW = 24, wMs = new Float32Array(MAXW * 16), wCol = new Float32Array(MAXW * 4), wSk = new Float32Array(MAXW * 4);
   walk.body.thinInstanceSetBuffer('matrix', wMs, 16, false); walk.skin.thinInstanceSetBuffer('matrix', wMs, 16, false); walk.body.thinInstanceSetBuffer('color', wCol, 4, false); walk.skin.thinInstanceSetBuffer('color', wSk, 4, false);
+  // the people who walk (the crew and the passengers coming and going): jointed figures that walk in step
+  walk.body.setEnabled(false); walk.skin.setEnabled(false);
+  const pmats = new Map<string, PBRMaterial>(), POOL = 14, pool: { p: Person; used: boolean; ph: number }[] = [];
+  for (let i = 0; i < POOL; i++) { const crewP = i < 3, sex = i % 2 ? 'f' : 'm';
+    const p = buildPerson(sc, { key: (crewP ? 'counsel-crew-' : 'public-cab-') + i, seat: 'w' + i, sex, sit: 0 }, { id: 'w' + i, x: 0, y: FLOOR, z: 0, yaw: 0, sit: 0 }, C1, pmats);
+    p.root.parent = root; p.root.setEnabled(false); for (const m of p.meshes) { meshes.push(m as Mesh); m.isPickable = true; m.metadata = { cabinWho: i }; } pool.push({ p, used: crewP, ph: Math.random() * 6 }); }
+  const take = () => { for (let i = 3; i < POOL; i++) if (!pool[i].used) { pool[i].used = true; return i; } return -1; };
+  const PM = (i: number) => pool[i] && pool[i].p;
+  void PM;
   const trolleyM = mat('cabin-trolleyM', '#B8BEC6', 0.6); const trolley = own(MeshBuilder.CreateBox('cabin-trolley', { width: 0.3, height: 1.03, depth: 0.8 }, sc), trolleyM);
   const uniform = Color3.FromHexString(C1);
   const walkers: Walker[] = [];
   const crew = { z: CABIN_Z.front, dir: -1, row: 0, stop: 0, out: false, t: 0, walker: { z: CABIN_Z.back, dir: 1, t: 0, wait: 20 } };
+  // ---- who says what: the crew, and every passenger in their own mood ----
+  let talkWho = -9, lastStop = -1, phaseNow = '';
+  const whoAt: { [i: number]: Vector3 } = {};
+  const MOODS = ['happy', 'happy', 'fine', 'fine', 'fine', 'tired', 'nervous', 'grumpy', 'chatty'], moodOf = (i: number) => MOODS[Math.floor(R2(i) * MOODS.length)];
+  function R2(i: number) { let h = (i * 2654435761) >>> 0; h ^= h >>> 13; h = Math.imul(h, 1274126177) >>> 0; return (h % 10000) / 10000; }
+  const pickL = (a: string[], k: number) => a[Math.floor((k + Math.random() * 0.999) * a.length) % a.length];
+  const CREW: { [k: string]: string[] } = {
+    boarding: ['Good morning, welcome aboard!', 'May I see your boarding pass? Row ahead on the left.', 'Let me help you with that bag.', 'Please take your seat as soon as you can, thank you.'],
+    trolley: ['Anything to drink for you today?', 'Tea or coffee? We also have juice and water.', 'Would you like something from the menu?', 'A snack with that?', 'Card only on board, thank you.'],
+    cruise: ['Is everything all right here?', 'We will be landing in about an hour.', 'Can I get you a blanket?', 'The toilets are at the front and at the back.'],
+    descent: ['Seat backs upright, please, we are starting our descent.', 'Seat belt on, please.', 'Tray tables up, thank you.', 'Please put your bag under the seat in front.'],
+    ground: ['Welcome aboard!', 'Thank you for flying with us, goodbye!', 'Mind your step at the door.'],
+  };
+  const PAX: { [m: string]: string[] } = {
+    happy: ['A coffee, please, with milk. Thank you!', 'Lovely flight so far.', 'Orange juice would be great, thanks.', 'Could I have some water?'],
+    fine: ['Just water, thanks.', 'Tea, no sugar.', 'Do you have a sandwich?', 'No thank you, I am fine.'],
+    tired: ['Just water, I am trying to sleep.', 'Could you wake me before landing?', 'Coffee. A strong one, please.'],
+    nervous: ['Is that bumping normal?', 'How long until we land?', 'Could I have some water? I do not love flying.'],
+    grumpy: ['The seat will not recline.', 'Is there really nothing hot to eat?', 'It is very warm in here.', 'We were late leaving, again.'],
+    chatty: ['Is it your first time on this route? Mine is the tenth!', 'Have you been to the airport there? The views are something.', 'I love the colours of this airline.'],
+  };
+  const crewLine = (k: string) => pickL(CREW[k] || CREW.cruise, 0);
+  const paxLine = (i: number, k: string) => { const m = moodOf(i); if (k === 'trolley') return pickL(PAX[m], 0); return pickL(PAX[m === 'happy' || m === 'fine' ? 'chatty' : m], 0); };
+  const seatName = (i: number) => `${Math.floor(i / 6) + 1}${'ABCDEF'[i % 6]}`;
+  const seatAtIdx = (i: number) => new Vector3(SEATX[i % 6], FLOOR + 1.45, zOf(ROWS[Math.floor(i / 6)]));
+  const seatedIn = (row: number) => { const c = [row * 6 + 2, row * 6 + 3, row * 6 + 1, row * 6 + 4, row * 6, row * 6 + 5].filter(i => seated[i]); return c.length ? c[Math.floor(Math.random() * c.length)] : -1; };
+  const say = (who: number, text: string, at: Vector3, name: string) => { const now = performance.now() / 1000; api.bubbles = api.bubbles.filter(b => b.who !== name); api.bubbles.push({ at, who: name, text, until: now + Math.max(4, text.length / 12 + 2) }); if (who >= 0) { talkWho = who; setTimeout(() => { if (talkWho === who) talkWho = -9; }, 2500); } };
+  let instSeat: number[] = [];
+
 
   // the cabin's own light: bright by day, dimmed at night in the cruise; the sun and the sky's light stay outside
   const lamp = new HemisphericLight('cabin-light', new Vector3(0.1, 1, 0.05), sc); lamp.groundColor = new Color3(0.42, 0.4, 0.38); lamp.specular = new Color3(0.2, 0.2, 0.2);
@@ -230,8 +275,16 @@ export function buildCabin(sc: Scene, parent: TransformNode, lights: Light[]): C
       try { const o = floorM.diffuseTexture; const t = carpet(sc, c1); t.vScale = 6; floorM.diffuseTexture = t; if (o) o.dispose(); } catch (e) { /* keeps the old */ }
       for (const [m, f] of [[bhF, true], [bhA, false]] as [StandardMaterial, boolean][]) { const o = m.diffuseTexture; m.diffuseTexture = bulkhead(sc, f, c1, c2); if (o) o.dispose(); }
     },
+    bubbles: [],
+    talk(mesh, inst) {
+      const md: any = (mesh as any).metadata;
+      if (md && md.cabinWho != null) { const i = md.cabinWho, at = whoAt[i] || new Vector3(0, FLOOR + 1.75, 0);
+        const k = /board/i.test(phaseNow) ? 'boarding' : /desc|appro|land/i.test(phaseNow) ? 'descent' : /gate|ground|taxi|deboard|park/i.test(phaseNow) ? 'ground' : i === 0 && crew.stop > 0 ? 'trolley' : 'cruise';
+        say(i, i < 3 ? crewLine(k) : pickL(PAX.chatty.concat(PAX.fine), 0), at, i < 3 ? 'Cabin crew' : 'Passenger'); return true; }
+      if ((mesh.name === 'cabin-pax' || mesh.name === 'cabin-pax-skin') && inst >= 0 && instSeat[inst] != null) { const sI = instSeat[inst]; say(-1, paxLine(sI, 'cruise'), seatAtIdx(sI), `Passenger ${seatName(sI)} · ${moodOf(sI)}`); return true; }
+      return false; },
     frame(dt, o) {
-      if (!api.on) return;
+      if (!api.on) return; phaseNow = o.phase;
       const boarding = /board/i.test(o.phase) && !/deboard/i.test(o.phase), deboarding = /deboard|arriv|landed|at the gate/i.test(o.phase) && o.onGround;
       // how many are aboard: the flight's own number (80 % in the demo), or the boarding and deboarding as it goes
       const want = o.paxMax ? Math.round(N * Math.min(1, o.pax / o.paxMax)) : o.pax ? Math.min(N, o.pax) : Math.round(N * 0.8);
@@ -239,19 +292,22 @@ export function buildCabin(sc: Scene, parent: TransformNode, lights: Light[]): C
       // boarding: the next passengers come in at the front door and walk to their row; deboarding: they stand up and leave
       if ((boarding && shown < target) || (deboarding && shown > 0)) {
         if (walkers.length < 10 && Math.random() < dt * 1.2) {
-          if (boarding) { const i = shown++, id = order[i]; walkers.push({ row: Math.floor(id / 6), seat: id % 6, z: CABIN_Z.door, t: 0, dir: -1, state: 'walk', body: 0, skin: 0, c: clothes[id], k: skins[id] }); }
-          else { const i = --shown, id = order[i]; place(i, false); writePax(); walkers.push({ row: Math.floor(id / 6), seat: id % 6, z: zOf(ROWS[Math.floor(id / 6)]), t: 0, dir: 1, state: 'walk', body: 0, skin: 0, c: clothes[id], k: skins[id] }); }
+          if (boarding) { const i = shown++, id = order[i]; walkers.push({ pi: take(), row: Math.floor(id / 6), seat: id % 6, z: CABIN_Z.door, t: 0, dir: -1, state: 'walk', body: 0, skin: 0, c: clothes[id], k: skins[id] }); }
+          else { const i = --shown, id = order[i]; place(i, false); writePax(); walkers.push({ pi: take(), row: Math.floor(id / 6), seat: id % 6, z: zOf(ROWS[Math.floor(id / 6)]), t: 0, dir: 1, state: 'walk', body: 0, skin: 0, c: clothes[id], k: skins[id] }); }
         }
       }
-      let n = 0;
-      const put = (x: number, z: number, yaw: number, bob: number, c: Color3, k: Color3) => { if (n >= MAXW) return; Matrix.Compose(Vector3.One(), Quaternion.FromEulerAngles(0, yaw, 0), new Vector3(x, FLOOR + bob, z)).copyToArray(wMs, n * 16); wCol.set([c.r, c.g, c.b, 1], n * 4); wSk.set([k.r, k.g, k.b, 1], n * 4); n++; };
+      let n = 0; const visibleP = new Set<number>(), tt = performance.now() / 1000;
+      const put = (x: number, z: number, yaw: number, bob: number, c: Color3, k: Color3, pi = -1) => { void c; void k; if (pi < 0) { n++; return; } const q = pool[pi]; if (!q) return;
+        const walking = bob > 0.001, P2 = q.p; P2.root.setEnabled(true); P2.root.position.set(x, FLOOR, z); P2.root.rotation.y = yaw; P2.seat.yaw = yaw; P2.seat.x = x; P2.seat.z = z; P2.want = 0;
+        if (walking) q.ph += dt * 6.2; posePerson(P2, tt, talkWho === pi, null, dt); stridePerson(P2, q.ph, walking ? 1 : 0); visibleP.add(pi); n++;
+        whoAt[pi] = new Vector3(x, FLOOR + 1.75, z); };
       for (let i = walkers.length - 1; i >= 0; i--) {
         const w = walkers[i], rz = zOf(ROWS[w.row]); w.t += dt;
         if (w.dir < 0) { // boarding: down the aisle to the row, then into the seat
-          if (w.z > rz) { w.z = Math.max(rz, w.z - dt * 0.9); put(0, w.z, Math.PI, Math.abs(Math.sin(w.t * 6)) * 0.03, w.c, w.k); }
-          else { const idx = order.indexOf(w.row * 6 + w.seat); place(idx, true); writePax(); walkers.splice(i, 1); }
+          if (w.z > rz) { w.z = Math.max(rz, w.z - dt * 0.9); put(0, w.z, Math.PI, 0.03, w.c, w.k, w.pi); }
+          else { const idx = order.indexOf(w.row * 6 + w.seat); place(idx, true); writePax(); if (pool[w.pi]) pool[w.pi].used = false; walkers.splice(i, 1); }
         } else { // deboarding: into the aisle and forward to the door
-          w.z += dt * 0.9; put(0, w.z, 0, Math.abs(Math.sin(w.t * 6)) * 0.03, w.c, w.k); if (w.z > CABIN_Z.door) walkers.splice(i, 1);
+          w.z += dt * 0.9; put(0, w.z, 0, 0.03, w.c, w.k, w.pi); if (w.z > CABIN_Z.door) { if (pool[w.pi]) pool[w.pi].used = false; walkers.splice(i, 1); }
         }
       }
       // the cruise: the trolley down the aisle row by row and back, another crew member walking the cabin
@@ -261,22 +317,26 @@ export function buildCabin(sc: Scene, parent: TransformNode, lights: Light[]): C
         if (crew.stop > 0) crew.stop -= dt;
         else { crew.z += crew.dir * dt * 0.45; const r = ROWS.findIndex(s => zOf(s) < crew.z + (crew.dir < 0 ? 0 : -0.79)); if (crew.dir < 0 && r >= 0 && r !== crew.row) { crew.row = r; crew.stop = 7 + Math.random() * 6; }
           if (crew.z < CABIN_Z.back + 1) crew.dir = 1; if (crew.z > CABIN_Z.front && crew.dir > 0) { crew.dir = -1; crew.row = -1; crew.stop = 90; } }
-        trolley.setEnabled(true); trolley.position.set(0, FLOOR + 0.52, crew.z - 0.5); put(0, crew.z + 0.12, Math.PI, 0, uniform, skinA); put(0, crew.z - 1.12, 0, 0, uniform, Color3.FromHexString('#C68863'));
+        trolley.setEnabled(true); trolley.position.set(0, FLOOR + 0.52, crew.z - 0.5); const pushing = crew.stop <= 0 ? 0.03 : 0; put(0, crew.z + 0.12, Math.PI, pushing, uniform, skinA, 0); put(0, crew.z - 1.12, 0, pushing, uniform, Color3.FromHexString('#C68863'), 1);
         const cw = crew.walker; if (cw.wait > 0) cw.wait -= dt; else { cw.z += cw.dir * dt * 0.8; cw.t += dt; if (cw.z > CABIN_Z.front) { cw.dir = -1; cw.wait = 40; } if (cw.z < CABIN_Z.back) { cw.dir = 1; cw.wait = 30; } }
-        if (Math.abs(cw.z - crew.z) > 2.2) put(0, cw.z, cw.dir > 0 ? 0 : Math.PI, cw.wait > 0 ? 0 : Math.abs(Math.sin(cw.t * 6)) * 0.03, uniform, Color3.FromHexString('#F1C9A5'));
+        if (Math.abs(cw.z - crew.z) > 2.2) put(0, cw.z, cw.dir > 0 ? 0 : Math.PI, cw.wait > 0 ? 0 : 0.03, uniform, Color3.FromHexString('#F1C9A5'), 2);
       } else {
         trolley.setEnabled(false);
         // seated for take-off and landing; at the gate, welcoming at the front door
-        if (o.onGround) put(0.15, CABIN_Z.front - 0.3, Math.PI, 0, uniform, skinA);
+        if (o.onGround) put(0.15, CABIN_Z.front - 0.3, Math.PI, 0, uniform, skinA, 0);
       }
-      walk.body.thinInstanceCount = n; walk.skin.thinInstanceCount = n; walk.body.isVisible = walk.skin.isVisible = n > 0;
-      if (n) { walk.body.thinInstanceBufferUpdated('matrix'); walk.skin.thinInstanceBufferUpdated('matrix'); walk.body.thinInstanceBufferUpdated('color'); walk.skin.thinInstanceBufferUpdated('color'); }
+      for (let i = 0; i < POOL; i++) if (!visibleP.has(i)) pool[i].p.root.setEnabled(false);
+      // the trolley's stops: a word with the row, and the answer from someone there (in their own mood)
+      if (o.cruise && crew.row >= 0 && crew.row !== lastStop && crew.stop > 0) { lastStop = crew.row; const sp = seatedIn(crew.row); say(0, crewLine('trolley'), new Vector3(0, FLOOR + 1.75, crew.z + 0.12), 'Cabin crew');
+        if (sp >= 0) setTimeout(() => { const ss = seatAtIdx(sp); say(-1, paxLine(sp, 'trolley'), ss, 'Passenger ' + seatName(sp)); }, 2600); }
+      const nowS = performance.now() / 1000; api.bubbles = api.bubbles.filter(b => b.until > nowS);
       // the light: dimmed at night in the cruise, full for boarding, take-off and landing
       const dim = o.night && o.cruise ? 0.45 : 1; lamp.intensity = 0.95 * dim + 0.15; stripM.emissiveColor = new Color3(1, 0.97, 0.9).scale(0.4 + 0.6 * dim);
       moodM.emissiveColor = Color3.FromHexString(C2).scale(o.night && o.cruise ? 1 : 0.55);
     },
     dispose() { lamp.dispose(); root.dispose(false, true); },
   };
+  pax.body.thinInstanceEnablePicking = true; pax.skin.thinInstanceEnablePicking = true; pax.body.isPickable = pax.skin.isPickable = true;
   api.show(false);
   return api;
 }

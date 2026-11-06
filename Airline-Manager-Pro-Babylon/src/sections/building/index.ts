@@ -185,6 +185,9 @@ const Building: Section = {
       if (t.closest('[data-coll]')) { const l = hud.querySelector('.bd-list') as HTMLElement; l.hidden = !l.hidden; return; }
       const pc = t.closest('[data-piece]') as HTMLElement; if (pc) { (hud.querySelector('.bd-list') as HTMLElement).hidden = true; goToPiece(Number(pc.getAttribute('data-piece'))); }
     });
+    // opened for one piece of the collection ("in 3D" in the game): straight to it, in your hands
+    { const ft = ctx.opts && ctx.opts.data && ctx.opts.data.focus; if (ft) { const i = items.findIndex(e => e.title === ft); if (i >= 0) setTimeout(() => { try { goToPiece(i); } catch (e) { /* the museum */ } }, 300); } }
+    if (ctx.opts && ctx.opts.data && ctx.opts.data.stress) { S.gfx.showFps = true; perfShow(); }
     toast(IS_TOUCH ? 'Left thumb: walk · Right: drag to look · tap a door to open it' : 'W A S D to walk · click to look with the mouse · E or click a door to open it');
     let down: any = null; const cv = ctx.canvas;
     B.pd = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; };
@@ -204,7 +207,7 @@ const Building: Section = {
           let mx = fx2 * inp.my + rx * inp.mx, mz = fz2 * inp.my + rz * inp.mx; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
           const st = F.v * dt, nx = F.x + mx * st, nz = F.z + mz * st;
           if (walkable(nx, nz)) { F.x = nx; F.z = nz; } else if (walkable(nx, F.z)) F.x = nx; else if (walkable(F.x, nz)) F.z = nz; F.bob += st; }
-        cam.position.set(F.x, EYE + Math.sin(F.bob / 0.65 * Math.PI) * 0.015 * Math.min(1, F.v / 1.1), F.z);
+        cam.position.set(F.x, EYE - (B.office && B.office.pet ? B.office.pet.kneel * 0.95 : 0) + Math.sin(F.bob / 0.65 * Math.PI) * 0.015 * Math.min(1, F.v / 1.1), F.z);
       }
       const cp = Math.cos(F.pitch); cam.setTarget(cam.position.add(new Vector3(Math.sin(F.yaw) * cp, Math.sin(F.pitch), Math.cos(F.yaw) * cp)));
       // the lounge's doors slide open as you come up to them, and shut behind you
@@ -290,6 +293,7 @@ function use(px?: number, py?: number) {
   if (a === 'board') { toast('Departures and Arrivals'); return; }
   if (a === 'phone') { toast('No calls right now'); return; }
   if (a === 'pet' && B.office.pet) { B.office.pet.stir(); return; }
+  if (a === 'bowl-food' && B.office.pet) { B.office.pet.cam = B.office.pet.cam || (B.cam); if (!B.office.pet.pickup()) toast('Just a moment'); return; }
   if ((a === 'bowl-water' || a === 'bowl-food') && B.office.pet) { if (!B.office.pet.refill(a === 'bowl-food' ? 'food' : 'water')) toast(a === 'bowl-food' ? 'The bowl is full' : 'The water bowl is full'); return; }
   if (a === 'globe') { toast('The world your airline flies'); return; }
   if (a === 'model') { toast('A model of one of your aircraft, in the company colours'); return; }

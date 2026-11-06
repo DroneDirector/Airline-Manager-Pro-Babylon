@@ -356,3 +356,9 @@ body.photo-on .site-services { display: none; }
 
 .site-lift { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; background: rgba(8,14,28,.72); color: #eef3fa; font-size: 13px; pointer-events: none; }
 body.photo-on .site-lift { display: none; }
+
+/* the cabin: who says what */
+.cab-says { position: absolute; inset: 0; pointer-events: none; z-index: 7; }
+.cab-say { position: absolute; left: 0; top: 0; max-width: 240px; padding: 8px 10px; border-radius: 12px 12px 12px 3px; background: rgba(250,250,247,.95); color: #14202E; font-size: 13px; line-height: 1.35; box-shadow: 0 6px 18px rgba(0,0,0,.35); pointer-events: auto; display: flex; flex-direction: column; gap: 2px; }
+.cab-say b { font-size: 11px; color: #5A6573; } .cab-play { align-self: flex-end; border: 0; background: #14202E; color: #fff; border-radius: 999px; width: 26px; height: 26px; font-size: 11px; cursor: pointer; }
+body.photo-on .cab-says { display: none; }

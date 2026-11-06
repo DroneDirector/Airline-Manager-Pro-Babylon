@@ -6,7 +6,7 @@
 // legs, has a drink or a bite, comes back, turns round in its bed and lies down to sleep again. Tap it and it wakes for
 // a moment and looks at you; tap a bowl and it is filled up.
 // Office coordinates (x east, y up, z north, metres). The pet faces +x in its own frame.
-import { Scene, Vector3, Color3, Color4, MeshBuilder, Mesh, StandardMaterial, PBRMaterial, DynamicTexture, TransformNode, ShaderMaterial, Effect, VertexData, AbstractMesh, Matrix, Quaternion, Vector4 } from '@babylonjs/core';
+import { Scene, Vector3, Color3, Color4, MeshBuilder, Mesh, StandardMaterial, PBRMaterial, DynamicTexture, TransformNode, ShaderMaterial, Effect, VertexData, AbstractMesh, Matrix, Quaternion, Vector4, Camera } from '@babylonjs/core';
 
 export type PetKind = 'dog' | 'cat' | 'none';
 export interface PetData { kind: PetKind; name: string; coat: number; white: boolean; size: 's' | 'm' | 'l'; ears: 'floppy' | 'pointy'; bed: number; coatHex?: string; lightHex?: string; food?: number; water?: number }
@@ -202,7 +202,7 @@ void main() {
   gl_FragColor = vec4(c, 1.0); }`;
 
 export interface PetHooks { free?: (x: number, z: number) => boolean; door: number[]; box: number[]; save?: (food: number, water: number) => void; toast?: (t: string) => void; fine?: boolean }
-export interface Pet { root: TransformNode; hits: AbstractMesh[]; blocks: number[][]; step(t: number, dt: number): void; stir(): void; refill(k: 'food' | 'water'): boolean; name: string; dispose(): void }
+export interface Pet { kneel: number; cam: Camera | null; pickup(): boolean; root: TransformNode; hits: AbstractMesh[]; blocks: number[][]; step(t: number, dt: number): void; stir(): void; refill(k: 'food' | 'water'): boolean; name: string; dispose(): void }
 
 /** The bed at pos (x, z) turned by yaw, the pet asleep in it, its bowls beside it. */
 export function placePet(sc: Scene, parent: TransformNode | null, P: PetData, pos: number[], yaw: number, H: PetHooks): Pet | null {
@@ -300,7 +300,18 @@ export function placePet(sc: Scene, parent: TransformNode | null, P: PetData, po
     }
     if (F.t >= Dd) { if (F.mesh) F.mesh.dispose(); if (F.drops) B.rain.isVisible = false; lv[F.k as 'food' | 'water'] = 1; B.set(1); A.fill = null; if (H.save) H.save(lv.food || 0, lv.water || 0); }
   };
+  // the food bowl in your hands: down on one knee beside it, picked up and looked at, put back down (and filled up)
+  const carry: any = { st: '', t: 0 };
+  const carryStep = (dt: number) => {
+    if (!carry.st) return; carry.t += dt; const B = bowls.food, hd: TransformNode = B.holder;
+    if (carry.st === 'down') { api.kneel = sm(carry.t / 0.7); if (carry.t >= 0.7 && api.cam) { carry.home = { p: hd.parent, pos: hd.position.clone(), rot: hd.rotation.clone() }; hd.parent = api.cam; hd.position.set(0, -0.16, 0.42); hd.rotation.set(-0.55, Math.PI, 0); carry.st = 'hold'; carry.t = 0;
+        if (H.toast) H.toast(`${(P.name || (cat ? 'Kitty' : 'Buddy')).toUpperCase()}: ${api.name}'s bowl, ${Math.round((lv.food || 0) * 100)} % full`); } }
+    else if (carry.st === 'hold') { hd.rotation.y = Math.PI + Math.sin(carry.t * 1.2) * 0.35; if (carry.t > 3.2) { const h0 = carry.home; hd.parent = h0.p; hd.position.copyFrom(h0.pos); hd.rotation.copyFrom(h0.rot); carry.st = 'up'; carry.t = 0; if ((lv.food || 0) < 0.97) api.refill('food'); } }
+    else if (carry.st === 'up') { api.kneel = 1 - sm(carry.t / 0.7); if (carry.t >= 0.7) { api.kneel = 0; carry.st = ''; } }
+  };
   const api: Pet = {
+    kneel: 0, cam: null,
+    pickup() { if (carry.st || A.fill || !api.cam) return false; carry.st = 'down'; carry.t = 0; return true; },
     root, hits, blocks, name: P.name || (cat ? 'Your cat' : 'Your dog'),
     step(t, dt) {
       const per = cat ? 2.6 : 3.6; A.t += dt;
@@ -308,7 +319,7 @@ export function placePet(sc: Scene, parent: TransformNode | null, P: PetData, po
       if (t > A.nextEar) { A.ear = Math.random() < 0.5 ? 0 : 1; A.earT = 0; A.nextEar = t + 6 + Math.random() * 14; }
       U.uEarL = 0; U.uEarR = 0;
       if (A.ear >= 0) { A.earT += dt; const k = A.earT < 0.4 ? Math.sin(A.earT / 0.4 * Math.PI * 2) * (1 - A.earT / 0.4) : 0; if (A.ear) U.uEarR = 0.4 * k; else U.uEarL = 0.4 * k; if (A.earT > 0.4) A.ear = -1; }
-      fillStep(dt);
+      fillStep(dt); carryStep(dt);
       let open = 1, wantHead = 0, wantTailY = 0, wantTailW = 0.12 * Math.sin(t * 1.3), wantLie = 0, wantPitch = 0;
       if (A.st === 'sleep') {
         wantLie = 1; wantHead = -0.32; wantTailY = 0.95; wantTailW = 1.0; open = 0; A.gait = 0;

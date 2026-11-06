@@ -62,7 +62,7 @@ function wantAirports(me: Sample) { const A = V.apts || (V.apts = {}); for (cons
 onGameAirport((d: any) => {
   if (!V.scene || !V.apts || !d.L || !(d.icao in V.apts)) return;
   try { const old: Airport = V.apts[d.icao]; if (old) old.dispose(); const A = buildAirport(V.scene, d.L); V.apts[d.icao] = A;
-    if (d.crash) { try { const c: Crash = buildCrash(V.scene, A.root, d.L, d.crash); (V.crashes = V.crashes || {})[d.icao] = c; const dis = A.dispose.bind(A); A.dispose = () => { try { c.dispose(); } catch (e) { /* gone */ } delete V.crashes[d.icao]; dis(); }; if (V.crashFocus === d.icao) V.crashAt = { A, c }; } catch (e) { console.error(e); } }
+    if (d.crash) { try { const c: Crash = buildCrash(V.scene, A.root, d.L, d.crash, { elev: A.elev, sea: (la: number, lo: number) => { try { const hh = V.ter ? V.ter.heightAt(la, lo) : null; return hh != null && hh < 0.6 && A.elev < 60 && !!(V.ter && (V.ter as any).isSea ? (V.ter as any).isSea(la, lo) : hh <= 0.1); } catch (e) { return false; } } }); (V.crashes = V.crashes || {})[d.icao] = c; const dis = A.dispose.bind(A); A.dispose = () => { try { c.dispose(); } catch (e) { /* gone */ } delete V.crashes[d.icao]; dis(); }; if (V.crashFocus === d.icao) V.crashAt = { A, c }; } catch (e) { console.error(e); } }
     else if (V.crashFocus === d.icao) toast('The crash site there has been cleared'); farDiscs(); for (const l of A.lights) V.glow.addIncludedOnlyMesh(l); if (V.sg) A.root.getChildMeshes().forEach(m => m.receiveShadows = true); } catch (e) { console.error(e); }
 });
 /** The real ground under the flight (below 33,000 ft, when Real terrain is on): laid out again as the aircraft flies on. */
@@ -250,6 +250,14 @@ const Viewer: Section = {
     // photo mode: looks, a wide frame, depth of field (focused on the aircraft), a caption, and the picture
     V.photo = makePhotoMode({ hud, root: document.body, engine, canvas: ctx.canvas, dp: () => V.dp, cam: () => V.cam, focus: () => (V.cam && V.ac ? V.cam.globalPosition.subtract(V.ac.root.getAbsolutePosition()).length() : 300), caption: () => '' });
     V.rwx = makeRealWx(sc, () => V.cam, hud);
+    // in the cabin: tap someone to hear what they say (a bubble over them, with a button to hear it)
+    const says = document.createElement('div'); says.className = 'cab-says'; hud.appendChild(says); V.says = says;
+    says.addEventListener('click', (e: Event) => { const b = (e.target as HTMLElement).closest('[data-speak]') as HTMLElement; if (!b) return; e.stopPropagation(); try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(b.getAttribute('data-speak') || ''); u.lang = 'en-GB'; speechSynthesis.speak(u); } catch (err) { /* no voice */ } });
+    let td: any = null; V.tdn = (e: PointerEvent) => { td = { x: e.clientX, y: e.clientY, t: performance.now() }; };
+    V.tup = (e: PointerEvent) => { if (!td || !V.inCabin || !V.cabin) { td = null; return; } const moved = Math.hypot(e.clientX - td.x, e.clientY - td.y), quick = performance.now() - td.t < 350; td = null; if (moved > 8 || !quick) return;
+      const cv = ctx.canvas, en = sc.getEngine(), px = (e.clientX - cv.getBoundingClientRect().left) * en.getRenderWidth() / cv.clientWidth, py = (e.clientY - cv.getBoundingClientRect().top) * en.getRenderHeight() / cv.clientHeight;
+      const hit = sc.pick(px, py, (m: any) => m.isPickable && m.isEnabled() && m.isDescendantOf(V.cabin.root)); if (hit && hit.hit && hit.pickedMesh) V.cabin.talk(hit.pickedMesh, hit.thinInstanceIndex == null ? -1 : hit.thinInstanceIndex); };
+    ctx.canvas.addEventListener('pointerdown', V.tdn); ctx.canvas.addEventListener('pointerup', V.tup);
     perfAttach(engine, sc, hud.querySelector('.v3d-perf') as HTMLElement); perfShow();
     hud.addEventListener('click', (e: Event) => {
       const b = (e.target as HTMLElement).closest('button') as HTMLElement; if (!b) return;
@@ -380,6 +388,13 @@ const Viewer: Section = {
       if (V.probeOn && (V.envDirty || now > envT)) { pr.cubeTexture.resetRefreshCounter(); envT = now + (V.speed >= 2000 ? 0.2 : V.speed >= 600 ? 0.4 : 1.2); V.envDirty = false; }
       if (now > infoT) { infoT = now + 0.25; info(); const wc = V.hud && V.hud.querySelector('.v3d-wxchip'); if (wc && V.rwx) wc.textContent = V.rwx.chip(); }
       if (V.crashes) { const night = Math.max(0, Math.min(1, (-(V.sunAlt || 0) + 2) / 8)), rw = V.rwx && V.rwx.on() ? V.drift : null; for (const k in V.crashes) V.crashes[k].step(now, night, rw ? [3, 1] : [2, 1]); }
+      // the cabin's bubbles, over whoever is speaking
+      if (V.says) { const bs = V.inCabin && V.cabin ? V.cabin.bubbles : [];
+        if (!bs.length) { if (V.says.childElementCount) V.says.innerHTML = ''; }
+        else { const en = sc.getEngine(), W = en.getRenderWidth(), H = en.getRenderHeight(), cw = ctx.canvas.clientWidth / W, ch = ctx.canvas.clientHeight / H, wm2 = V.cabin.root.getWorldMatrix(), tm = sc.getTransformMatrix(), vp = cam.viewport.toGlobal(W, H);
+          const key = bs.map((b: any) => b.who + b.text).join('|'); if (V.saysKey !== key) { V.saysKey = key; V.says.innerHTML = bs.map((b: any) => `<div class="cab-say"><b>${esc(b.who)}</b><span>${esc(b.text)}</span><button class="cab-play" data-speak="${esc(b.text)}" aria-label="Hear it">▶</button></div>`).join(''); }
+          bs.forEach((b: any, i: number) => { const el = V.says.children[i] as HTMLElement; if (!el) return; const w = Vector3.TransformCoordinates(b.at, wm2), p = Vector3.Project(w, Matrix.Identity(), tm, vp), vis = p.z > 0 && p.z < 1;
+            el.style.display = vis ? '' : 'none'; el.style.transform = `translate(${p.x * cw}px, ${p.y * ch}px) translate(-50%, -100%)`; }); } }
       if (V.photo) V.photo.frame();
       sc.render();
       perfEnd();
@@ -388,6 +403,7 @@ const Viewer: Section = {
   close() {
     const sc: Scene = V.scene; if (!sc) return;
     try { if (V.rwx) { V.rwx.dispose(); V.rwx = null; } } catch (e) { /* gone */ }
+    try { V.ctxCanvas && 0; const cv: HTMLCanvasElement = (V.scene && V.scene.getEngine().getRenderingCanvas()) as HTMLCanvasElement; if (cv) { cv.removeEventListener('pointerdown', V.tdn); cv.removeEventListener('pointerup', V.tup); } speechSynthesis.cancel(); } catch (e) { /* gone */ }
     try { if (V.cabin) { V.cabin.dispose(); V.cabin = null; } V.inCabin = false; V.cw = null; V.fuse = null; } catch (e) { /* gone */ }
     try { if (V.photo) { V.photo.dispose(); V.photo = null; } document.body.classList.remove('photo-on'); } catch (e) { /* gone */ }
     try { V.ctx.canvas.removeEventListener('wheel', V.wheel); } catch (e) { /* gone */ }

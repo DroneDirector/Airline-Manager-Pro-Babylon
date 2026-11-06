@@ -81,7 +81,7 @@ const Office$: Section = {
           let mx = fx * inp.my + rx * inp.mx, mz = fz * inp.my + rz * inp.mx; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
           const st = F.v * dt, nx = F.x + mx * st, nz = F.z + mz * st;
           if (!officeBlocked(of, nx, nz)) { F.x = nx; F.z = nz; } else if (!officeBlocked(of, nx, F.z)) F.x = nx; else if (!officeBlocked(of, F.x, nz)) F.z = nz; F.bob += st; }
-        cam.position.set(F.x, EYE + Math.sin(F.bob / 0.65 * Math.PI) * 0.015 * Math.min(1, F.v / 1.1), F.z);
+        cam.position.set(F.x, EYE - (O.of && O.of.pet ? O.of.pet.kneel * 0.95 : 0) + Math.sin(F.bob / 0.65 * Math.PI) * 0.015 * Math.min(1, F.v / 1.1), F.z);
       }
       const cp = Math.cos(F.pitch); cam.setTarget(cam.position.add(new Vector3(Math.sin(F.yaw) * cp, Math.sin(F.pitch), Math.cos(F.yaw) * cp)));
       // what you are looking at (the middle of the view), within reach: its name
@@ -121,6 +121,7 @@ function use(px?: number, py?: number) {
   if (a === 'phone') { toast('No calls right now'); return; }
   if (a === 'window') { toast('The airport, below the mountains'); return; }
   if (a === 'pet' && O.of.pet) { O.of.pet.stir(); return; }
+  if (a === 'bowl-food' && O.of.pet) { O.of.pet.cam = O.of.pet.cam || (O.cam); if (!O.of.pet.pickup()) toast('Just a moment'); return; }
   if ((a === 'bowl-water' || a === 'bowl-food') && O.of.pet) { if (!O.of.pet.refill(a === 'bowl-food' ? 'food' : 'water')) toast(a === 'bowl-food' ? 'The bowl is full' : 'The water bowl is full'); return; }
   if (a === 'globe') { toast('The world your airline flies'); return; }
   if (a === 'model') { toast('A model of one of your aircraft, in the company colours'); return; }

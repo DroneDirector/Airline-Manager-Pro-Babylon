@@ -11,7 +11,7 @@
 // once for all of them (thin instances), so the room stays light on phones and tablets.
 import { Scene, Vector3, Color3, MeshBuilder, Mesh, PBRMaterial, StandardMaterial, DynamicTexture, Texture, TransformNode, AbstractMesh, PointLight, Matrix, Quaternion } from '@babylonjs/core';
 import * as P from '../lounge/pictures';
-import { buildPerson, posePerson, Person } from '../court/people';
+import { buildPerson, posePerson, stridePerson, Person } from '../court/people';
 import type { Seat } from '../court/seats';
 
 export const TRN = { x0: -14.6, x1: -5.6, z0: 9.5, z1: 17.5, h: 3.0 };
@@ -183,8 +183,11 @@ export function buildTraining(sc: Scene, airline: string, c1: string, c2: string
       const head = new Vector3(teacher.root.position.x, 1.66, teacher.root.position.z);
       posePerson(teacher, t, talking, new Vector3(x0 + 7, 1.2, cz), dt);
       for (const k in people) if (k !== 'teacher') posePerson(people[k].p, t, false, head, dt);
-      // the instructor walks a little in front of the board while talking
-      teacher.root.position.z = cz + 0.6 + Math.sin(t * 0.12) * 1.1; teacher.root.rotation.y = Math.PI / 2 + Math.sin(t * 0.25) * 0.25;
+      // the instructor walks to and fro in front of the board while talking, stopping now and then to face the class
+      const cyc = (t * 0.05) % 1, seg = cyc < 0.25 ? sm2(cyc / 0.25) : cyc < 0.5 ? 1 : cyc < 0.75 ? 1 - sm2((cyc - 0.5) / 0.25) : 0, v = cyc < 0.25 || (cyc >= 0.5 && cyc < 0.75) ? 1 : 0;
+      teacher.root.position.z = cz - 0.9 + seg * 2.4; const face = v ? (cyc < 0.25 ? 0 : Math.PI) : Math.PI / 2 + Math.sin(t * 0.25) * 0.25;
+      let da = face - teacher.root.rotation.y; da = Math.atan2(Math.sin(da), Math.cos(da)); teacher.root.rotation.y += da * Math.min(1, dt * 4); teacher.seat.yaw = teacher.root.rotation.y;
+      (teacher as any).walkPh = ((teacher as any).walkPh || 0) + dt * 5.5 * v; stridePerson(teacher, (teacher as any).walkPh, v * Math.min(1, Math.abs(Math.sin(Math.PI * (cyc % 0.25) / 0.25)) * 1.6));
     },
     clock() { const d = new Date(), hr = (d.getHours() % 12 + d.getMinutes() / 60) / 12 * Math.PI * 2, mn = (d.getMinutes() + d.getSeconds() / 60) / 60 * Math.PI * 2; hh.rotation.x = -hr; mh.rotation.x = -mn; },
   };
@@ -192,6 +195,7 @@ export function buildTraining(sc: Scene, airline: string, c1: string, c2: string
   return api;
 }
 
+function sm2(x: number) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
 function shade(hex: string, k: number): string { const c = Color3.FromHexString(hex), f = (v: number) => Math.round(Math.max(0, Math.min(1, k < 0 ? v * (1 + k) : v + (1 - v) * k)) * 255); return `rgb(${f(c.r)},${f(c.g)},${f(c.b)})`; }
 /** The airline's notebook cover: its mark, its name, and Academy below. */
 function notebookCanvas(name: string, acc: string): HTMLCanvasElement {

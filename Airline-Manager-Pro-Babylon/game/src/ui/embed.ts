@@ -71,7 +71,12 @@ if (EMBED) {
       out.students.push({ id: String(p.id), name: p.name, role: roleNameOf(p), sex: p.sex || 'm', course: C ? C.name : ty ? `${ty.maker} ${ty.model} type rating` : 'Training', who: C ? C.who : 'pilot', until: p.trainingUntil || (p.course && p.course.until) || Date.now(), from: p.trainingFrom || Date.now() }); } } catch (e) { /* an empty class */ }
     return out;
   };
-  const building = (at: string) => { try { saveNow(true); } catch (e) { /* saved */ } embedTell('room', { room: 'building', at, data: Object.assign(officeData(), { museum: museumData(), training: trainingData() }) }); };
+  const building = (at: string, extra?: any) => { try { saveNow(true); } catch (e) { /* saved */ } embedTell('room', { room: 'building', at, data: Object.assign(officeData(), { museum: museumData(), training: trainingData() }, extra || {}) }); };
+  // a gift, a plaque or a badge "in 3D": in your museum, in your hands (the edition's 3D); one given away is not there
+  W.viewer3dOpen = (o: any) => { const t = o && o.title; if (!t) return; if (!museumData().some((m: any) => m.title === t)) { toast(`${t} is not in your museum: only what you were given or earned stands there`, 'info'); return; } closeAll(); building('museum', { focus: t }); };
+  // the graphics stress test: a walk through the joined building with the frame rate on the screen
+  const stress = () => { if (typeof company !== 'function' || !company()) { toast('Start or load a game first: the test walks through your own rooms', 'info'); return; } closeAll(); building('concourse', { stress: true }); };
+  ACTIONS['gfx-stress'] = stress; setTimeout(() => { ACTIONS['gfx-stress'] = stress; }, 0);
   const trnVisit = () => { closeAll(); building('training'); }; ACTIONS['ct-visit'] = trnVisit; setTimeout(() => { ACTIONS['ct-visit'] = trnVisit; }, 0);
   OfficeRoom.open = () => building('office');
   OpsRoom.open = () => building('ops');
@@ -174,7 +179,7 @@ if (EMBED) {
     else if (d.ampb === 'airport' && d.icao) {
       // an airport's layout for the 3D viewer: what is known now, and again if a better one arrives
       const A: any = apt(d.icao), elev = A && A.elev ? A.elev * 0.3048 : 0;
-      const crash = (() => { try { const c: any = crashSiteAt(d.icao); return c ? JSON.parse(JSON.stringify(c)) : null; } catch (e) { return null; } })();
+      const crash = (() => { try { const c: any = crashSiteAt(d.icao); if (!c) return null; const o = JSON.parse(JSON.stringify(c)); try { o.heli = typeof isHeli === 'function' && isHeli(c.typeId); } catch (e) { /* an aeroplane */ } return o; } catch (e) { return null; } })();
       const out = (L: any) => { if (L) embedTell('airport', { icao: d.icao, crash, L: Object.assign({}, L, { alt: L.alt || elev }) }); };
       try { AirportLayouts.get(d.icao, out).then(out).catch(() => embedTell('airport', { icao: d.icao, L: null })); } catch (e) { embedTell('airport', { icao: d.icao, L: null }); }
     }

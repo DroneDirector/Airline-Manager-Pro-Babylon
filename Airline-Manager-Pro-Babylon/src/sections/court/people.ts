@@ -73,3 +73,13 @@ export function posePerson(p: Person, t: number, talking: boolean, spk: Vector3 
 }
 /** Where a person's head is (for the camera and for the others to look at). */
 export function headOf(p: Person): Vector3 { const s = p.sk; return new Vector3(p.seat.x, p.seat.y + (s > 0.5 ? 1.28 : 1.66), p.seat.z); }
+/** Walking (after posePerson, standing): the legs in step, the knees bending as each foot comes through, the arms
+ *  swinging against the legs, a little rise and fall. ph is the step's phase (it goes on with the distance walked),
+ *  k how much of a walk it is (0 standing still … 1 walking). */
+export function stridePerson(p: Person, ph: number, k: number) {
+  if (k < 0.01) return;
+  for (let i = 0; i < 2; i++) { const s = Math.sin(ph + i * Math.PI);
+    p.thighs[i].rotation.x += -s * 0.42 * k; p.shins[i].rotation.x += Math.max(0, Math.sin(ph + i * Math.PI + 1.3)) * 0.75 * k;
+    p.arms[i].rotation.x += s * 0.34 * k; p.fore[i].rotation.x += -0.18 * k; }
+  p.hip.position.y += (Math.abs(Math.cos(ph)) - 0.6) * 0.035 * k; p.hip.rotation.y = Math.sin(ph) * 0.06 * k;
+}
