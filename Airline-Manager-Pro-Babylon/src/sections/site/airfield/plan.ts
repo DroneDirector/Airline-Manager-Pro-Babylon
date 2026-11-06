@@ -131,7 +131,7 @@ export const TERMINAL: any = (() => {
   PAIRS.forEach((a, i) => { const cx = Math.round((-62 + i * 2 * 286 / 7) * 100) / 100, cw = Math.round((-62 + (i * 2 + 1) * 286 / 7) * 100) / 100;   // 40.86 m apart, as in the 3D terminal
     // as in the Babylon terminal (fixtures.ts): out of the gate at x0 + 22, the rotunda 5.2 m out on its column, the moving
     // tunnel from 6.6 m out down to the aircraft's front door
-    J.push({ id: 'J-' + (i + 1), gate: 'F2-GATE-' + (i + 1), door: 'D-F2-GATE-' + (i + 1) + '-JW', x: a + 28, y: PN, rotunda: [a + 28, PN + 5.2], cab: [cx + 2.4, PN + 6 + 5.5] });
+    J.push({ id: 'J-' + (i + 1), gate: 'F2-GATE-' + (i + 1), door: 'D-F2-GATE-' + (i + 1) + '-JW', x: a + 28, y: PN, rotunda: [cx + 15, PN + 2.5], cab: [cx + 2.4, PN + 6 + 5.5] });
     S.push({ id: 'STAND-' + (i + 1), gate: 'F2-GATE-' + (i + 1), kind: 'jetway stand', x: cx, nose: PN + 6 });
     S.push({ id: 'STAND-' + (i + 5), gate: 'F1-GATE-' + (i + 5), kind: 'walk-out stand', x: cw, nose: PN + 8 }); });
 

@@ -96,7 +96,7 @@ export const field = (x, P, s, o) => {
       x.strokeStyle = 'rgba(255,74,61,.85)'; x.lineWidth = Math.max(1, 0.15 * s); for (let k = -30; k <= 30; k += 1.5) { const p = P(rx + k, ry - 20), q = P(rx + k + 20, ry + 20); x.beginPath(); x.moveTo(p[0], p[1]); x.lineTo(q[0], q[1]); x.stroke(); } x.restore();
       line(sec.concat([sec[0]]), red, Math.max(2, 0.2 * s));
       { const p = P(rx, ry); x.beginPath(); x.arc(p[0], p[1], 2.2 * s, 0, 7); x.strokeStyle = red; x.lineWidth = Math.max(2, 0.2 * s); x.stroke(); x.fillStyle = 'rgba(255,255,255,.25)'; x.fill(); }
-      { const bx = rx + Math.cos(th) * 4.8, by = ry + Math.sin(th) * 4.8; x.save(); const p = P(bx, by); x.translate(p[0], p[1]); x.rotate(-th); x.strokeStyle = gold; x.lineWidth = Math.max(2, 0.18 * s); x.strokeRect(-1.4 * s, -0.9 * s, 2.8 * s, 1.8 * s); if (s >= 6) { x.fillStyle = gold; x.font = `800 ${Math.round(0.9 * s)}px Inter, Arial`; x.textAlign = 'center'; RT(x, 'PBB', 0, 0.32 * s); x.textAlign = 'left'; } x.restore(); }
+      { const bx = rx + Math.cos(th) * reach * 0.62, by = ry + Math.sin(th) * reach * 0.62; x.save(); const p = P(bx, by); x.translate(p[0], p[1]); x.rotate(-th); x.strokeStyle = gold; x.lineWidth = Math.max(2, 0.18 * s); x.strokeRect(-1.4 * s, -0.9 * s, 2.8 * s, 1.8 * s); if (s >= 6) { x.fillStyle = gold; x.font = `800 ${Math.round(0.9 * s)}px Inter, Arial`; x.textAlign = 'center'; RT(x, 'PBB', 0, 0.32 * s); x.textAlign = 'left'; } x.restore(); }
       if (o.marks) return;
       // the bridge seen from above: fixed tunnel, rotunda, moving tunnel to the door, its cab
       const fx = [[j.x - 1.3, j.y], [j.x + 1.3, j.y], [j.x + 1.3, ry], [j.x - 1.3, ry]]; x.fillStyle = 'rgba(210,216,224,.55)'; x.strokeStyle = '#E6ECF2'; x.lineWidth = Math.max(1.5, 0.1 * s);
