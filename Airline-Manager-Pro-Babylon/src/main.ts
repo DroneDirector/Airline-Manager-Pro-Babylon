@@ -1,6 +1,7 @@
 // Airline Manager Pro, Babylon.js edition. It starts with the start screen (the film), then one place: the lounge.
 // The gear in the corner is always there: graphics and controls settings. More parts of the game are added as
 // sections (core/sections.ts) and opened from here.
+import { logProblem } from './core/errlog';
 import { makeEngine, applyScale, getEngine } from './core/engine';
 import { onSettings } from './core/settings';
 import { inputInit, onButton, setPlay, onPad } from './core/input';
@@ -63,8 +64,13 @@ onPad(name => toast(name ? `${name} connected` : 'Controller disconnected'));
 async function enter(id: string, title: string, opts?: any) {
   loadingShow(title);
   const engine = makeEngine(canvas);
-  const ctx: SectionCtx = { engine, canvas, ui, progress: (p, s) => loadingProgress(p, s), back: backToTitle, opts, toGame: opts && gameExists() ? backToGame : undefined, goTo: goToPlace };
-  try { await openSection(id, ctx); } catch (e) { console.error(e); loadingProgress(100, 'This place could not be opened on this device'); return; }
+  // where the loading got to: if it is still loading after two minutes, that goes to the log (Settings → Updates and errors)
+  let at = { p: 0, s: 'Starting' }, opened = false;
+  const ctx: SectionCtx = { engine, canvas, ui, progress: (p, s) => { at = { p, s }; loadingProgress(p, s); }, back: backToTitle, opts, toGame: opts && gameExists() ? backToGame : undefined, goTo: goToPlace };
+  const watch = setTimeout(() => { if (!opened) logProblem('3d places', `${title} is taking too long to open`, `Still loading after 2 minutes, at ${Math.round(at.p)}% (${at.s}).`, `Place: ${id}\nOptions: ${JSON.stringify(opts || {}).slice(0, 300)}\nDevice: ${navigator.userAgent}`); }, 120000);
+  try { await openSection(id, ctx); } catch (e: any) { clearTimeout(watch); console.error(e); loadingProgress(100, 'This place could not be opened on this device');
+    logProblem('3d places', `${title} could not be opened`, `${(e && e.message) || String(e)} (at ${Math.round(at.p)}%, ${at.s})`, `Place: ${id}\nVersion: ${APP.version}\nDevice: ${navigator.userAgent}\n\n${(e && e.stack) || ''}`.slice(0, 4000)); return; }
+  opened = true; clearTimeout(watch);
   loadingProgress(100, 'Welcome'); canvas.classList.add('on');
   setTimeout(() => { loadingHide(); inPlace = true; titleB.hidden = false; verB.hidden = false; document.body.classList.toggle('in-viewer', id === 'viewer3d'); if (!settingsOpen()) setPlay(true); }, 350);
 }

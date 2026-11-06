@@ -152,7 +152,7 @@ if (EMBED) {
   W.petPreviewDraw = (P: any) => { const cv = document.querySelector('[data-pet-prev]') as HTMLCanvasElement; if (!cv || !P || P.kind === 'none') return; petPrevN++; embedTell('petprev', { pet: JSON.parse(JSON.stringify(P)), w: cv.width, h: cv.height, id: petPrevN }); };
   // the 3D places' notes on replaced parts (your own models in models/) and any problem with them: into the log
   const partLog = () => { try { const q = JSON.parse(localStorage.getItem('ampb.partlog') || '[]'); localStorage.removeItem('ampb.partlog');
-    for (const p of q) ErrorLog.add('3d models', p.title, p.message, p.detail || '', p.kind === 'problem'); } catch (err) { /* none */ } };
+    for (const p of q) ErrorLog.add(p.area || '3d models', p.title, p.message, p.detail || '', p.kind === 'problem'); } catch (err) { /* none */ } };
   partLog();
   window.addEventListener('message', (e: MessageEvent) => {
     const d: any = e.data; if (!d || !d.ampb) return;

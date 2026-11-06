@@ -82,9 +82,11 @@ export const WET_FINAL = `{ if (wtGl > .001 && wtSunDir.y > 0.) { vec3 Vg = norm
   vec3 rc = texture2D(wtMir, gl_FragCoord.xy / wtRes + normalW.xz * .05).rgb;
   finalColor.rgb = mix(finalColor.rgb, rc, clamp(.1 + fr * 1.15, 0., .92) * wq); } }`;
 /** Wet ground and puddles on a plain paved material (the roads, the kerb and paths behind the terminal, the stands). */
+let nextPave = 1;
 export class WetPlugin extends MaterialPluginBase {
   pave: number;
-  constructor(mat: any, pave = 1) { super(mat, 'Wet', 220, { WETGROUND: false }); this.pave = pave; this._enable(true); }
+  // (the base class asks for the shader code while it is being made, before this.pave is set: hence nextPave)
+  constructor(mat: any, pave = 1) { nextPave = pave; super(mat, 'Wet', 220, { WETGROUND: false }); this.pave = pave; this._enable(true); }
   getClassName() { return 'WetPlugin'; }
   prepareDefines(d: any) { d.WETGROUND = true; }
   getSamplers(s: string[]) { s.push('wtMir'); }
@@ -92,7 +94,7 @@ export class WetPlugin extends MaterialPluginBase {
   bindForSubMesh(ubo: any, scene: Scene) { bindWet(ubo, scene); }
   getCustomCode(type: string, lang?: any): any { if (lang || type === 'vertex') return null;
     return { CUSTOM_FRAGMENT_DEFINITIONS: 'float wtR = 1.; float wtHH = 0.;\n' + WET_GLSL,
-      CUSTOM_FRAGMENT_UPDATE_ALPHA: `{ vec3 c = surfaceAlbedo; wetIt(vPositionW.xz, ${this.pave.toFixed(2)}, 0., 0., c, wtR, wtHH); snowIt(vPositionW.xz, ${this.pave.toFixed(2)}, 0., 0., 0., c, wtR, wtHH); surfaceAlbedo = c;
+      CUSTOM_FRAGMENT_UPDATE_ALPHA: `{ vec3 c = surfaceAlbedo; wetIt(vPositionW.xz, ${(this.pave ?? nextPave).toFixed(2)}, 0., 0., c, wtR, wtHH); snowIt(vPositionW.xz, ${(this.pave ?? nextPave).toFixed(2)}, 0., 0., 0., c, wtR, wtHH); surfaceAlbedo = c;
         vec3 dpx = dFdx(vPositionW), dpy = dFdy(vPositionW); vec3 r1 = cross(dpy, normalW), r2 = cross(normalW, dpx); float det = dot(dpx, r1);
         vec3 grd = sign(det) * (dFdx(wtHH) * r1 + dFdy(wtHH) * r2); normalW = normalize(abs(det) * normalW - grd * 1.6); }`,
       CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: WET_FINAL,
