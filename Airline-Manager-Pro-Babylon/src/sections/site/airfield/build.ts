@@ -12,7 +12,7 @@
 import { TransformNode, Mesh, VertexData, PBRMaterial, StandardMaterial, Color3, RawTexture, Texture, DynamicTexture, MaterialPluginBase, Matrix, Vector3, MeshBuilder } from '@babylonjs/core';
 import { AIRFIELD as AF, TERMINAL as TL } from './plan';
 import { field } from './field';
-import { WET_GLSL, WET_UNIFORMS, WET_DECL, bindWet } from '../../../core/look';
+import { WET_GLSL, WET_FINAL, WET_UNIFORMS, WET_DECL, bindWet } from '../../../core/look';
 
 const R = AF.runway, Y = AF.ys, PU = AF.airport.planU, PV = AF.airport.planV;
 const M0 = [-2060, -230], M1 = [2300, 1380];
@@ -33,7 +33,7 @@ const standCode = () => {
       ${st.map((s, i) => `t += standOne(p, vec4(${s.map(f).join(', ')}), ${f(i)}, oil);`).join('\n      ')}
       return t; }`;
 };
-const glNoise = (low: boolean) => `
+const glNoise = (low: boolean) => `uniform sampler2D afSkid;
     float h21(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
     float vn(vec2 p){ vec2 i = floor(p), q = fract(p); vec2 u = q * q * (3. - 2. * q); return mix(mix(h21(i), h21(i + vec2(1., 0.)), u.x), mix(h21(i + vec2(0., 1.)), h21(i + vec2(1., 1.)), u.x), u.y); }
     float fbm(vec2 p){ float a = .5, s = 0.; for (int i = 0; i < ${low ? 3 : 5}; i++) { s += a * vn(p); p = mat2(1.6, 1.2, -1.2, 1.6) * p + 7.7; a *= .5; } return s; }
@@ -42,12 +42,14 @@ const glNoise = (low: boolean) => `
     // the grain of the asphalt (aggregate), fading out when smaller than a pixel
     float grain(vec2 pl, float w){ return (vnA(pl * 34., w * 34.) - .5) * .32 + (vnA(pl * 95., w * 95.) - .5) * .42 + (vnA(pl * 230., w * 230.) - .5) * .34; }
     // rubber and skid marks in the two touchdown zones (from the landing thresholds)
-    float rubber(vec2 p){ float y = abs(p.y - ${f(R.y)}); float lat = 1. - smoothstep(3.5, 13., y); if (lat < .001) return 0.;
-      float d0 = p.x - ${f(R.x0 + R.ends[0].disp)}, d1 = ${f(R.x1 - R.ends[1].disp)} - p.x; float z = smoothstep(-30., 140., d0) * (1. - smoothstep(650., 1350., d0)) + smoothstep(-30., 140., d1) * (1. - smoothstep(650., 1350., d1));
-      if (z * lat < .001) return 0.;
-      float streak = fbm(vec2(p.x * .012, p.y * 1.35)); float body = smoothstep(.42, .78, streak + .22 * vn(vec2(p.x * .06, p.y * 5.)));
-      float ln = fract(p.y * .72); float k = vn(vec2(p.x * .016 + floor(p.y * .72) * 13.1, 3.)); float skid = smoothstep(.6, .7, k) * (1. - smoothstep(.12, .32, abs(ln - .5)));
-      return clamp(z * lat * (body * .75 + skid * .7), 0., 1.); }
+    // (the marks from the skid-mark picture: 96 m long, tiling along the runway, 30 m across the centre line; turned round
+    //  for the far end, so they start heavy where the wheels touch and fade the way the aircraft rolls)
+    float rubber(vec2 p){ float y = p.y - ${f(R.y)}; if (abs(y) > 15.) return 0.;
+      float d0 = p.x - ${f(R.x0 + R.ends[0].disp)}, d1 = ${f(R.x1 - R.ends[1].disp)} - p.x;
+      float z0 = smoothstep(-30., 140., d0) * (1. - smoothstep(700., 1400., d0)), z1 = smoothstep(-30., 140., d1) * (1. - smoothstep(700., 1400., d1));
+      float z = max(z0 + z1, .14 * step(${f(R.x0)}, p.x) * step(p.x, ${f(R.x1)})); if (z < .001) return 0.;
+      float u = z0 >= z1 ? (d0 + 18.) / 96. : (d1 + 18.) / 96.; float sk = texture2D(afSkid, vec2(u, y / 30. + .5)).r;
+      return clamp(z * sk * (.8 + .4 * vn(vec2(p.x * .004, 1.7))) * 1.15, 0., 1.); }
     // dirt in patches
     float dirt(vec2 p){ return smoothstep(.55, .86, fbm(p * .055 + 20.)) * .9 + smoothstep(.7, .95, fbm(p * .4 + 3.)) * .3; }
     ${standCode()}
@@ -91,6 +93,9 @@ const glSurf = (low: boolean) => `
 const BUMP = `{ vec3 dpx = dFdx(vPositionW), dpy = dFdy(vPositionW); vec3 r1 = cross(dpy, normalW), r2 = cross(normalW, dpx); float det = dot(dpx, r1);
       vec3 grd = sign(det) * (dFdx(afH) * r1 + dFdy(afH) * r2); normalW = normalize(abs(det) * normalW - grd * 1.6); }`;
 
+/** The runway's skid marks (own picture, tiling along the runway). */
+let SKID: Texture | null = null;
+const skidTex = (scene) => { if (!SKID || SKID.getScene() !== scene) { SKID = new Texture('assets/textures/runway-skid.webp', scene, false, true, Texture.TRILINEAR_SAMPLINGMODE); SKID.wrapU = Texture.WRAP_ADDRESSMODE; SKID.wrapV = Texture.CLAMP_ADDRESSMODE; SKID.anisotropicFilteringLevel = 8; } return SKID; };
 /** Where the camera is on the plan, rounded to 256 m: the fine noise is worked out from there (keeps its precision). */
 const orgOf = (scene, mesh) => { const cam = scene.activeCamera; if (!cam) return [0, 0]; const inv = mesh.getWorldMatrix().clone(); inv.invert();
   const lp = Vector3.TransformCoordinates(cam.globalPosition, inv); return [Math.floor((lp.x - PU) / 256) * 256, Math.floor((lp.z - PV) / 256) * 256]; };
@@ -100,14 +105,14 @@ class AirfieldGroundPlugin extends MaterialPluginBase {
   getClassName() { return 'AirfieldGroundPlugin'; }
   prepareDefines(defines) { defines.AFGROUND = true; }
   isReadyForSubMesh() { return !this.mask || this.mask.isReady(); }
-  getSamplers(samplers) { samplers.push('afMask'); }
+  getSamplers(samplers) { samplers.push('afMask', 'afSkid', 'wtMir'); }
   getUniforms() { return { ubo: [{ name: 'afOrg', size: 2, type: 'vec2' }, ...WET_UNIFORMS], vertex: 'uniform vec2 afOrg;', fragment: 'uniform vec2 afOrg; ' + WET_DECL }; }
-  bindForSubMesh(ubo, scene, engine, subMesh) { const o = orgOf(scene, subMesh.getMesh()); ubo.updateFloat2('afOrg', o[0], o[1]); ubo.setTexture('afMask', this.mask); bindWet(ubo); }
+  bindForSubMesh(ubo, scene, engine, subMesh) { const o = orgOf(scene, subMesh.getMesh()); ubo.updateFloat2('afOrg', o[0], o[1]); ubo.setTexture('afMask', this.mask); ubo.setTexture('afSkid', skidTex(scene)); bindWet(ubo, scene); }
   getCustomCode(type, lang) {
     if (lang) return null;
     if (type === 'vertex') return { CUSTOM_VERTEX_DEFINITIONS: 'varying vec2 vPlan;', CUSTOM_VERTEX_MAIN_END: `vPlan = positionUpdated.xz - vec2(${f(PU)}, ${f(PV)});` };
     return this._code || (this._code = {
-      CUSTOM_FRAGMENT_DEFINITIONS: `varying vec2 vPlan; uniform sampler2D afMask; float afH = 0.; float afR = .9;\n${glNoise(this.low)}\n${glSurf(this.low)}\n${WET_GLSL}`,
+      CUSTOM_FRAGMENT_DEFINITIONS: `varying vec2 vPlan; uniform sampler2D afMask; float afH = 0.; float afR = .9; float afRw = 0.;\n${glNoise(this.low)}\n${glSurf(this.low)}\n${WET_GLSL}`,
       CUSTOM_FRAGMENT_UPDATE_ALPHA: `{
         vec2 p = vPlan, pl = p - afOrg; float fw = max(length(fwidth(p)), 1e-4);
         vec4 ms = maskAt(p);
@@ -126,12 +131,13 @@ class AirfieldGroundPlugin extends MaterialPluginBase {
           if (isC > .001) { float ch, cr; vec3 cc = concCol(p, pl, fw, ch, cr); pc = mix(ac, cc, isC); ph = mix(ah, ch, isC); pr = mix(ar, cr, isC); }
           float worn = (1. - smoothstep(.5, .78, pa)) * (1. - isC); pc = mix(pc, pc * vec3(1.18, 1.1, .92) + .02, worn * .5);
           float tuft = smoothstep(.62, .75, vnA(pl * 5.5, fw * 5.5)) * worn; pc = mix(pc, gc * 1.1, tuft * .8);
-          col = mix(gc, pc, pave); hh = mix(gh, ph, pave); rr = mix(.96, pr, pave);
+          col = mix(gc, pc, pave); hh = mix(gh, ph, pave); rr = mix(.96, pr, pave); afRw = isR * (1. - isS);
         }
-        wetIt(p, pave, col, rr, hh);
+        { float yy = abs(p.y - ${f(R.y)}); wetIt(p, pave, afRw, afRw * (.07 * exp(-pow((yy - 4.4) / 2.4, 2.)) + .03 * exp(-pow(yy / 1.6, 2.))), col, rr, hh); }
         surfaceAlbedo = col; afH = hh; afR = rr; }
         ${BUMP}`,
-      '!float roughness=reflectivityOut\\.roughness;': 'float roughness=clamp(afR,.05,1.);',
+      '!float roughness=reflectivityOut\\.roughness;': 'float roughness=clamp(afR,.015,1.);',
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: WET_FINAL,
     });
   }
 }
@@ -141,10 +147,10 @@ class AirfieldPaintPlugin extends MaterialPluginBase {
   prepareDefines(defines) { defines.AFPAINT = true; }
   isReadyForSubMesh() { return !this.atlas || this.atlas.isReady(); }
   getAttributes(attributes) { attributes.push('aCol', 'aInfo', 'aSide'); }
-  getSamplers(samplers) { samplers.push('afAtlas'); }
+  getSamplers(samplers) { samplers.push('afAtlas', 'afSkid', 'wtMir'); }
   getUniforms() { return { ubo: [{ name: 'afOrg', size: 2, type: 'vec2' }, { name: 'afPix', size: 1, type: 'float' }, ...WET_UNIFORMS], vertex: 'uniform vec2 afOrg; uniform float afPix;', fragment: 'uniform vec2 afOrg; uniform float afPix; ' + WET_DECL }; }
   bindForSubMesh(ubo, scene, engine, subMesh) { const o = orgOf(scene, subMesh.getMesh()), cam = scene.activeCamera;
-    ubo.updateFloat2('afOrg', o[0], o[1]); ubo.updateFloat('afPix', cam ? (cam.fov || 0.8) / Math.max(1, engine.getRenderHeight()) : this.pix); ubo.setTexture('afAtlas', this.atlas); bindWet(ubo); }
+    ubo.updateFloat2('afOrg', o[0], o[1]); ubo.updateFloat('afPix', cam ? (cam.fov || 0.8) / Math.max(1, engine.getRenderHeight()) : this.pix); ubo.setTexture('afAtlas', this.atlas); ubo.setTexture('afSkid', skidTex(scene)); bindWet(ubo, scene); }
   getCustomCode(type, lang) {
     if (lang) return null;
     if (type === 'vertex') return {
@@ -171,8 +177,9 @@ class AirfieldPaintPlugin extends MaterialPluginBase {
         a *= mix(1., smoothstep(.12, .32, vnA(pl * 7., fw * 7.)), .45);
         col = mix(col, col * vec3(.72, .68, .6), dirt(p) * .45);
         float ru = rubber(p); col = mix(col, vec3(.03), ru * .88); a *= 1. - ru * .25;
-        afR = .62 + ru * .2; { float wH = 0.; wetIt(p, 1., col, afR, wH); } surfaceAlbedo = col; alpha = clamp(a, 0., 1.); }`,
-      '!float roughness=reflectivityOut\\.roughness;': 'float roughness=clamp(afR,.05,1.);',
+        afR = .62 + ru * .2; { float wH = 0.; float yy = abs(p.y - ${f(R.y)}); float rw = (1. - smoothstep(${f(R.w / 2 - 0.4)}, ${f(R.w / 2 + 0.4)}, yy)) * step(${f(R.x0)}, p.x) * step(p.x, ${f(R.x1)}); wetIt(p, 1., rw, rw * (.07 * exp(-pow((yy - 4.4) / 2.4, 2.)) + .03 * exp(-pow(yy / 1.6, 2.))), col, afR, wH); } surfaceAlbedo = col; alpha = clamp(a, 0., 1.); }`,
+      '!float roughness=reflectivityOut\\.roughness;': 'float roughness=clamp(afR,.015,1.);',
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: WET_FINAL,
     });
   }
 }
