@@ -16,6 +16,7 @@ import { IS_PC, IS_TOUCH } from '../../core/app';
 import { icon, esc, toast } from '../../ui/icons';
 import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core/perf-meter';
 import { makeSky, skyFrame, Sky } from './sky';
+import { makePhotoMode } from './photo';
 import { buildAirliner, Airliner, repaint, setGear } from './airliner';
 import { buildAirport, placeAirport, Airport } from './airport';
 import { buildTerrain, placeTerrain, terrainStale, Terrain } from './terrain';
@@ -173,6 +174,7 @@ function hudHtml(): string {
     <div class="v3d-top">
       ${V.live ? `<button class="v3d-b v3d-game" data-v="game" aria-label="Back to the game">${icon('back')}<span>Back to the game</span></button>` : ''}
       <button class="v3d-b v3d-site" data-v="site" aria-label="To the airport: your gate, gate 4">${icon('mountain')}<span>Airport</span></button>
+      <button class="v3d-b v3d-photo" data-v="photo" aria-label="Photo mode: looks, a wide frame, depth of field, a caption"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M4 8h3l2-3h6l2 3h3v11H4V8Zm8 2.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/></svg><span>Photo mode</span></button>
       <div class="v3d-info"><div class="v3d-csr">${V.live ? `<button class="v3d-b v3d-pk" data-v="prev" aria-label="The previous flight">‹</button>` : ''}<b class="v3d-cs">${V.live ? 'Waiting for the flight…' : `AMP 214 · ${esc(FROM.name)} → ${esc(TO.name)}`}</b>${V.live ? `<button class="v3d-b v3d-pk" data-v="next" aria-label="The next flight">›</button>` : ''}</div><small class="v3d-al"></small><div class="v3d-rows"></div></div>
     </div>
     <div class="v3d-views" role="toolbar" aria-label="Camera">${VIEWS.map((v, i) => `<button class="v3d-b ${i === 0 ? 'on' : ''}" data-view="${v.id}">${esc(v.label)}</button>`).join('')}</div>
@@ -230,12 +232,15 @@ const Viewer: Section = {
     apply('all');
     // the controls on the screen
     const hud = document.createElement('div'); hud.className = 'hud v3d-hud'; hud.innerHTML = hudHtml(); ui.appendChild(hud); V.hud = hud;
+    // photo mode: looks, a wide frame, depth of field (focused on the aircraft), a caption, and the picture
+    V.photo = makePhotoMode({ hud, root: document.body, engine, canvas: ctx.canvas, dp: () => V.dp, cam: () => V.cam, focus: () => (V.cam && V.ac ? V.cam.globalPosition.subtract(V.ac.root.getAbsolutePosition()).length() : 300), caption: () => '' });
     perfAttach(engine, sc, hud.querySelector('.v3d-perf') as HTMLElement); perfShow();
     hud.addEventListener('click', (e: Event) => {
       const b = (e.target as HTMLElement).closest('button') as HTMLElement; if (!b) return;
       if (b.hasAttribute('data-view')) setView(b.getAttribute('data-view') as string);
       else if (b.hasAttribute('data-speed')) setSpeed(Number(b.getAttribute('data-speed')));
       else if (b.getAttribute('data-v') === 'game' && ctx.toGame) ctx.toGame();
+      else if (b.getAttribute('data-v') === 'photo' && V.photo) V.photo.toggle();
       else if (b.getAttribute('data-v') === 'site' && ctx.goTo) ctx.goTo('site', { site: 'myrdalssandur', view: 'carpark' });
       else if ((b.getAttribute('data-v') === 'prev' || b.getAttribute('data-v') === 'next') && V.live) { const l = V.live.list || [], i = l.findIndex((x: any) => x.id === V.live.id); if (l.length) follow(l[(i + (b.getAttribute('data-v') === 'next' ? 1 : l.length - 1) + l.length) % l.length].id); }
     });
@@ -337,12 +342,14 @@ const Viewer: Section = {
       // the sky's reflection on the paint: refreshed now and then, and at once when the slider moves
       if (V.probeOn && (V.envDirty || now > envT)) { pr.cubeTexture.resetRefreshCounter(); envT = now + (V.speed >= 2000 ? 0.2 : V.speed >= 600 ? 0.4 : 1.2); V.envDirty = false; }
       if (now > infoT) { infoT = now + 0.25; info(); }
+      if (V.photo) V.photo.frame();
       sc.render();
       perfEnd();
     });
   },
   close() {
     const sc: Scene = V.scene; if (!sc) return;
+    try { if (V.photo) { V.photo.dispose(); V.photo = null; } document.body.classList.remove('photo-on'); } catch (e) { /* gone */ }
     try { V.ctx.canvas.removeEventListener('wheel', V.wheel); } catch (e) { /* gone */ }
     window.removeEventListener('keydown', V.key);
     if (V.live) { gameSend({ ampb: 'stop' }); V.live = null; } V.others = {}; V.apts = {}; if (V.ter) { V.ter.dispose(); V.ter = null; }

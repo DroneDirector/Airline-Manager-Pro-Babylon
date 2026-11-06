@@ -323,3 +323,18 @@ body.game-on .gear, body.game-on .exit, body.game-on .to-title, body.game-on .pl
 .site-ud { bottom: 30%; }
 .site-moves { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 34px); display: grid; grid-template-columns: repeat(2, auto); gap: 8px; pointer-events: auto; }
 .site-moves .wx-b { min-width: 86px; justify-content: center; padding: 10px 12px; }
+/* photo mode in the 3D viewer: everything but the strip goes away */
+body.photo-on .v3d-top, body.photo-on .v3d-views, body.photo-on .v3d-time, body.photo-on .v3d-perf, body.photo-on .v3d-credit, body.photo-on .gear, body.photo-on .exit, body.photo-on .to-title, body.photo-on .perf { opacity: 0 !important; pointer-events: none !important; transition: opacity .25s; }
+.ph-wrap { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 20; max-width: calc(100vw - 20px); pointer-events: auto; }
+.ph-wrap[hidden], .ph-bars[hidden] { display: none; }
+.ph-bar { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; align-items: center; padding: 8px 10px; border-radius: 16px; background: rgba(8, 12, 18, .72); backdrop-filter: blur(10px); border: 1px solid rgba(140, 170, 255, .22); }
+.ph-look { border: 1px solid rgba(140, 170, 255, .28); background: rgba(255, 255, 255, .06); color: #F1F4FA; border-radius: 9px; padding: 7px 11px; font: 600 12.5px 'Inter', sans-serif; cursor: pointer; }
+.ph-look.on { background: linear-gradient(90deg, rgba(255, 63, 184, .55), rgba(53, 240, 255, .3)); border-color: rgba(255, 140, 220, .7); }
+.ph-cap { min-width: 180px; padding: 7px 10px; border-radius: 9px; border: 1px solid rgba(140, 170, 255, .28); background: rgba(0, 0, 0, .35); color: #fff; font: 500 13px 'Inter', sans-serif; }
+.ph-shoot { width: 54px; height: 54px; border-radius: 50%; border: 3px solid #fff; background: rgba(255, 255, 255, .18); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.ph-shoot .ic { width: 24px; height: 24px; }
+.ph-exit { width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .35); background: rgba(0, 0, 0, .4); color: #fff; font-size: 16px; cursor: pointer; }
+.ph-bars { position: absolute; inset: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+.ph-bars i { display: block; height: calc((100vh - 100vw / 2.39) / 2); background: #000; }
+.v3d-flash { position: absolute; inset: 0; z-index: 50; background: #fff; pointer-events: none; animation: v3dFlash .5s ease-out forwards; }
+@keyframes v3dFlash { from { opacity: .85; } to { opacity: 0; } }

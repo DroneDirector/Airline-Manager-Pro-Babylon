@@ -4,7 +4,7 @@
   "shortName": "AMP Babylon",
   "appId": "com.dronedirector.airlinemanagerpro.babylon",
   "publisher": "DroneDirector",
-  "version": "0.3.28",
-  "versionCode": 36,
+  "version": "0.3.29",
+  "versionCode": 37,
   "updates": { "repo": "DroneDirector/Airline-Manager-Pro-Babylon", "tagPrefix": "airline-manager-pro-babylon-v" }
 }
