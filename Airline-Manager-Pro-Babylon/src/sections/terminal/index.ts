@@ -22,6 +22,7 @@ import { makeWeather, Weather } from './weather';
 import { ROOMS, STAIRS, OUTSIDE, SPAWN, F2Y, Fl, Stair, inRoom, roomAt } from './plan';
 import { museumBlocked } from '../building/museum';
 import { holoMap } from '../../ui/holomap';
+import { slimGlow } from '../../core/look';
 
 const EYE = 1.65, R = 0.3;
 const O: any = { scene: null as Scene | null };
@@ -78,7 +79,7 @@ const Terminal$: Section = {
     const F = { x: SPAWN.x, z: SPAWN.z, f: SPAWN.f as Fl, y: 0, yaw: SPAWN.yaw, pitch: -0.04, v: 0, bob: 0, stair: null as Stair | null }; O.F = F;
     if (!walkable(1, F.x, F.z)) { const s = freeNear(1, F.x, F.z); F.x = s[0]; F.z = s[1]; }
     const cam = new UniversalCamera('eyes', new Vector3(F.x, EYE, F.z), sc); cam.minZ = 0.1; cam.maxZ = 900; cam.inertia = 0; O.cam = cam; sc.activeCamera = cam;
-    O.glow = new GlowLayer('glow', sc, { mainTextureRatio: IS_PC ? 0.5 : 0.3, blurKernelSize: 32 }); O.glow.intensity = 0.35; for (const m of sc.meshes) if (m.material && (m.material as any)._soft) O.glow.addExcludedMesh(m as any); sc.onNewMeshAddedObservable.add(m => { setTimeout(() => { if (m.material && (m.material as any)._soft) O.glow.addExcludedMesh(m as any); }, 0); });
+    O.glow = new GlowLayer('glow', sc, { mainTextureRatio: IS_PC ? 0.5 : 0.3, blurKernelSize: 32 }); O.glow.intensity = 0.35; for (const m of sc.meshes) if (m.material && (m.material as any)._soft) O.glow.addExcludedMesh(m as any); sc.onNewMeshAddedObservable.add(m => { setTimeout(() => { if (m.material && (m.material as any)._soft) O.glow.addExcludedMesh(m as any); }, 0); }); slimGlow(O.glow, sc);
     O.dp = new DefaultRenderingPipeline('dp', true, sc, [cam]);
     progress(92, 'Lighting the terminal…');
     apply('all');

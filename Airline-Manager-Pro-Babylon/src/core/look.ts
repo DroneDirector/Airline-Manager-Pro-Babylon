@@ -82,6 +82,22 @@ export const WET_FINAL = `{ if (wtGl > .001 && wtSunDir.y > 0.) { vec3 Vg = norm
   vec3 rc = texture2D(wtMir, gl_FragCoord.xy / wtRes + normalW.xz * .05).rgb;
   finalColor.rgb = mix(finalColor.rgb, rc, clamp(.1 + fr * 1.15, 0., .92) * wq); } }`;
 /** Wet ground and puddles on a plain paved material (the roads, the kerb and paths behind the terminal, the stands). */
+/** Is this something big enough to matter in the extra passes (a building, a wall, a jetway's body, an aircraft, a mast,
+ *  the sky)? Small things (chairs, fittings, wheels, signs on poles) only matter in the picture itself. */
+const BIGW = new WeakMap<AbstractMesh, boolean>();
+export function isBig(m: AbstractMesh): boolean { let b = BIGW.get(m); if (b != null) return b;
+  try { const bi = m.getBoundingInfo(); const e = bi.boundingBox.extendSizeWorld; b = /sky/i.test(m.name) || Math.hypot(e.x, e.y, e.z) * 2 > 4; } catch (e) { b = true; } BIGW.set(m, b); return b; }
+/** Does it glow (lights, signs, screens)? */
+function glows(m: AbstractMesh): boolean { const src: any = (m as any).sourceMesh || m, mt: any = src.material; if (!mt || mt._soft) return false;
+  const c = mt.emissiveColor; return !!mt.emissiveTexture || !!(c && c.r + c.g + c.b > 0.02); }
+/** The glow layer draws only what glows, and the big things that stand in front of lights (so a halo never shows
+ *  through a wall, a jetway or an aircraft): the look of the glow stays the same, at a fraction of the draw calls. */
+export function slimGlow(glow: any, sc: Scene) {
+  const skip = new Set<number>((glow._excludedMeshes || []) as number[]);
+  const take = (m: AbstractMesh) => { if (skip.has(m.uniqueId) || (m as any).isAnInstance) return; if (glows(m) || (!(m as any).hasInstances && isBig(m))) glow.addIncludedOnlyMesh(m as Mesh); };
+  for (const m of sc.meshes) take(m);
+  sc.onNewMeshAddedObservable.add(m => setTimeout(() => { if (!m.isDisposed()) take(m); }, 0));
+}
 let nextPave = 1;
 export class WetPlugin extends MaterialPluginBase {
   pave: number;
@@ -146,6 +162,7 @@ export function applyLook(P: LookParts): (dt: number) => void {
     steps.push(() => { const d = P.sun.direction; sunDisc!.position.copyFrom(cam.globalPosition.subtract(d.scale(780))); const up = -d.y; sunDisc!.setEnabled(up > -0.03); sm.emissiveColor.set(1, 0.72 + 0.2 * Math.min(1, up * 4), 0.45 + 0.3 * Math.min(1, up * 4)); }); }
   // volumetric light: rays from the sun past the buildings, the jetways and through the glass
   if (g.volLight && sunDisc) tryIt(() => { const vls = new VolumetricLightScatteringPostProcess('look-rays', IS_PC ? 0.75 : 0.5, cam, sunDisc!, IS_PC ? 90 : 40, Texture.BILINEAR_SAMPLINGMODE, E, false); vls.exposure = 0.18; vls.decay = 0.965; vls.weight = 0.55; vls.density = 0.92;
+    vls.excludedMeshes = sc.meshes.filter(m => m !== sunDisc && !isBig(m));   // only big things block the sun's rays (small ones never show in them)
     steps.push(() => { vls.exposure = 0.18 * Math.max(0, Math.min(1, (-P.sun.direction.y + 0.03) * 6)); }); });
   // lens flares on the sun
   if (g.flares && sunDisc) tryIt(() => { const fs = new LensFlareSystem('look-flares', sunDisc, sc); const tx = (a: number, c: string) => { const t = new DynamicTexture('flare', glowDot(128, a, c), sc, false); t.hasAlpha = true; t.update(); return t as any as Texture; };
@@ -169,7 +186,7 @@ export function applyLook(P: LookParts): (dt: number) => void {
   if (g.wetRain) {
     // the puddles' mirror: everything standing (buildings, jetways, masts, aircraft, the sky), seen from below the ground
     if (S.gfx.mirror !== 'off') tryIt(() => { const mt = new MirrorTexture('look-puddles', { ratio: S.gfx.mirror === 'high' ? (IS_PC ? 0.5 : 0.35) : 0.25 }, sc, true);
-      mt.mirrorPlane = new Plane(0, -1, 0, P.base + 0.02); mt.renderListPredicate = (m: AbstractMesh) => m.isVisible && m.isEnabled() && !NOT_REFLECTED.test(m.name) && !(m.material && NOT_REFLECTED.test(m.material.name));
+      mt.mirrorPlane = new Plane(0, -1, 0, P.base + 0.02); mt.renderListPredicate = (m: AbstractMesh) => m.isVisible && m.isEnabled() && isBig(m) && !NOT_REFLECTED.test(m.name) && !(m.material && NOT_REFLECTED.test(m.material.name));
       mt.refreshRate = 100000; sc.customRenderTargets.push(mt); WET.mirror = mt; });
     let wet = 0, snow = 0, was = false; steps.push(dt => { const r = WX.rain, sn = SUN.snow;
       // snow settles in about four minutes of snowfall and melts in about ten; melting snow wets the ground

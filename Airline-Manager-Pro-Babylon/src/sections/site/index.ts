@@ -20,7 +20,7 @@ import { toast } from '../../ui/icons';
 import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core/perf-meter';
 import { buildAirliner, setGear } from '../viewer3d/airliner';
 import { makeWeather, Weather } from '../terminal/weather';
-import { applyLook } from '../../core/look';
+import { applyLook, slimGlow } from '../../core/look';
 import { makeKit } from '../terminal/kit';
 import { buildShell } from '../terminal/shell';
 import { buildDoors, stepDoors, DoorObj } from '../terminal/doors';
@@ -244,6 +244,7 @@ const Site$: Section = {
     const sun = new DirectionalLight('sun', new Vector3(-0.4, -1, 0.3), sc); sun.intensity = 2.2; sun.shadowMinZ = 1; sun.shadowMaxZ = 9000;
     const cam = new UniversalCamera('cam', new Vector3(0, 10, 0), sc); cam.minZ = 0.5; cam.maxZ = 120000; cam.fov = 0.9; cam.inertia = 0; O.cam = cam; sc.activeCamera = cam;
     const glow = new GlowLayer('glow', sc, { mainTextureRatio: 0.4 }); glow.intensity = 0.3; glow.isEnabled = S.gfx.glow !== false; for (const g of [inner.m, outer.m, sea].concat(O.AFB.exclude)) glow.addExcludedMesh(g); for (const m of sc.meshes) if (m.material && (m.material as any)._soft) glow.addExcludedMesh(m as any); sc.onNewMeshAddedObservable.add(m => { setTimeout(() => { if (m.material && (m.material as any)._soft) glow.addExcludedMesh(m as any); }, 0); });
+    slimGlow(glow, sc);
     const ULTRA = S.gfx.preset === 'ultra', HIGH = ULTRA || S.gfx.preset === 'high';
     const SG: any[] = [];
     if (S.gfx.shadows !== 'off' && ULTRA && IS_PC) { const csm = new CascadedShadowGenerator(4096, sun); csm.numCascades = 4; csm.lambda = 0.85; csm.stabilizeCascades = true; csm.usePercentageCloserFiltering = true; csm.filteringQuality = CascadedShadowGenerator.QUALITY_HIGH; csm.bias = 0.002; csm.normalBias = 0.02; csm.shadowMaxZ = 420; for (const m of casters) csm.addShadowCaster(m, false); SG.push(csm); }

@@ -254,7 +254,7 @@ body.game-on .gear, body.game-on .exit, body.game-on .to-title, body.game-on .pl
 .ts-btn.ts-demo .ts-bt b { font-size: 13px; }
 @media (max-height: 560px) { .ts-btn .ts-bt small { display: none; } .ts-nav { gap: 4px; margin-top: 8px; } }
 /* the 3D viewer following a real flight */
-.game-frame.away { visibility: hidden; pointer-events: none; }
+.game-frame.away { display: none; pointer-events: none; }   /* fully hidden in the 3D places: it draws nothing and polls no controller (the airline keeps running) */
 .game-frame.over { background: transparent; }
 .v3d-csr { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
 .v3d-csr .v3d-cs { margin-bottom: 0; flex: 1; }
