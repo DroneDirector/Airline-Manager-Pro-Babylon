@@ -25,6 +25,8 @@ import { makeKit } from '../terminal/kit';
 import { buildShell } from '../terminal/shell';
 import { buildDoors, stepDoors, DoorObj } from '../terminal/doors';
 import { STAIRS, F2Y } from '../terminal/plan';
+import { holoMap } from '../../ui/holomap';
+import { Matrix } from '@babylonjs/core';
 import { stepLifts, LiftCtl } from '../terminal/lifts';
 import { furnish } from '../terminal/furnish';
 import { buildFixtures } from '../terminal/fixtures';
@@ -291,6 +293,10 @@ const Site$: Section = {
       body.ellipsoid = new Vector3(st.r, st.half, st.r); body.ellipsoidOffset = new Vector3(0, st.half, 0); hud.querySelectorAll('[data-mv]').forEach(b => b.classList.toggle('on', b.getAttribute('data-mv') === k)); };
     O.setStance = setStance;
     // airport mode starts at the kerb's edge, square on to the main entrance under its DEPARTURES sign
+    // the airport map in the corner while walking: where you are on the plan, which floor, which way you face
+    if (walkMode) holoMap(hud, () => { const inv = Matrix.Invert(ap.computeWorldMatrix(true)), l = Vector3.TransformCoordinates(body.position, inv);
+      const d = Vector3.TransformNormal(new Vector3(Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw)), inv);
+      return { x: l.x - AIRFIELD.airport.planU, z: l.z - AIRFIELD.airport.planV, f: l.y > F2Y - 1.5 ? 2 : 1, yaw: Math.atan2(d.x, d.z) }; });
     if (walkMode) { const p = toWorld(75, 0.3, -21.5); body.position.copyFrom(p); const f = toWorld(75, 0.3, 20).subtract(p).normalize(); CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = 0; }
     const place = (id: string) => { const v = VIEWS.find(q => q.id === id) || VIEWS[0], at = Vector3.TransformCoordinates(new Vector3(v.at[0], v.at[1], v.at[2]), ap.computeWorldMatrix(true)), lk = Vector3.TransformCoordinates(new Vector3(v.look[0], v.look[1], v.look[2]), ap.getWorldMatrix());
       const d = lk.subtract(at).normalize(); CAM.x = at.x; CAM.y = at.y; CAM.z = at.z; CAM.yaw = Math.atan2(d.x, d.z); CAM.pitch = Math.asin(d.y); CAM.speed = id === 'air' || id === 'flyby' ? 220 : id === 'gate' ? 8 : 40;
