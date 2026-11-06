@@ -1,10 +1,25 @@
-name: Airport layouts – one-off build
+name: Airport layouts – build
 
+# The airport layouts that ship inside the game, for every airport in the game's list. Runs when the airport list
+# changes (new airports are covered automatically), once a month (to pick up newly mapped airports), or by hand.
+# The packs go to the layout-data branch; every app build takes them from there.
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 3 2 * *'
+  push:
+    branches: [main]
+    paths:
+      - 'Airline-Manager-Pro-Babylon/game/www/airports-world.json'
+      - '.github/layouts/**'
+      - '.github/workflows/layouts.yml'
 
 permissions:
   contents: write
+
+concurrency:
+  group: amp-layouts
+  cancel-in-progress: true
 
 jobs:
   fetch:
@@ -20,12 +35,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node .github/layouts/fetch.mjs ${{ matrix.shard }} 6 shard-${{ matrix.shard }}.json
+      - run: node --max-old-space-size=6144 .github/layouts/fetch.mjs ${{ matrix.shard }} 6 shard-${{ matrix.shard }}.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: shard-${{ matrix.shard }}
           path: shard-${{ matrix.shard }}.json
+          if-no-files-found: ignore
   pack:
     needs: fetch
     if: always()
@@ -39,12 +55,19 @@ jobs:
         with:
           path: shards
           merge-multiple: true
-      - run: node .github/layouts/pack.mjs shards Airline-Manager-Pro-Babylon/game/www/layouts
+      - name: The last build's packs (kept for any tile not answered this time)
+        run: |
+          mkdir -p old
+          if git fetch --depth 1 origin layout-data; then git archive FETCH_HEAD Airline-Manager-Pro-Babylon/game/www/layouts | tar -x -C old || true; fi
+      - run: node --max-old-space-size=6144 .github/layouts/pack.mjs shards layouts-out old/Airline-Manager-Pro-Babylon/game/www/layouts
       - name: Commit to the layout-data branch
         run: |
           git config user.name DroneDirector
           git config user.email simon@dronedirector.fo
-          git checkout -b layout-data
+          git checkout --orphan layout-data-new
+          git rm -rq --cached . 
+          mkdir -p Airline-Manager-Pro-Babylon/game/www
+          rm -rf Airline-Manager-Pro-Babylon/game/www/layouts && cp -r layouts-out Airline-Manager-Pro-Babylon/game/www/layouts
           git add Airline-Manager-Pro-Babylon/game/www/layouts
-          git commit -m "Airport layouts from OpenStreetMap (ODbL), built once for the game"
-          git push -f origin layout-data
+          git commit -qm "Airport layouts from OpenStreetMap (ODbL), built for the game"
+          git push -f origin layout-data-new:layout-data
