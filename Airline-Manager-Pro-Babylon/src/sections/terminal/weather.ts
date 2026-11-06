@@ -18,7 +18,31 @@ import { savePhoto } from '../../core/photo';
 import { toast } from '../../ui/icons';
 
 /** The sun's height above the horizon at the airport now (degrees), for lights that come on at dusk (kept up by the weather each frame). */
-export const SUN = { alt: 30, rain: 0 };
+export const SUN = { alt: 30, rain: 0, snow: 0, vis: 1 };
+
+// ---- is the sun out? The sky's own cloud layer (the same noise as its shader, in single precision), sampled along
+// the ray towards the sun: 1 in a clear sky or a gap in the clouds, 0 behind thick cloud ----
+const fr = Math.fround;
+const fract = (v: number) => fr(v - Math.floor(v));
+function hash3(x: number, y: number, z: number) { x = fr(fract(fr(fr(x * 0.3183099) + 0.1)) * 17); y = fr(fract(fr(fr(y * 0.3183099) + 0.1)) * 17); z = fr(fract(fr(fr(z * 0.3183099) + 0.1)) * 17);
+  return fract(fr(fr(fr(x * y) * z) * fr(fr(x + y) + z))); }
+function noise3(x: number, y: number, z: number) { const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z); let fx = x - ix, fy = y - iy, fz = z - iz;
+  fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); fz = fz * fz * (3 - 2 * fz); const h = (a: number, b: number, c: number) => hash3(ix + a, iy + b, iz + c), m = (a: number, b: number, t: number) => a + (b - a) * t;
+  return m(m(m(h(0, 0, 0), h(1, 0, 0), fx), m(h(0, 1, 0), h(1, 1, 0), fx), fy), m(m(h(0, 0, 1), h(1, 0, 1), fx), m(h(0, 1, 1), h(1, 1, 1), fx), fy), fz); }
+function fbm3(x: number, y: number, z: number) { let a = 0.5, s = 0; for (let i = 0; i < 4; i++) { s += a * noise3(x, y, z); x = x * 2.03 + 1.7; y = y * 2.03 + 9.2; z = z * 2.03 + 3.1; a *= 0.5; } return s; }
+const smooth = (e0: number, e1: number, x: number) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+function cloudAt(px: number, h: number, pz: number, drift: number[], time: number, cover: number, BASE = 2100, TOP = 5600) {
+  const hn = (h - BASE) / (TOP - BASE); if (hn < 0 || hn > 1) return 0; const gx = px + drift[0], gz = pz + drift[1];
+  const big = noise3(gx * 0.000035, gz * 0.000035, 0.5) * 0.65 + noise3(gx * 0.00011, gz * 0.00011, 2.5) * 0.35;
+  const shape = fbm3(gx * 0.00032 + time * 0.004, h * 0.00055, gz * 0.00032 + time * 0.002);
+  const prof = smooth(0, 0.12, hn) * smooth(1, 0.35 + 0.35 * big, hn);
+  return Math.max(0, Math.min(1, (shape * 0.9 + big * 0.75 - (1.55 - cover)) * prof * 2.4)); }
+/** How much of the sun gets through the clouds to where you are (dir: towards the sun, alt: your height). */
+export function sunThrough(dir: number[], alt: number, drift: number[], time: number, cover: number) {
+  if (dir[1] <= 0.01) return 0; const t0 = (2100 - alt) / dir[1], t1 = (5600 - alt) / dir[1], n = 10, dt = (t1 - t0) / n; let sum = 0;
+  for (let i = 0; i < n; i++) { const t = t0 + (i + 0.5) * dt; sum += cloudAt(dir[0] * t, alt + dir[1] * t, dir[2] * t, drift, time, cover); }
+  return Math.exp(-sum * dt * 0.0022); }
+
 const D2R = Math.PI / 180, LAT = 62.06, LON = -7.28;            // the airport's place on the Earth (for the sun, moon and stars)
 const CLOUDQ: { [k: string]: [number, number] } = { low: [18, 2], medium: [30, 3], high: [46, 4], ultra: [72, 6] };
 /** The kinds of sky: cloud cover, how dark the day, the haze, how hard it rains, lightning. */
@@ -133,7 +157,7 @@ export function makeWeather(h: WxHooks) {
       for (const p of ['cover', 'dark', 'fog', 'bolts'] as const) c[p] += (tgt[p] - c[p]) * k;
       const wantRain = W.precip === 'rain' ? Math.max(0.5, tgt.wet) : 0, wantSnow = W.precip === 'snow' ? Math.max(0.5, tgt.wet * 0.8) : 0; c.rain += (wantRain - c.rain) * k; c.snow += (wantSnow - c.snow) * k;
       // the sun, the moon, the stars
-      const s = sunAt(W.t, LAT, LON), m = moonAt(W.t, LAT, LON), sd = dirOf(s), md = dirOf(m), gl = groundLight(s.alt); SUN.alt = s.alt; SUN.rain = c.rain;
+      const s = sunAt(W.t, LAT, LON), m = moonAt(W.t, LAT, LON), sd = dirOf(s), md = dirOf(m), gl = groundLight(s.alt); SUN.alt = s.alt; SUN.rain = c.rain; SUN.snow = c.snow;
       const phase = (1 - (sd[0] * md[0] + sd[1] * md[1] + sd[2] * md[2])) / 2, moonK = m.alt > -1 ? 0.06 * phase * Math.min(1, (m.alt + 1) / 6) : 0, nightK = Math.max(0, Math.min(1, (-s.alt - 1) / 7));
       const lit = s.alt > -3 || moonK < 0.002 ? sd : md; let lc: number[] = s.alt > -3 ? gl : [moonK * 0.75, moonK * 0.85, moonK * 1.1];
       const dim = 1 - c.dark * 0.8; lc = lc.map(v => v * dim);
@@ -145,7 +169,8 @@ export function makeWeather(h: WxHooks) {
         steps: q[0], lsteps: q[1], lat: LAT * D2R, lst: lst(W.t, LON) * D2R, starK: Math.min(1.4, nightK * 1.4) * (1 - Math.min(1, c.cover * 0.8)), nightK, gnd: 0, landK: 1 });
       // the light on the terminal
       const mx = Math.max(lc[0], lc[1], lc[2], 1e-4); sun.direction = new Vector3(-lit[0], -lit[1], -lit[2]); sun.position = h.centre.add(new Vector3(lit[0] * 220, lit[1] * 220, lit[2] * 220));
-      sun.diffuse = new Color3(lc[0] / mx, lc[1] / mx, lc[2] / mx); sun.intensity = mx * 2.4; sun.shadowEnabled = mx > 0.03 && c.dark < 0.55;
+      sun.diffuse = new Color3(lc[0] / mx, lc[1] / mx, lc[2] / mx); const through = s.alt > -3 ? sunThrough(sd, 40 + Math.max(0, cam.position.y), W.drift, W.ctime, c.cover) : 1; SUN.vis += (through - SUN.vis) * Math.min(1, dt * 2.5);
+      sun.intensity = mx * 2.4 * (0.35 + 0.65 * SUN.vis); sun.shadowEnabled = mx > 0.03 && c.dark < 0.55 && SUN.vis > 0.25;
       const day = Math.max(0, Math.min(1, (s.alt + 6) / 16)) * (1 - c.dark * 0.55);
       hemi.diffuse = Color3.Lerp(new Color3(0.05, 0.06, 0.12), new Color3(0.82, 0.88, 0.98), day); hemi.groundColor = Color3.Lerp(new Color3(0.03, 0.03, 0.05), new Color3(0.45, 0.42, 0.38), day);
       hemi.intensity = 0.18 + 0.8 * day + moonK * 2 + fl * 1.6;

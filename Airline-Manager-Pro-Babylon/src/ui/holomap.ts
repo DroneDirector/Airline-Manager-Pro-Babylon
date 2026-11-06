@@ -1,7 +1,7 @@
 // The airport map while you walk: a square, holographic blue map in the corner, always centred on you and turned
 // the way you face. It is drawn from the terminal's plan: the walls (with their doorways open), the stairs, the
 // lifts, the columns, the rooms' names, the kerb, the apron and the rental car centre. The floor you are on is drawn
-// clearly; the other floor only faintly. Places show up as you get near them and stay shown (kept on the device).
+// clearly; the other floor only faintly. Everything on the floor shows, right out to the map's edges and corners.
 // M (or a tap on the map) makes it bigger or smaller.
 import { ROOMS, DOORS, STAIRS, LIFTS, OUTSIDE, COLUMNS, Fl } from '../sections/terminal/plan';
 import { IS_TOUCH } from '../core/app';
@@ -72,7 +72,7 @@ export function holoMap(host: HTMLElement, get: () => HoloState | null) {
   try { const k = JSON.parse(localStorage.getItem(KEY) || 'null'); if (k) for (const f of [1, 2]) if (k[f]) { const b = atob(k[f]); for (let i = 0; i < Math.min(b.length, GW * GH); i++) seen[f][i] = b.charCodeAt(i); } } catch (e) { /* a fresh map */ }
   let dirty = false, saveT = 0;
   const cellOf = (x: number, z: number) => { const i = Math.floor((x - GX0) / CELL), j = Math.floor((z - GZ0) / CELL); return i < 0 || j < 0 || i >= GW || j >= GH ? -1 : j * GW + i; };
-  const isSeen = (f: Fl, x: number, z: number) => { const c = cellOf(x, z); return c >= 0 && seen[f][c] === 1; };
+  const isSeen = (_f: Fl, _x: number, _z: number) => true;   // the whole floor is shown, right out to the map's corners
   const reveal = (f: Fl, x: number, z: number) => { const n = Math.ceil(REVEAL / CELL); for (let dj = -n; dj <= n; dj++) for (let di = -n; di <= n; di++) {
     if (di * di + dj * dj > n * n) continue; const c = cellOf(x + di * CELL, z + dj * CELL); if (c >= 0 && !seen[f][c]) { seen[f][c] = 1; dirty = true; } } };
 
@@ -87,7 +87,7 @@ export function holoMap(host: HTMLElement, get: () => HoloState | null) {
     const R = W / 2, view = big ? 150 : 90, k = W / view;                     // metres across the square
     const sy = Math.sin(st.yaw), cy = Math.cos(st.yaw);
     const P = (x: number, z: number): [number, number] => { const dx = x - st.x, dz = z - st.z; return [R + (dx * cy - dz * sy) * k, R - (dx * sy + dz * cy) * k]; };
-    const inView = (x: number, z: number) => Math.abs(x - st.x) < view * 0.75 && Math.abs(z - st.z) < view * 0.75;
+    const inView = (x: number, z: number) => Math.abs(x - st.x) < view * 0.8 && Math.abs(z - st.z) < view * 0.8;
     cx.clearRect(0, 0, W, H);
     // the panel: deep blue glass, a faint grid (turning with the map), a soft edge glow
     const bg = cx.createRadialGradient(R, R, R * 0.1, R, R, R * 1.45); bg.addColorStop(0, 'rgba(10,40,70,.78)'); bg.addColorStop(1, 'rgba(3,12,26,.86)');

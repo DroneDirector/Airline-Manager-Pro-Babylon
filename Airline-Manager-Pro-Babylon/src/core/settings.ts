@@ -7,7 +7,7 @@ export interface Gfx {
   mirror: 'off' | 'low' | 'high'; probe: boolean; glow: boolean; bloom: boolean; ssao: boolean; aces: boolean; exposure: number;
   sharpen: boolean; fov: number; clouds: 'low' | 'medium' | 'high' | 'ultra'; terrain: boolean; showFps: boolean; showCpu: boolean; showGpu: boolean; showMem: boolean; particles: 'low' | 'high';
   iblShadows: boolean; manyLights: boolean; volLight: boolean; heightFog: boolean; ssr: boolean; pcss: boolean; taa: boolean;
-  eyeAdapt: boolean; flares: boolean; dof: boolean; mblur: boolean; parallax: boolean; wetRain: boolean;
+  eyeAdapt: boolean; flares: boolean; dof: boolean; mblur: boolean; parallax: boolean; wetRain: boolean; glint: boolean;
 }
 export interface Controls {
   padLook: number; padDead: number; padInvert: boolean; padSwap: boolean; padVibrate: boolean;
@@ -16,10 +16,10 @@ export interface Controls {
 export interface Settings { gfx: Gfx; ctl: Controls; music: boolean }
 
 export const PRESETS: { [k: string]: Partial<Gfx> } = {
-  low: { scale: 0.6, aa: 'off', shadows: 'off', mirror: 'low', probe: false, glow: true, bloom: false, ssao: false, sharpen: false, particles: 'low', clouds: 'low', iblShadows: false, manyLights: false, volLight: false, heightFog: false, ssr: false, pcss: false, taa: false, eyeAdapt: true, flares: false, dof: false, mblur: false, parallax: false, wetRain: true },
-  medium: { scale: 0.8, aa: 'fxaa', shadows: 'low', mirror: 'low', probe: true, glow: true, bloom: true, ssao: false, sharpen: false, particles: 'high', clouds: 'medium', iblShadows: false, manyLights: false, volLight: false, heightFog: true, ssr: false, pcss: false, taa: false, eyeAdapt: true, flares: true, dof: false, mblur: false, parallax: false, wetRain: true },
-  high: { scale: 1, aa: 'msaa', shadows: 'high', mirror: 'high', probe: true, glow: true, bloom: true, ssao: false, sharpen: true, particles: 'high', clouds: 'high', iblShadows: false, manyLights: IS_PC, volLight: true, heightFog: true, ssr: false, pcss: true, taa: true, eyeAdapt: true, flares: true, dof: false, mblur: false, parallax: true, wetRain: true },
-  ultra: { scale: IS_PC ? 1.25 : 1, aa: 'msaa', shadows: 'high', mirror: 'high', probe: true, glow: true, bloom: true, ssao: true, sharpen: true, particles: 'high', clouds: 'ultra', iblShadows: IS_PC, manyLights: true, volLight: true, heightFog: true, ssr: IS_PC, pcss: true, taa: true, eyeAdapt: true, flares: true, dof: false, mblur: false, parallax: true, wetRain: true },
+  low: { scale: 0.6, aa: 'off', shadows: 'off', mirror: 'low', probe: false, glow: true, bloom: false, ssao: false, sharpen: false, particles: 'low', clouds: 'low', iblShadows: false, manyLights: false, volLight: false, heightFog: false, ssr: false, pcss: false, taa: false, eyeAdapt: true, flares: false, dof: false, mblur: false, parallax: false, wetRain: true, glint: true },
+  medium: { scale: 0.8, aa: 'fxaa', shadows: 'low', mirror: 'low', probe: true, glow: true, bloom: true, ssao: false, sharpen: false, particles: 'high', clouds: 'medium', iblShadows: false, manyLights: false, volLight: false, heightFog: true, ssr: false, pcss: false, taa: false, eyeAdapt: true, flares: true, dof: false, mblur: false, parallax: false, wetRain: true, glint: true },
+  high: { scale: 1, aa: 'msaa', shadows: 'high', mirror: 'high', probe: true, glow: true, bloom: true, ssao: false, sharpen: true, particles: 'high', clouds: 'high', iblShadows: false, manyLights: IS_PC, volLight: true, heightFog: true, ssr: false, pcss: true, taa: true, eyeAdapt: true, flares: true, dof: false, mblur: false, parallax: true, wetRain: true, glint: true },
+  ultra: { scale: IS_PC ? 1.25 : 1, aa: 'msaa', shadows: 'high', mirror: 'high', probe: true, glow: true, bloom: true, ssao: true, sharpen: true, particles: 'high', clouds: 'ultra', iblShadows: IS_PC, manyLights: true, volLight: true, heightFog: true, ssr: IS_PC, pcss: true, taa: true, eyeAdapt: true, flares: true, dof: false, mblur: false, parallax: true, wetRain: true, glint: true },
 };
 const DEF: Settings = {
   gfx: Object.assign({ preset: (IS_PC ? 'high' : 'medium') as Preset, fps: IS_PC ? 0 : 60, terrain: true, aces: true, exposure: 1, fov: 70, showFps: false, showCpu: false, showGpu: false, showMem: false } as any, PRESETS[IS_PC ? 'high' : 'medium']),

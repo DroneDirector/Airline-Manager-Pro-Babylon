@@ -133,7 +133,8 @@ class AirfieldGroundPlugin extends MaterialPluginBase {
           float tuft = smoothstep(.62, .75, vnA(pl * 5.5, fw * 5.5)) * worn; pc = mix(pc, gc * 1.1, tuft * .8);
           col = mix(gc, pc, pave); hh = mix(gh, ph, pave); rr = mix(.96, pr, pave); afRw = isR * (1. - isS);
         }
-        { float yy = abs(p.y - ${f(R.y)}); wetIt(p, pave, afRw, afRw * (.07 * exp(-pow((yy - 4.4) / 2.4, 2.)) + .03 * exp(-pow(yy / 1.6, 2.))), col, rr, hh); }
+        { float yy = abs(p.y - ${f(R.y)}); wetIt(p, pave, afRw, afRw * (.07 * exp(-pow((yy - 4.4) / 2.4, 2.)) + .03 * exp(-pow(yy / 1.6, 2.))), col, rr, hh);
+          snowIt(p, pave, afRw, max(1. - smoothstep(.55, .95, pa), afRw * smoothstep(${f(R.w / 2 - 9)}, ${f(R.w / 2 - 1)}, yy)), afRw * (exp(-pow((yy - 4.4) / 1.6, 2.)) + .6 * exp(-pow(yy / 1.2, 2.))), col, rr, hh); }
         surfaceAlbedo = col; afH = hh; afR = rr; }
         ${BUMP}`,
       '!float roughness=reflectivityOut\\.roughness;': 'float roughness=clamp(afR,.015,1.);',
@@ -177,7 +178,7 @@ class AirfieldPaintPlugin extends MaterialPluginBase {
         a *= mix(1., smoothstep(.12, .32, vnA(pl * 7., fw * 7.)), .45);
         col = mix(col, col * vec3(.72, .68, .6), dirt(p) * .45);
         float ru = rubber(p); col = mix(col, vec3(.03), ru * .88); a *= 1. - ru * .25;
-        afR = .62 + ru * .2; { float wH = 0.; float yy = abs(p.y - ${f(R.y)}); float rw = (1. - smoothstep(${f(R.w / 2 - 0.4)}, ${f(R.w / 2 + 0.4)}, yy)) * step(${f(R.x0)}, p.x) * step(p.x, ${f(R.x1)}); wetIt(p, 1., rw, rw * (.07 * exp(-pow((yy - 4.4) / 2.4, 2.)) + .03 * exp(-pow(yy / 1.6, 2.))), col, afR, wH); } surfaceAlbedo = col; alpha = clamp(a, 0., 1.); }`,
+        afR = .62 + ru * .2; { float wH = 0.; float yy = abs(p.y - ${f(R.y)}); float rw = (1. - smoothstep(${f(R.w / 2 - 0.4)}, ${f(R.w / 2 + 0.4)}, yy)) * step(${f(R.x0)}, p.x) * step(p.x, ${f(R.x1)}); wetIt(p, 1., rw, rw * (.07 * exp(-pow((yy - 4.4) / 2.4, 2.)) + .03 * exp(-pow(yy / 1.6, 2.))), col, afR, wH); snowIt(p, 1., rw, rw * smoothstep(${f(R.w / 2 - 9)}, ${f(R.w / 2 - 1)}, yy), rw * (exp(-pow((yy - 4.4) / 1.6, 2.)) + .6 * exp(-pow(yy / 1.2, 2.))), col, afR, wH); wtGl *= 1.35; } surfaceAlbedo = col; alpha = clamp(a, 0., 1.); }`,
       '!float roughness=reflectivityOut\\.roughness;': 'float roughness=clamp(afR,.015,1.);',
       CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: WET_FINAL,
     });

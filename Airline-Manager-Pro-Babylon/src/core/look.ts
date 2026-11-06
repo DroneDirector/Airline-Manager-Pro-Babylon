@@ -28,10 +28,10 @@ void main(void) { vec4 c = texture2D(textureSampler, vUV); float z = texture2D(d
 
 /** How wet the ground is now (0 dry, 1 soaked), how hard it rains, a clock for the ripples, and the puddles' mirror
  *  (the scene seen upside down from the ground: what the puddles reflect). Read by the ground's shaders. */
-export const WET: { wet: number; rain: number; t: number; mirror: MirrorTexture | null; blank: RawTexture | null } = { wet: 0, rain: 0, t: 0, mirror: null, blank: null };
-export const WET_UNIFORMS = [{ name: 'wtWet', size: 1, type: 'float' }, { name: 'wtRain', size: 1, type: 'float' }, { name: 'wtT', size: 1, type: 'float' }, { name: 'wtRes', size: 2, type: 'vec2' }, { name: 'wtMirOn', size: 1, type: 'float' }];
-export const WET_DECL = 'uniform float wtWet; uniform float wtRain; uniform float wtT; uniform vec2 wtRes; uniform float wtMirOn;';
-export const bindWet = (ubo: any, scene: Scene) => { const E = scene.getEngine(); ubo.updateFloat('wtWet', WET.wet); ubo.updateFloat('wtRain', WET.rain); ubo.updateFloat('wtT', WET.t);
+export const WET: { wet: number; rain: number; snow: number; t: number; sun: number[]; sunCol: number[]; mirror: MirrorTexture | null; blank: RawTexture | null } = { wet: 0, rain: 0, snow: 0, t: 0, sun: [0, 1, 0], sunCol: [0, 0, 0], mirror: null, blank: null };
+export const WET_UNIFORMS = [{ name: 'wtWet', size: 1, type: 'float' }, { name: 'wtRain', size: 1, type: 'float' }, { name: 'wtT', size: 1, type: 'float' }, { name: 'wtRes', size: 2, type: 'vec2' }, { name: 'wtMirOn', size: 1, type: 'float' }, { name: 'wtSnow', size: 1, type: 'float' }, { name: 'wtSunDir', size: 3, type: 'vec3' }, { name: 'wtSunCol', size: 3, type: 'vec3' }];
+export const WET_DECL = 'uniform float wtWet; uniform float wtRain; uniform float wtT; uniform vec2 wtRes; uniform float wtMirOn; uniform float wtSnow; uniform vec3 wtSunDir; uniform vec3 wtSunCol;';
+export const bindWet = (ubo: any, scene: Scene) => { const E = scene.getEngine(); ubo.updateFloat('wtWet', WET.wet); ubo.updateFloat('wtRain', WET.rain); ubo.updateFloat('wtT', WET.t); ubo.updateFloat('wtSnow', WET.snow); ubo.updateFloat3('wtSunDir', WET.sun[0], WET.sun[1], WET.sun[2]); ubo.updateFloat3('wtSunCol', WET.sunCol[0], WET.sunCol[1], WET.sunCol[2]);
   ubo.updateFloat2('wtRes', E.getRenderWidth(), E.getRenderHeight()); const on = !!WET.mirror && WET.wet > 0.03; ubo.updateFloat('wtMirOn', on ? 1 : 0);
   if (!WET.blank) WET.blank = new RawTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, Constants.TEXTUREFORMAT_RGBA, scene);
   ubo.setTexture('wtMir', on ? WET.mirror : WET.blank); };
@@ -41,12 +41,15 @@ export const bindWet = (ubo: any, scene: Scene) => { const E = scene.getEngine()
  *  hollows, broad and ragged at the edges, spreading the longer it rains and drying from the edges after; mirror-smooth,
  *  reflecting what stands round them (wtFinal), rippled by the drops while it rains. */
 export const WET_GLSL = `
-uniform sampler2D wtMir; float wtPud = 0.; float wtFilm = 0.;
+uniform sampler2D wtMir; float wtPud = 0.; float wtFilm = 0.; float wtGl = 0.; float wtSpk = 0.;
 float wtH1(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float wtN(vec2 p){ vec2 i = floor(p), q = fract(p); vec2 u = q * q * (3. - 2. * q); return mix(mix(wtH1(i), wtH1(i + vec2(1., 0.)), u.x), mix(wtH1(i + vec2(0., 1.)), wtH1(i + vec2(1., 1.)), u.x), u.y); }
 float wtRip(vec2 p, float t){ float h = 0.; for (int k = 0; k < 3; k++) { vec2 q = p * 2.6 + float(k) * 7.31; vec2 c = floor(q), f = fract(q); vec2 o = vec2(wtH1(c), wtH1(c + 13.7)) * .7 + .15;
   float ph = fract(t * (.7 + .3 * wtH1(c + 3.3)) + wtH1(c + 5.1)), d = length(f - o), r = ph * .42; h += sin((d - r) * 75.) * (1. - ph) * (1. - smoothstep(0., .06, abs(d - r))); } return h; }
+float wtVor(vec2 p){ vec2 i = floor(p), f = fract(p); float d1 = 8., d2 = 8.; for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 g = vec2(float(x), float(y));
+  vec2 o = vec2(wtH1(i + g), wtH1(i + g + 19.3)); float d = length(g + o - f); if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d; } return d2 - d1; }
 void wetIt(vec2 p, float pave, float along, float bias, inout vec3 col, inout float rr, inout float hh){
+  wtGl = pave; wtSpk = smoothstep(.62, .9, wtN(p * 7.3));
   float w = wtWet; if (w < .002) return;
   float damp = w * mix(.4, 1., pave); col *= 1. - damp * mix(.2, .4, pave); rr = mix(rr, rr * mix(.88, .45, pave), damp);
   vec2 q = p * vec2(mix(1., .28, along), 1.);
@@ -55,15 +58,33 @@ void wetIt(vec2 p, float pave, float along, float bias, inout vec3 col, inout fl
   wtFilm = smoothstep(th - .09, th, n) * pave * w; col *= 1. - .18 * wtFilm; rr = mix(rr, min(rr, .14), wtFilm);
   wtPud = smoothstep(th, th + .015, n) * pave;
   if (wtPud > 0.) { col = mix(col, col * .42, wtPud); rr = mix(rr, .015, wtPud); hh = mix(hh, wtRain * .0022 * wtRip(p, wtT), wtPud); } }
+/** Snow: off the pavement it lies all over; on the pavement it is ploughed, and left in the cracks, in patches and
+ *  streaks (drawn out along the runway), thicker along the edges (edge) and thinner in the wheel tracks (track). */
+void snowIt(vec2 p, float pave, float along, float edge, float track, inout vec3 col, inout float rr, inout float hh){
+  float s = wtSnow; if (s < .002) return;
+  vec3 sc = vec3(.88, .9, .94) * (.9 + .1 * wtN(p * .7));
+  float cov = (1. - pave) * smoothstep(0., .45, s) * (.8 + .2 * smoothstep(.3, .7, wtN(p * .15)));
+  vec2 q = p * vec2(mix(1., .2, along), 1.); float th = mix(.98, .6, s);
+  float spot = smoothstep(th, th + .05, wtN(q * .06) * .5 + wtN(q * .21 + 4.) * .3 + wtN(p * 1.7) * .2 + edge * .45 - track * .3);
+  float crack = (1. - smoothstep(0., .035, wtVor(p * .16))) * smoothstep(.08, .35, s) * (.4 + .6 * wtN(p * .9 + 2.));
+  float bits = smoothstep(.82, .88, wtN(p * 2.3)) * smoothstep(.15, .6, s) * (1. - track);
+  cov = max(cov, max(max(spot, crack * .95), bits * .8) * pave);
+  col = mix(col, sc, cov); rr = mix(rr, .7, cov); hh = mix(hh, cov * .0025 * wtN(p * 6.), cov);
+  wtPud *= 1. - cov; wtFilm *= 1. - cov; wtGl *= 1. - cov * .7; }
 `;
 /** The puddles' reflection, at the end of the shader: the mirror image, stronger towards the horizon (as water is). */
-export const WET_FINAL = `{ float wq = max(wtPud, wtFilm * .3); if (wtMirOn > .5 && wq > .001) {
+export const WET_FINAL = `{ if (wtGl > .001 && wtSunDir.y > 0.) { vec3 Vg = normalize(vEyePosition.xyz - vPositionW), Hg = normalize(wtSunDir + Vg);
+  float nh = max(dot(normalW, Hg), 0.), vh = max(dot(Vg, Hg), 0.), Fg = .04 + .96 * pow(1. - vh, 5.);
+  float lobe = pow(nh, mix(70., 240., wtWet)) * .45 + pow(nh, 900.) * 3. * wtSpk;
+  finalColor.rgb += wtSunCol * lobe * Fg * wtGl * (1. + 1.8 * wtWet); } }
+{ float wq = max(wtPud, wtFilm * .3); if (wtMirOn > .5 && wq > .001) {
   vec3 Vw = normalize(vEyePosition.xyz - vPositionW); float cs = clamp(Vw.y, 0., 1.), fr = .02 + .98 * pow(1. - cs, 5.);
   vec3 rc = texture2D(wtMir, gl_FragCoord.xy / wtRes + normalW.xz * .05).rgb;
   finalColor.rgb = mix(finalColor.rgb, rc, clamp(.1 + fr * 1.15, 0., .92) * wq); } }`;
 /** Wet ground and puddles on a plain paved material (the roads, the kerb and paths behind the terminal, the stands). */
 export class WetPlugin extends MaterialPluginBase {
-  constructor(mat: any) { super(mat, 'Wet', 220, { WETGROUND: false }); this._enable(true); }
+  pave: number;
+  constructor(mat: any, pave = 1) { super(mat, 'Wet', 220, { WETGROUND: false }); this.pave = pave; this._enable(true); }
   getClassName() { return 'WetPlugin'; }
   prepareDefines(d: any) { d.WETGROUND = true; }
   getSamplers(s: string[]) { s.push('wtMir'); }
@@ -71,14 +92,14 @@ export class WetPlugin extends MaterialPluginBase {
   bindForSubMesh(ubo: any, scene: Scene) { bindWet(ubo, scene); }
   getCustomCode(type: string, lang?: any): any { if (lang || type === 'vertex') return null;
     return { CUSTOM_FRAGMENT_DEFINITIONS: 'float wtR = 1.; float wtHH = 0.;\n' + WET_GLSL,
-      CUSTOM_FRAGMENT_UPDATE_ALPHA: `{ vec3 c = surfaceAlbedo; wetIt(vPositionW.xz, 1., 0., 0., c, wtR, wtHH); surfaceAlbedo = c;
+      CUSTOM_FRAGMENT_UPDATE_ALPHA: `{ vec3 c = surfaceAlbedo; wetIt(vPositionW.xz, ${this.pave.toFixed(2)}, 0., 0., c, wtR, wtHH); snowIt(vPositionW.xz, ${this.pave.toFixed(2)}, 0., 0., 0., c, wtR, wtHH); surfaceAlbedo = c;
         vec3 dpx = dFdx(vPositionW), dpy = dFdy(vPositionW); vec3 r1 = cross(dpy, normalW), r2 = cross(normalW, dpx); float det = dot(dpx, r1);
         vec3 grd = sign(det) * (dFdx(wtHH) * r1 + dFdy(wtHH) * r2); normalW = normalize(abs(det) * normalW - grd * 1.6); }`,
       CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: WET_FINAL,
       '!float roughness=reflectivityOut\\.roughness;': 'float roughness=clamp(reflectivityOut.roughness*wtR,.015,1.);' }; }
 }
-/** Every paved surface outside that is not the airfield's own ground: these get the wet plugin. */
-const PAVED = /^(ROAD|asphalt|apron|kerb)$/;
+/** Every paved surface outside that is not the airfield's own ground, and the grass and landscape round it: these get the wet plugin. */
+const PAVED = /^(ROAD|asphalt|apron|kerb)$/, SOFT = /^(groundM|grass)$/;
 const NOT_REFLECTED = /^(AIRFIELD\/(GROUND|MARKINGS|PAINT)|ground|sea|ROAD|SITE\/(ROAD|APRON|KERB|SIDE-PATH|GRASS))|^look-/;
 
 const glowDot = (sz: number, a: number, col: string) => { const c = document.createElement('canvas'); c.width = c.height = sz; const x = c.getContext('2d')!, g = x.createRadialGradient(sz / 2, sz / 2, 0, sz / 2, sz / 2, sz / 2);
@@ -139,18 +160,27 @@ export function applyLook(P: LookParts): (dt: number) => void {
     steps.push(dt => { t += dt; if (t > 0.3) { t = 0; const hit = sc.pickWithRay(new Ray(cam.globalPosition, Vector3.Up(), 25), m => m.isPickable && m.isVisible && !/sky|look-/i.test(m.name)); target = hit && hit.hit ? 1.32 : 1; }
       cur += (target - cur) * Math.min(1, dt * (target > cur ? 0.6 : 1.4)); ip.exposure = baseExp * cur; }); }
 
-  // rain on the ground: wet, darker and glossier while it rains, puddles spreading as it goes on, drying slowly after
-  //  (the airfield, its markings and every paved surface in their shaders; the far landscape here: a little darker)
-  if (g.wetRain) { const mats = new Map<any, { r: number; c: Color3 | null }>(); for (const m of P.ground) { const mt: any = m.material; if (mt && 'roughness' in mt && !mats.has(mt) && !/^AIRFIELD\/(GROUND|PAINT)$/.test(mt.name) && !PAVED.test(mt.name)) mats.set(mt, { r: mt.roughness ?? 0.9, c: mt.albedoColor ? mt.albedoColor.clone() : null }); }
-    for (const mt of sc.materials as any[]) if (mt instanceof PBRMaterial && PAVED.test(mt.name) && !(mt as any)._wet) (mt as any)._wet = new WetPlugin(mt);
+  // rain and snow on the ground, and the sun glinting on it: wet, darker and glossier while it rains, puddles spreading
+  // as it goes on, drying slowly after; snow settling while it snows, melting (and wetting) after; all in the shaders
+  // of the airfield, its markings, every paved surface and the grass and landscape round them
+  if (g.wetRain || g.glint !== false) for (const mt of sc.materials as any[]) if (mt instanceof PBRMaterial && (PAVED.test(mt.name) || SOFT.test(mt.name)) && !(mt as any)._wet) (mt as any)._wet = new WetPlugin(mt, SOFT.test(mt.name) ? 0 : 1);
+  if (g.wetRain) {
     // the puddles' mirror: everything standing (buildings, jetways, masts, aircraft, the sky), seen from below the ground
     if (S.gfx.mirror !== 'off') tryIt(() => { const mt = new MirrorTexture('look-puddles', { ratio: S.gfx.mirror === 'high' ? (IS_PC ? 0.5 : 0.35) : 0.25 }, sc, true);
       mt.mirrorPlane = new Plane(0, -1, 0, P.base + 0.02); mt.renderListPredicate = (m: AbstractMesh) => m.isVisible && m.isEnabled() && !NOT_REFLECTED.test(m.name) && !(m.material && NOT_REFLECTED.test(m.material.name));
       mt.refreshRate = 100000; sc.customRenderTargets.push(mt); WET.mirror = mt; });
-    let wet = 0, was = false; steps.push(dt => { const r = WX.rain; wet += ((r > 0.05 ? Math.min(1, 0.4 + r) : 0) - wet) * Math.min(1, dt * (r > 0.05 ? 0.012 : 0.004));
-      WET.wet = wet; WET.rain = Math.min(1, r * 1.4); WET.t = (WET.t + dt) % 1000;
-      const on = wet > 0.03; if (WET.mirror && on !== was) { WET.mirror.refreshRate = on ? (IS_PC ? 1 : 2) : 100000; was = on; }
-      for (const [mt, b] of mats) { mt.roughness = b.r * (1 - 0.15 * wet); if (b.c && mt.albedoColor) mt.albedoColor.copyFrom(b.c.scale(1 - 0.2 * wet)); } }); }
+    let wet = 0, snow = 0, was = false; steps.push(dt => { const r = WX.rain, sn = SUN.snow;
+      // snow settles in about four minutes of snowfall and melts in about ten; melting snow wets the ground
+      snow += sn > 0.05 ? (Math.min(1, 0.3 + sn) - snow) * Math.min(1, dt * 0.008) : -Math.min(snow, dt * 0.0017);
+      const wantWet = r > 0.05 ? Math.min(1, 0.4 + r) : snow > 0.05 && sn <= 0.05 ? 0.55 : sn > 0.05 ? 0.3 : 0;
+      wet += (wantWet - wet) * Math.min(1, dt * (wantWet > wet ? 0.012 : 0.004));
+      WET.wet = wet; WET.snow = snow; WET.rain = Math.min(1, r * 1.4); WET.t = (WET.t + dt) % 1000;
+      const on = wet > 0.03; if (WET.mirror && on !== was) { WET.mirror.refreshRate = on ? (IS_PC ? 1 : 2) : 100000; was = on; } }); }
+  // the sun glinting on the tarmac, the concrete and the markings: from the sun's side only, and only when the sun
+  // gets through the clouds (sunshine through a gap in them glints too)
+  steps.push(() => { const d = P.sun.direction, L = Math.hypot(d.x, d.y, d.z) || 1; WET.sun = [-d.x / L, -d.y / L, -d.z / L];
+    const sl: any = P.sun, k = g.glint === false ? 0 : (sl.intensity || 0) * SUN.vis * 0.55 * Math.max(0, Math.min(1, (SUN.alt + 1) / 6)), c = sl.diffuse || { r: 1, g: 1, b: 1 };
+    WET.sunCol = [c.r * k, c.g * k, c.b * k]; });
 
   void Color4; void Light;
   return (dt: number) => { for (const s of steps) s(dt); };
