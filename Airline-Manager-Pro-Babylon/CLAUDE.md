@@ -4,7 +4,7 @@
   (DroneDirector/Microsoft-Flight-Simulator-Projects).
 - Sign every commit as `DroneDirector <simon@dronedirector.fo>`, with no co-author or session lines.
 - Never mention in code, comments, text or commits that anything is made with AI.
-- Licences of anything used must allow commercial sale. Our own models, pictures and sounds only.
+- Licences of anything used must allow commercial sale in a paid game, asking at most for credit (and the licence text). Never non-commercial, share-alike on the game, or paid-only terms. Our own models, pictures and sounds only. List every third-party part in THIRD-PARTY-NOTICES.md and keep it up to date.
 - Always build and release the Android app and the PC app together; `versionCode` in `app.config.json` goes up with
   every release, and updates install over the old version (the fixed test key in `signing/`).
 - Merging to `main` releases (the workflow builds both and publishes a pre-release with `release-notes/<version>.md`).
