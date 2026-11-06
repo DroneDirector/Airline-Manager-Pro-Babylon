@@ -1,5 +1,5 @@
 // Builds the airport layouts that ship inside the game (no downloads while playing), for every airport in the game's
-// airport list (game/www/airports-world.json, about 49,000), so new airports added to the list are covered on the next
+// airport list (game/assets/airports-world.json, about 49,000), so new airports added to the list are covered on the next
 // run. The world is fetched from OpenStreetMap once, in map tiles (5° squares that hold airports, split smaller when a
 // tile is too big for the server), politely: one request at a time, a pause between, spread over the public servers.
 // Each airport then takes from its tile what lies in the box round it (the same box the game used to ask for: its
@@ -8,7 +8,7 @@
 // Usage: node fetch.mjs <shard> <shards> <out.json>
 import fs from 'node:fs';
 const [shard, shards, out] = [Number(process.argv[2] || 0), Number(process.argv[3] || 1), process.argv[4] || 'out.json'];
-const ROOT = new URL('../../Airline-Manager-Pro-Babylon/game/www/', import.meta.url);
+const ROOT = new URL('../../Airline-Manager-Pro-Babylon/game/assets/', import.meta.url);
 const AP = JSON.parse(fs.readFileSync(new URL('airports-world.json', ROOT))).airports.filter(r => /^[A-Z0-9-]{2,8}$/.test(r[0]) && isFinite(r[4]) && isFinite(r[5]));
 const RW = JSON.parse(fs.readFileSync(new URL('runways-world.json', ROOT)));
 const SERVERS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];

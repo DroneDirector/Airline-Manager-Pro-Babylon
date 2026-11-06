@@ -10,7 +10,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'Airline-Manager-Pro-Babylon/game/www/airports-world.json'
+      - 'Airline-Manager-Pro-Babylon/game/assets/airports-world.json'
       - '.github/layouts/**'
       - '.github/workflows/layouts.yml'
 
