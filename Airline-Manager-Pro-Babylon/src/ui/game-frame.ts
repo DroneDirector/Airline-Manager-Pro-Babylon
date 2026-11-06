@@ -54,7 +54,7 @@ window.addEventListener('message', (e: MessageEvent) => {
   const h = handlers;
   if (d.amp === 'title') { gameClose(); h.title(); }
   else if (d.amp === 'exit') h.exit();
-  else if (d.amp === 'viewer3d') { if (d.id) { gameHide(); h.viewer(d.id); } else { gameClose(); h.viewer(''); } }
+  else if (d.amp === 'viewer3d') { if (d.crash) { gameHide(); h.viewer('crash:' + d.crash); } else if (d.id) { gameHide(); h.viewer(d.id); } else { gameClose(); h.viewer(''); } }
   else if (d.amp === 'room') { gameHide(); for (const f of roomSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'court') { for (const f of courtSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'monitor') { for (const f of monSubs) { try { f(d); } catch (err) { console.error(err); } } }

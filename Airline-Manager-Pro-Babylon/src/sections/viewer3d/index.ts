@@ -21,6 +21,7 @@ import { makeRealWx } from './realwx';
 import { buildCabin, seatAt, FLOOR as CFLOOR, CABIN_VIEW_ROW, CABIN_AISLE_ROW, CABIN_Z } from './cabin';
 import { buildAirliner, Airliner, repaint, setGear } from './airliner';
 import { buildAirport, placeAirport, Airport } from './airport';
+import { buildCrash, Crash } from './crash';
 import { buildTerrain, placeTerrain, terrainStale, Terrain } from './terrain';
 import { gameSend, onGameFlight, onGameAirport } from '../../ui/game-frame';
 import { sunAt, moonAt, dirOf, sunlight, lst } from './astro';
@@ -60,7 +61,9 @@ onGameFlight((d: any) => {
 function wantAirports(me: Sample) { const A = V.apts || (V.apts = {}); for (const k of [me.from, me.to]) if (k && !(k in A)) { A[k] = null; gameSend({ ampb: 'airport', icao: k }); } }
 onGameAirport((d: any) => {
   if (!V.scene || !V.apts || !d.L || !(d.icao in V.apts)) return;
-  try { const old: Airport = V.apts[d.icao]; if (old) old.dispose(); const A = buildAirport(V.scene, d.L); V.apts[d.icao] = A; farDiscs(); for (const l of A.lights) V.glow.addIncludedOnlyMesh(l); if (V.sg) A.root.getChildMeshes().forEach(m => m.receiveShadows = true); } catch (e) { console.error(e); }
+  try { const old: Airport = V.apts[d.icao]; if (old) old.dispose(); const A = buildAirport(V.scene, d.L); V.apts[d.icao] = A;
+    if (d.crash) { try { const c: Crash = buildCrash(V.scene, A.root, d.L, d.crash); (V.crashes = V.crashes || {})[d.icao] = c; const dis = A.dispose.bind(A); A.dispose = () => { try { c.dispose(); } catch (e) { /* gone */ } delete V.crashes[d.icao]; dis(); }; if (V.crashFocus === d.icao) V.crashAt = { A, c }; } catch (e) { console.error(e); } }
+    else if (V.crashFocus === d.icao) toast('The crash site there has been cleared'); farDiscs(); for (const l of A.lights) V.glow.addIncludedOnlyMesh(l); if (V.sg) A.root.getChildMeshes().forEach(m => m.receiveShadows = true); } catch (e) { console.error(e); }
 });
 /** The real ground under the flight (below 33,000 ft, when Real terrain is on): laid out again as the aircraft flies on. */
 function terrainStep(lat: number, lon: number, alt: number) {
@@ -213,6 +216,8 @@ const Viewer: Section = {
   id: 'viewer3d', title: '3D viewer',
   async open(ctx: SectionCtx) {
     const { engine, ui, progress } = ctx; V.ctx = ctx;
+    const crashIcao = ctx.opts && ctx.opts.crash; V.crashFocus = crashIcao || ''; V.crashAt = null; V.crashes = {};
+    if (crashIcao) { V.apts = V.apts || {}; V.apts[crashIcao] = null; gameSend({ ampb: 'airport', icao: crashIcao }); }
     const liveId = ctx.opts && ctx.opts.live; V.live = liveId ? { id: liveId, s0: null, s1: null, list: [], near: [], painted: '', prev: null } : null; V.others = {}; V.turn = 0; V.cur = null;
     if (liveId) gameSend({ ampb: 'follow', id: liveId });
     V.apts = {}; V.gnd = 0; V.land = 0; V.ter = null;
@@ -287,7 +292,13 @@ const Viewer: Section = {
       if (!V.sliding) V.t += dt * 1000 * V.speed;
       let hdg: number, h: number, bank = 0, pitch = -0.035, fan = 48;
       const r = ac.root;
-      if (V.live) {
+      if (V.crashAt) {
+        // a crash site: the camera on the wreck from a little way off, the aircraft out of sight
+        const { A, c } = V.crashAt as { A: Airport; c: Crash }; ac.root.setEnabled(false);
+        V.pos = [A.lat, A.lon]; V.gnd = A.elev; V.land = 1; V.alt = A.elev + 3.9; V.spd = 0; hdg = 0;
+        for (const k in V.apts) if (V.apts[k]) placeAirport(V.apts[k], A.lat, A.lon, V.alt, V.sunAlt < 2);
+        terrainStep(A.lat, A.lon, V.alt); r.position.y = 0;
+      } else if (V.live) {
         // the real flight: where the game says it is
         const st = liveState(performance.now()); V.cur = st;
         if (st) {
@@ -353,6 +364,8 @@ const Viewer: Section = {
         const ahead = Vector3.Dot(V.fb, new Vector3(Math.sin(h), 0, Math.cos(h))); if (ahead < -420 && fbPrev >= -420) placeFlyby(); fbPrev = ahead;
         at = Vector3.TransformCoordinates(new Vector3(0, 0, 0), wm);
       }
+      if (V.crashAt) { const c: Crash = V.crashAt.c; c.root.computeWorldMatrix(true); const ctr = Vector3.TransformCoordinates(c.centre, c.root.getWorldMatrix()), yaw = 0.7 + V.uYaw, pp = Math.max(0.08, Math.min(1.3, 0.3 + V.uPitch)), d = 230 * V.zoom;
+        at = ctr; eye = ctr.add(new Vector3(Math.cos(yaw) * Math.cos(pp) * d, Math.sin(pp) * d, Math.sin(yaw) * Math.cos(pp) * d)); }
       V.blend = v.cabin || V.inCabin ? 1 : Math.min(1, V.blend + dt * 2.2);   // straight into the cabin and out, no glide through the fuselage
       if (V.blend < 1 && V.lastEye) { const k = V.blend * V.blend * (3 - 2 * V.blend); eye = Vector3.Lerp(V.lastEye, eye, k); at = Vector3.Lerp(V.lastAt, at, k); }
       if (V.blend >= 1) { V.lastEye = eye.clone(); V.lastAt = at.clone(); }
@@ -366,6 +379,7 @@ const Viewer: Section = {
       // the sky's reflection on the paint: refreshed now and then, and at once when the slider moves
       if (V.probeOn && (V.envDirty || now > envT)) { pr.cubeTexture.resetRefreshCounter(); envT = now + (V.speed >= 2000 ? 0.2 : V.speed >= 600 ? 0.4 : 1.2); V.envDirty = false; }
       if (now > infoT) { infoT = now + 0.25; info(); const wc = V.hud && V.hud.querySelector('.v3d-wxchip'); if (wc && V.rwx) wc.textContent = V.rwx.chip(); }
+      if (V.crashes) { const night = Math.max(0, Math.min(1, (-(V.sunAlt || 0) + 2) / 8)), rw = V.rwx && V.rwx.on() ? V.drift : null; for (const k in V.crashes) V.crashes[k].step(now, night, rw ? [3, 1] : [2, 1]); }
       if (V.photo) V.photo.frame();
       sc.render();
       perfEnd();

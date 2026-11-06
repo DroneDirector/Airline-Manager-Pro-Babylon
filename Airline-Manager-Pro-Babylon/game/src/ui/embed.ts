@@ -117,6 +117,9 @@ if (EMBED) {
     if (!fid || String(fid).indexOf('apt:') === 0) { embedTell('viewer3d', { id: '' }); return; }
     embedTell('viewer3d', { id: fid });
   };
+  // a crash site from the map or a notification: the 3D viewer at that airport, looking at the wreck
+  ACTIONS['crash-3d'] = (el: any) => { const k = el && el.getAttribute ? el.getAttribute('data-apt') : ''; if (!k) return; closeAll(); embedTell('viewer3d', { crash: k }); };
+  setTimeout(() => { ACTIONS['crash-3d'] = (el: any) => { const k = el && el.getAttribute ? el.getAttribute('data-apt') : ''; if (!k) return; closeAll(); embedTell('viewer3d', { crash: k }); }; }, 0);
   W.v3dSupported = () => true;   // the edition's 3D viewer is always there
   ACTIONS['v3d-open'] = () => W.v3dOpen(''); ACTIONS['apt-3d'] = () => W.v3dOpen('');
   let follow = '', timer: any = 0;
@@ -171,7 +174,8 @@ if (EMBED) {
     else if (d.ampb === 'airport' && d.icao) {
       // an airport's layout for the 3D viewer: what is known now, and again if a better one arrives
       const A: any = apt(d.icao), elev = A && A.elev ? A.elev * 0.3048 : 0;
-      const out = (L: any) => { if (L) embedTell('airport', { icao: d.icao, L: Object.assign({}, L, { alt: L.alt || elev }) }); };
+      const crash = (() => { try { const c: any = crashSiteAt(d.icao); return c ? JSON.parse(JSON.stringify(c)) : null; } catch (e) { return null; } })();
+      const out = (L: any) => { if (L) embedTell('airport', { icao: d.icao, crash, L: Object.assign({}, L, { alt: L.alt || elev }) }); };
       try { AirportLayouts.get(d.icao, out).then(out).catch(() => embedTell('airport', { icao: d.icao, L: null })); } catch (e) { embedTell('airport', { icao: d.icao, L: null }); }
     }
   });

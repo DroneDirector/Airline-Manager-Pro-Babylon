@@ -89,7 +89,7 @@ const TITLES: { [id: string]: string } = { viewer3d: '3D viewer · above the clo
 /** What was chosen on the title screen: the game (New, Continue, Load, Save, UI) or one of the demos. */
 function pickPlace(id: string) {
   if (id.indexOf('game:') === 0) {
-    gameOpen(id.slice(5) as any, { title: () => splashOpen(pickPlace), exit: () => exitGame(), viewer: (fid: string) => enter('viewer3d', fid ? '3D viewer · following the flight' : TITLES.viewer3d, fid ? { live: fid } : undefined) });
+    gameOpen(id.slice(5) as any, { title: () => splashOpen(pickPlace), exit: () => exitGame(), viewer: (fid: string) => enter('viewer3d', /^crash:/.test(fid) ? '3D viewer · the crash site' : fid ? '3D viewer · following the flight' : TITLES.viewer3d, /^crash:/.test(fid) ? { crash: fid.slice(6) } : fid ? { live: fid } : undefined) });
     return;
   }
   enter(id, TITLES[id] || id);
