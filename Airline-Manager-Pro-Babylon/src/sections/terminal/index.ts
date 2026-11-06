@@ -3,6 +3,7 @@
 // gates' stairs, the staff stairs), the lifts (tap or click them, Cross on a controller), the moving walkways that
 // carry you along the pier, out onto the kerb and the apron. Doors open as you come up to them. What you look at
 // shows its id (every room, door and object has one), and where you are shows at the top.
+import { LiftCtl, liftAt } from './lifts';
 import { Scene, Vector3, Color3, Color4, UniversalCamera, HemisphericLight, DirectionalLight, ShadowGenerator, GlowLayer, DefaultRenderingPipeline, ImageProcessingConfiguration, ReflectionProbe, RenderTargetTexture, AbstractMesh, InstancedMesh } from '@babylonjs/core';
 import { registerSection, Section, SectionCtx } from '../../core/sections';
 import { S } from '../../core/settings';
@@ -67,6 +68,7 @@ const Terminal$: Section = {
     // everything that never moves is fixed in place (cheaper to draw); the doors, the revolving wings, the lifts move
     const moving = new Set<AbstractMesh>(); for (const d of O.doors as DoorObj[]) for (const m of d.node.getChildMeshes()) moving.add(m);
     if (O.fx.museum) for (const m of O.fx.museum.root.getChildMeshes()) moving.add(m);
+    for (const l of O.fx.lifts as LiftCtl[]) for (const m of l.moving_parts) moving.add(m);
     for (const m of sc.meshes) if (!moving.has(m)) { m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true; }
     for (const m of sc.meshes) if (m.name.indexOf('SRC:') === 0) { m.isPickable = false; }
     O.walkways = Array.from(K.objects.values()).filter(o => o.kind === 'MOVING-WALKWAY').map(o => o.node.metadata);
@@ -181,9 +183,9 @@ function pick(px?: number, py?: number): { id: string; act?: string; dist: numbe
 function aimAt(): string { const p = pick(); if (!p) return ''; if (p.act === 'lift') return `${p.id} · lift: ${O.F.f === 1 ? 'up to Floor 2' : 'down to Floor 1'}`; return p.id; }
 function use(px?: number, py?: number) {
   const p = pick(px, py), F = O.F; if (!p || p.act !== 'lift' || p.dist > 3.5 || F.stair) return;
-  const l = (O.fx.lifts as { id: string; x: number; z: number; face: number }[]).filter(q => q.id === p.id)[0]; if (!l) return;
+  const l = (O.fx.lifts as LiftCtl[]).filter(q => q.id === p.id)[0]; if (!l) return;
   const to: Fl = F.f === 1 ? 2 : 1, fx = l.x + Math.sin(l.face) * 1.5, fz = l.z + Math.cos(l.face) * 1.5;
   const [x, z] = walkable(to, fx, fz) ? [fx, fz] : freeNear(to, fx, fz);
-  vibrate(60, 0.2, 0.3); F.f = to; F.y = to === 2 ? F2Y : 0; F.x = x; F.z = z; F.yaw = l.face; toast(`${l.id}: Floor ${to}`);
+  vibrate(60, 0.2, 0.3); F.f = to; F.y = to === 2 ? F2Y : 0; F.x = x; F.z = z; F.yaw = l.face; liftAt(l, to); toast(`${l.id}: Floor ${to}`);
 }
 registerSection(Terminal$);

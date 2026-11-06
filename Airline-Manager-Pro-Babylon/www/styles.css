@@ -353,3 +353,6 @@ body.photo-on .v3d-wxchip { display: none; }
 
 .site-services { position: absolute; right: 12px; top: 64px; z-index: 6; }
 body.photo-on .site-services { display: none; }
+
+.site-lift { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; background: rgba(8,14,28,.72); color: #eef3fa; font-size: 13px; pointer-events: none; }
+body.photo-on .site-lift { display: none; }

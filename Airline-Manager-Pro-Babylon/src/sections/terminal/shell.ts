@@ -3,6 +3,7 @@
 // where a wall faces the open air; the wave roof over the Grand Hall and the kerb (white on top, warm timber under it,
 // three lens skylights along its crests, downlights) on its eight tree columns; the pier's roof with its solar panels;
 // and the site: the kerb, the access road, the car park, the trees, the apron with its stands and taxi lane.
+import { liftHoles } from './lifts';
 import { MeshBuilder, Mesh, Vector3, VertexData, TransformNode } from '@babylonjs/core';
 import { Kit, signC } from './kit';
 import { ROOMS, DOORS, STAIRS, Room, Fl, F2Y, F1CEIL, F2CEIL, ROOF, doorH, WAVE, waveSouth, waveH, COLUMNS, STANDS, inRoom, PN } from './plan';
@@ -21,7 +22,7 @@ export function rectMinus(r: R4, holes: R4[]): R4[] {
 }
 const FLOOR_M: { [k: string]: string } = { hall: 'terrazzo', vestibule: 'terrazzo', plant: 'epoxy', wc: 'tile', clean: 'epoxy', security: 'terrazzo', airside: 'terrazzo', lounge: 'herring', office: 'carpetGrey', passage: 'tile', ops: 'carpetBlue', crew: 'carpetGrey', corridor: 'tile', academy: 'carpetBlue', staffentr: 'tileDark', baghall: 'concrete', ramp: 'concrete', gate1: 'carpetBlue', link: 'terrazzo', food: 'terrazzo', landing: 'terrazzo', taxfree: 'tile', family: 'carpet', bar: 'herring', walk: 'terrazzo', eatery: 'tileDark', gate2: 'carpetBlue', view: 'carpetBlue' };
 const WALL_M: { [k: string]: string } = { hall: 'white', plant: 'concrete', baghall: 'concrete', ramp: 'concrete', wc: 'tile', eatery: 'tileDark', clean: 'concrete', lounge: 'plaster' };
-export const stairHoles = (): R4[] => STAIRS.map(s => ({ x0: s.x0, z0: s.z0, x1: s.x1, z1: s.z1 }));
+export const stairHoles = (): R4[] => STAIRS.map(s => ({ x0: s.x0, z0: s.z0, x1: s.x1, z1: s.z1 })).concat(liftHoles());   // and the lift shafts
 
 export function buildShell(K: Kit, progress: (p: number, s: string) => void) {
   const { sc, M } = K;

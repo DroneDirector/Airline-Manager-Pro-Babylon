@@ -20,6 +20,7 @@ import { makeKit } from '../terminal/kit';
 import { buildShell } from '../terminal/shell';
 import { buildDoors, stepDoors, DoorObj } from '../terminal/doors';
 import { STAIRS, F2Y } from '../terminal/plan';
+import { stepLifts, LiftCtl } from '../terminal/lifts';
 import { furnish } from '../terminal/furnish';
 import { buildFixtures } from '../terminal/fixtures';
 import { buildRental, rentalCars } from '../terminal/rental';
@@ -196,7 +197,7 @@ const Site$: Section = {
     progress(86, 'Building your terminal…'); await new Promise(r => setTimeout(r, 0));
     const before = new Set(sc.transformNodes.concat(sc.meshes as any[]));
     const K = makeKit(sc); buildShell(K, () => { /* its own steps */ }); const doors = buildDoors(K) as DoorObj[]; furnish(K, () => { /* */ }); K.clearWalls();
-    buildFixtures(K, '#1C3A8A', '#3FD3E6', 'Airline Manager Pro', () => { /* */ }); buildRental(K);
+    const FX: any = buildFixtures(K, '#1C3A8A', '#3FD3E6', 'Airline Manager Pro', () => { /* */ }); O.lifts = (FX && FX.lifts) || []; buildRental(K);
     // the rental car centre's cars as the game has them: only the companies signed at your airport, and a car that is out is not in its bay
     try { const RC = ctx.opts && ctx.opts.data && ctx.opts.data.rental; if (RC) { const seen: { [k: string]: number } = {};
       for (const c of rentalCars(K)) { const k = c.company + '/' + c.type, n = seen[k] = (seen[k] || 0) + 1, on = RC.signed.indexOf(c.company) >= 0 && n > ((RC.out[c.company] || {})[c.type] || 0);
@@ -205,7 +206,8 @@ const Site$: Section = {
     for (const n of (sc.transformNodes as any[]).concat(sc.meshes as any[])) if (!before.has(n) && !n.parent && n !== K.root) n.parent = K.root;   // anything built loose goes with it
     K.root.parent = ap; K.root.position.set(PX(0), 0, PV(0)); O.K = K;
     for (const m of K.casters) casters.push(m);
-    for (const m of sc.meshes) { if (!before.has(m)) { m.renderingGroupId = 1; m.computeWorldMatrix(true); m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true; } }
+    const liftParts = new Set<any>(); for (const l of O.lifts as LiftCtl[]) for (const m of l.moving_parts) liftParts.add(m);
+    for (const m of sc.meshes) { if (!before.has(m)) { m.renderingGroupId = 1; m.computeWorldMatrix(true); if (!liftParts.has(m)) { m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true; } } }
     // airport mode (from the game's Airport): on foot, with gravity, against the terminal's floors, walls and glass,
     // the levelled ground and the aircraft; the stairs are walked up as ramps; the doors open as you come to them
     const walkMode = !!(ctx.opts && ctx.opts.walk); O.walkMode = walkMode;
@@ -247,6 +249,7 @@ const Site$: Section = {
       <div class="wx-updown site-ud" ${IS_TOUCH ? '' : 'hidden'}><button class="wx-b" data-ud="up">▲</button><button class="wx-b" data-ud="down">▼</button></div>`);
     const CAM = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, speed: 40, up: 0, down: 0 }; O.CAM = CAM;
     if (ctx.toGame) hud.insertAdjacentHTML('beforeend', `<button class="wx-b site-services" data-services>Services and concessions</button>`);
+    hud.insertAdjacentHTML('beforeend', `<div class="site-lift" hidden></div>`);
     if (walkMode) hud.insertAdjacentHTML('beforeend', `<div class="site-moves">${[['jump', 'Jump'], ['crouch', 'Crouch'], ['prone', 'Prone'], ['sprint', 'Sprint']].map(([k, l]) => `<button class="wx-b" data-mv="${k}">${l}</button>`).join('')}</div>`);
     if (walkMode) { hud.classList.add('site-walk'); (hud.querySelector('.site-dock') as HTMLElement).style.display = 'none'; (hud.querySelector('.site-ud') as HTMLElement).style.display = 'none'; }
     // the body you walk in: feet at its position, 1.8 m tall, 0.6 m across
@@ -274,16 +277,20 @@ const Site$: Section = {
       if (b.hasAttribute('data-sp2')) { CAM.speed = Number(b.getAttribute('data-sp2')); hud.querySelectorAll('[data-sp2]').forEach(q => q.classList.toggle('on', q === b)); }
       if (b.hasAttribute('data-site')) { const other = SITES.find(s => s !== site)!; if (ctx.back) { /* open again at the other site */ } O.reopen = other.id; Site$.close(); Site$.open(Object.assign({}, ctx, { opts: Object.assign({}, ctx.opts || {}, { site: other.id }) })); } });
     for (const k of ['up', 'down'] as const) { const b = hud.querySelector(`[data-ud="${k}"]`) as HTMLElement; b.addEventListener('pointerdown', e => { e.stopPropagation(); CAM[k] = 1; }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { CAM[k] = 0; }); }
-    const keys = new Set<string>(); O.kd = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); keys.add(k); if (!O.walkMode || e.repeat) return; if (k === ' ') O.W.jump = true; else if (k === 'c' || k === 'control') O.setStance('crouch'); else if (k === 'z') O.setStance('prone'); }; O.ku = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase()); window.addEventListener('keydown', O.kd); window.addEventListener('keyup', O.ku);
+    const keys = new Set<string>(); O.kd = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); keys.add(k); if (!O.walkMode || e.repeat) return; if (k === ' ') O.W.jump = true; else if (k === 'c' || k === 'control') O.setStance('crouch'); else if (k === 'z') O.setStance('prone'); else if (k === 'e') O.liftPress = true; }; O.ku = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase()); window.addEventListener('keydown', O.kd); window.addEventListener('keyup', O.ku);
     if (!walkMode) place((ctx.opts && ctx.opts.view) || 'gate');
     perfAttach(engine, sc, hud); perfShow();
-    if (walkMode) toast(IS_TOUCH ? 'Your airport · left thumb: walk · right: look' : 'Your airport · W A S D walk · mouse look · Shift run · P photo'); else toast(IS_TOUCH ? 'Pick a view · left thumb: fly · right: look · ▲ ▼ up and down' : 'Pick a view · W A S D fly · mouse look · Space / R up · C / F down · Shift faster · P photo');
+    if (walkMode) toast(IS_TOUCH ? 'Your airport · left thumb: walk · right: look' : 'Your airport · W A S D walk · mouse look · Shift run · Space jump · C crouch · Z prone · E lift · P photo · a controller: A jump, B crouch, Y prone, X lift, R3 sprint'); else toast(IS_TOUCH ? 'Pick a view · left thumb: fly · right: look · ▲ ▼ up and down' : 'Pick a view · W A S D fly · mouse look · Space / R up · C / F down · Shift faster · P photo');
     progress(100, 'Ready');
     runLoop(() => {
       perfBegin();
       const dt = Math.min(0.05, engine.getDeltaTime() / 1000), now = performance.now() / 1000, inp = inputFrame(dt);
       CAM.yaw += inp.lx; CAM.pitch = Math.max(-1.55, Math.min(1.55, CAM.pitch - inp.ly));
       if (walkMode) {
+        // a controller: Cross / A jumps, Circle / B crouches, Triangle / Y lies prone, Square / X uses a lift, R3 sprints (L3 too, while held)
+        const gp = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(x => x && x.connected)[0] : null;
+        if (gp) { const pb: boolean[] = O.pb || (O.pb = []), hit = (i: number) => { const p = !!(gp.buttons[i] && gp.buttons[i].pressed), e = p && !pb[i]; pb[i] = p; return e; };
+          if (hit(0)) W.jump = true; if (hit(1)) setStance('crouch'); if (hit(3)) setStance('prone'); if (hit(2)) O.liftPress = true; if (hit(11)) { W.sprint = !W.sprint; const sb = hud.querySelector('[data-mv="sprint"]'); if (sb) sb.classList.toggle('on', W.sprint); } }
         const st = STANCE[W.stance], sprinting = (inp.run || keys.has('shift') || W.sprint) && Math.hypot(inp.mx, inp.my) > 0.1;
         const cp0 = Math.cos(CAM.pitch), fw = new Vector3(Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw)), rt = new Vector3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw)), spd = (sprinting ? st.sprint : st.walk) * (W.ground ? 1 : 0.85) * dt;
         // a jump: up at 4.4 m/s (about a metre), from standing or crouching, only from the ground; landing from a crouch or prone stands you up first
@@ -297,6 +304,9 @@ const Site$: Section = {
         W.eye += (st.eye - W.eye) * Math.min(1, dt * 9); cam.position.set(body.position.x, body.position.y + W.eye, body.position.z); cam.setTarget(cam.position.add(new Vector3(Math.sin(CAM.yaw) * cp0, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp0)));
         // the doors open as you come to them
         const lp = Vector3.TransformCoordinates(body.position, K.root.getWorldMatrix().clone().invert()); try { stepDoors(doors, lp.x, lp.z, lp.y > 3 ? 2 : 1, dt, now); } catch (e) { /* still */ }
+        // the lifts: called as you come to them, and the ride (you go up and down with the car)
+        try { const r = stepLifts(O.lifts, lp.x, lp.y, lp.z, dt, !!O.liftPress); O.liftPress = false; if (r.dy) { body.position.y += r.dy; W.vy = 0; W.ground = true; }
+          const lh = hud.querySelector('.site-lift') as HTMLElement; if (lh) { lh.hidden = !r.hint; if (r.hint) lh.textContent = r.hint; } } catch (e) { /* still */ }
       } else {
       const sp = CAM.speed * (inp.run || keys.has('shift') ? 4 : 1) * dt, cp = Math.cos(CAM.pitch), f = new Vector3(Math.sin(CAM.yaw) * cp, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp), r = new Vector3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
       const mv = f.scale(inp.my).add(r.scale(inp.mx)), vert = (keys.has(' ') || keys.has('r') || CAM.up ? 1 : 0) - (keys.has('c') || keys.has('f') || CAM.down ? 1 : 0);

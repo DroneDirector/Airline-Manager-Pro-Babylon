@@ -4,12 +4,13 @@
 // entrance on the Grand Hall, an airliner on each stand and the jetways J-1 to J-4 from gates 1–4.
 import { MeshBuilder, Mesh, Vector3, TransformNode, PointLight, SpotLight, Light } from '@babylonjs/core';
 import { Kit, P, signC } from './kit';
+import { buildLifts, LiftCtl } from './lifts';
 import { SCREENS, STAIRS, LIFTS, STANDS, MOD, F2Y, F2CEIL, Stair, PN } from './plan';
 import { buildMuseum, Museum, Exhibit } from '../building/museum';
 import { buildAirliner, repaint, setGear, Airliner } from '../viewer3d/airliner';
 import { IS_PC } from '../../core/app';
 
-export interface Fixtures { museum: Museum | null; museumDoor: { k: number; base: Vector3[] }; aircraft: Airliner[]; lifts: { id: string; x: number; z: number; face: number }[] }
+export interface Fixtures { museum: Museum | null; museumDoor: { k: number; base: Vector3[] }; aircraft: Airliner[]; lifts: LiftCtl[] }
 
 export function buildFixtures(K: Kit, c1: string, c2: string, airline: string, progress: (p: number, s: string) => void): Fixtures {
   const { sc, M } = K;
@@ -47,18 +48,8 @@ export function buildFixtures(K: Kit, c1: string, c2: string, airline: string, p
       K.box(o, ax ? b - a : 0.04, 1.05, ax ? 0.04 : b - a, M.glass, ax ? (a + b) / 2 : line, F2Y + 0.53, ax ? line : (a + b) / 2); K.box(o, ax ? b - a : 0.07, 0.05, ax ? 0.07 : b - a, M.chrome, ax ? (a + b) / 2 : line, F2Y + 1.07, ax ? line : (a + b) / 2); }
     void Mesh;
   }
-  // ---- the lifts: a glass shaft through both floors, the car, the doors, the call buttons ----
-  const lifts: Fixtures['lifts'] = [];
-  for (const l of LIFTS) {
-    const o = K.obj(l.from, 'LIFT', l.x, 0, l.z, l.face, l.id); o.metadata.kind = 'lift'; o.metadata.act = 'lift';
-    for (const sx of [-0.9, 0.9]) for (const sz of [-0.9, 0.9]) K.box(o, 0.08, F2CEIL, 0.08, M.steel, sx, F2CEIL / 2, sz);
-    for (const [w, d, x, z] of [[1.8, 0.03, 0, -0.9], [0.03, 1.8, -0.9, 0], [0.03, 1.8, 0.9, 0]]) K.box(o, w, F2CEIL, d, M.glassBlue, x, F2CEIL / 2, z);
-    for (const fy of [0, F2Y]) { K.box(o, 0.75, 2.2, 0.04, M.steel, -0.42, fy + 1.1, 0.9); K.box(o, 0.75, 2.2, 0.04, M.steel, 0.42, fy + 1.1, 0.9); K.box(o, 0.08, 0.14, 0.04, M.black, 1.05, fy + 1.15, 0.95); K.box(o, 0.04, 0.04, 0.05, M.green, 1.05, fy + 1.18, 0.98);
-      const p = MeshBuilder.CreatePlane(K.nm('lf'), { width: 0.8, height: 0.24 }, sc); p.material = K.picture(signC(`${l.id} · LIFT`, '#14202E', '#F2F4F7', 512, 154, '700 72px Arial, sans-serif'), 1); p.parent = o; p.position.set(0, fy + 2.5, 0.93); p.metadata = o.metadata; }
-    K.box(o, 1.7, 2.4, 1.7, M.steel, 0, 1.2, 0); K.box(o, 1.6, 0.03, 1.6, M.light, 0, 2.38, 0);
-    K.block(1, l.x - 1.0, l.z - 1.0, l.x + 1.0, l.z + 1.0); K.block(2, l.x - 1.0, l.z - 1.0, l.x + 1.0, l.z + 1.0);
-    lifts.push({ id: l.id, x: l.x, z: l.z, face: l.face });
-  }
+  // ---- the lifts: each in its shaft through both floors, the car riding inside it, the doors on each floor ----
+  const lifts = buildLifts(K, signC);
   progress(72, 'Opening the museum…');
   // ---- the museum: the Vortex Gallery, its entrance on the Grand Hall's west wall (door D-F1-MUSEUM-1) ----
   let museum: Museum | null = null; const museumDoor = { k: 0, base: [] as Vector3[] };
