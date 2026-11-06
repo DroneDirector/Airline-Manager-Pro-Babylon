@@ -6,6 +6,7 @@
 import { Scene, Vector3, Color3, MeshBuilder, Mesh, PBRMaterial, StandardMaterial, DynamicTexture, Texture, TransformNode, AbstractMesh, PointLight } from '@babylonjs/core';
 import * as P from '../lounge/pictures';
 import { IS_PC } from '../../core/app';
+import { TRN_DOOR } from '../training/build';
 
 export const COR = { x0: -5.6, x1: -3.2, z0: -6, z1: 18.5, h: 3.0 };
 export const CON = { x0: -9, x1: 30, z0: -18, z1: -6, h: 5.2 };
@@ -47,7 +48,9 @@ export function buildHalls(sc: Scene, progress: (p: number, s: string) => void, 
   { const { x0, x1, z0, z1, h } = COR, w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     const f = MeshBuilder.CreateGround(nm('corF'), { width: w, height: d }, sc); f.position.set(cx, 0.001, cz); f.material = pbr({ tex: tex(P.noise('#9AA3AD', 14, 8), 2, 10), rough: 0.5 }); f.receiveShadows = true; f.parent = root;
     const c = MeshBuilder.CreatePlane(nm('corC'), { width: w, height: d }, sc); c.rotation.x = -Math.PI / 2; c.position.set(cx, h, cz); c.material = pbr({ col: '#ECEBE6', rough: 0.95 }); c.parent = root;
-    flat(d, h, wallM, x0, h / 2, cz, -Math.PI / 2); flat(w, h, wallM, cx, h / 2, z1, 0);
+    // the west wall, with the opening for the Training room's double doors
+    flat(TRN_DOOR.z0 - z0, h, wallM, x0 + 0.005, h / 2, (z0 + TRN_DOOR.z0) / 2, -Math.PI / 2); flat(z1 - TRN_DOOR.z1, h, wallM, x0 + 0.005, h / 2, (TRN_DOOR.z1 + z1) / 2, -Math.PI / 2);
+    flat(TRN_DOOR.z1 - TRN_DOOR.z0, h - 2.15, wallM, x0 + 0.005, 2.15 + (h - 2.15) / 2, (TRN_DOOR.z0 + TRN_DOOR.z1) / 2, -Math.PI / 2); flat(w, h, wallM, cx, h / 2, z1, 0);
     // the east wall, with the openings for your office's and the Operations office's doors (the rooms' own walls are behind)
     const seg = (za: number, zb: number) => { if (zb - za > 0.01) flat(zb - za, h, wallM, x1 - 0.005, h / 2, (za + zb) / 2, Math.PI / 2); };
     const lintel = (za: number, zb: number) => flat(zb - za, h - 2.15, wallM, x1 - 0.005, 2.15 + (h - 2.15) / 2, (za + zb) / 2, Math.PI / 2);
@@ -58,6 +61,7 @@ export function buildHalls(sc: Scene, progress: (p: number, s: string) => void, 
     const l = new PointLight('corL', new Vector3(cx, h - 0.4, cz), sc); l.intensity = 0.9; l.range = d; l.diffuse = Color3.FromHexString('#F4F6FA');
     // the signs beside the doors, airport style
     const sign = (t: string, z: number) => flat(0.9, 0.22, picMat(P.sign(t, '#14202E', '#F2C230', 512, 128, '700 46px Arial, sans-serif'), 0.6), x1 - 0.01, 2.3, z, Math.PI / 2);
+    flat(1.1, 0.22, picMat(P.sign('Training room', '#14202E', '#F2C230', 512, 128, '700 46px Arial, sans-serif'), 0.6), x0 + 0.01, 2.4, (TRN_DOOR.z0 + TRN_DOOR.z1) / 2, -Math.PI / 2);
     sign('Your office', (OFFICE_DOOR.z0 + OFFICE_DOOR.z1) / 2 + 1.0); sign('Operations', (OPS_DOOR.z0 + OPS_DOOR.z1) / 2 - 1.0);
     flat(1.0, 0.22, picMat(P.sign('Concourse', '#14202E', '#F2C230', 512, 128, '700 46px Arial, sans-serif'), 0.6), (sw0 + sw1) / 2, 2.4, z0 + 0.01, Math.PI);
   }

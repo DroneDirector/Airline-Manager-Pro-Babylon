@@ -64,7 +64,15 @@ if (EMBED) {
     try { const earned = ((State as any).badges || {}) as any; for (const b of badgeDefs().filter(b => earned[b.id]).sort((a, b) => b.tier - a.tier || earned[b.id] - earned[a.id]).slice(0, 12)) out.push({ title: b.title, sub: TIER_NAMES[b.tier] + ' badge', kind: 'badge', tier: b.tier }); } catch (e) { /* none */ }
     return out.slice(0, 36);
   };
-  const building = (at: string) => { try { saveNow(true); } catch (e) { /* saved */ } embedTell('room', { room: 'building', at, data: Object.assign(officeData(), { museum: museumData() }) }); };
+  // who is in the Training room now, the instructor and his lessons (as on the main game's Academy)
+  const trainingData = (): any => {
+    const out: any = { teacher: TRN_TEACHER, lessons: TRN_LESSONS, students: [] };
+    try { for (const p of inTrainingNow().slice(0, 12)) { const C: any = p.course ? CrewTraining.course(p.course.id) : null, ty: any = p.training ? acType(p.training.typeId) : null;
+      out.students.push({ id: String(p.id), name: p.name, role: roleNameOf(p), sex: p.sex || 'm', course: C ? C.name : ty ? `${ty.maker} ${ty.model} type rating` : 'Training', who: C ? C.who : 'pilot', until: p.trainingUntil || (p.course && p.course.until) || Date.now(), from: p.trainingFrom || Date.now() }); } } catch (e) { /* an empty class */ }
+    return out;
+  };
+  const building = (at: string) => { try { saveNow(true); } catch (e) { /* saved */ } embedTell('room', { room: 'building', at, data: Object.assign(officeData(), { museum: museumData(), training: trainingData() }) }); };
+  const trnVisit = () => { closeAll(); building('training'); }; ACTIONS['ct-visit'] = trnVisit; setTimeout(() => { ACTIONS['ct-visit'] = trnVisit; }, 0);
   OfficeRoom.open = () => building('office');
   OpsRoom.open = () => building('ops');
   LoungeRoom.open = () => building('lounge');

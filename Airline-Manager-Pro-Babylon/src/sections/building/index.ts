@@ -23,6 +23,7 @@ import { buildLounge, blockedAt, Lounge, DOOR_X, DOOR_W } from '../lounge/build'
 import * as P from '../lounge/pictures';
 import { buildHalls, Halls, COR, CON, STAFF_DOOR, LOUNGE_DOOR, OFFICE_DOOR, OPS_AT, OPS_DOOR, MUSEUM_DOOR } from './concourse';
 import { buildMuseum, museumBlocked, Museum, Exhibit } from './museum';
+import { buildTraining, Training, TRN, TRN_DOOR } from '../training/build';
 
 const EYE = 1.65, SIT = 1.2;
 const LG = { x: 37, z: -7.3 };   // the lounge's middle; turned a quarter so its doors face the concourse
@@ -30,13 +31,15 @@ const B: any = { scene: null as Scene | null };
 const HINTS: { [k: string]: string } = {
   laptop: 'Laptop: open the game at the Overview', planner: 'Monitor: the Flight planner', map: 'Route map: your routes', reports: 'Conduct reports: your crew', phone: 'The phone',
   globe: 'The globe', model: 'A model of one of your aircraft', poster: 'An aviation poster', window: 'The view', monitor: 'Monitor: your schedule', files: 'The archive',
-  piece: 'Take it in your hands', museumdoor: 'The museum',
+  piece: 'Take it in your hands', museumdoor: 'The museum', trndoor: 'The door', trn: 'Who is this?', whiteboard: 'The whiteboard: today\'s lesson', teacherdesk: 'The instructor\'s desk',
+  desk: 'A student\'s desk', books: 'Aviation books', clock: 'The clock',
   chair: 'A chair: sit down', door: 'The door', staffdoor: 'The staff door', shop: 'A shop', seat: 'A seat by the window', board: 'The flight boards',
 };
 onGameMonitor((d: any) => { if (B.scene && B.ops && d.url) opsMonitor(B.ops, d.url); });
 
 /** Where you are: which room, the corridor or the concourse. */
-function where(x: number, z: number): 'office' | 'ops' | 'corridor' | 'concourse' | 'lounge' | 'museum' | '' {
+function where(x: number, z: number): 'office' | 'ops' | 'corridor' | 'concourse' | 'lounge' | 'museum' | 'training' | '' {
+  if (x > TRN.x0 && x < TRN.x1 && z > TRN.z0 && z < TRN.z1) return 'training';
   const M: Museum = B.museum; if (M && x < CON.x0 && x > CON.x0 - M.D && Math.abs(z - MUSEUM_DOOR.z) < M.W / 2) return 'museum';
   if (x > -3.2 && x < 3.2 && z > -3.2 && z < 3.2) return 'office';
   if (x > OPS_AT.x - 3.0 && x < OPS_AT.x + 3.0 && z > OPS_AT.z - 2.7 && z < OPS_AT.z + 2.7) return 'ops';
@@ -53,6 +56,7 @@ function museumLocal(x: number, z: number): [number, number] { return [-(z - MUS
 function walkable(x: number, z: number): boolean {
   const D = B.doors, r = 0.25;
   if (D.office.k > 0.6 && x > COR.x1 - 0.5 && x < COR.x1 + 0.6 && z > OFFICE_DOOR.z0 + 0.1 && z < OFFICE_DOOR.z1 - 0.1) return true;
+  if (D.trnA.k > 0.6 && x > COR.x0 - 0.6 && x < COR.x0 + 0.5 && z > TRN_DOOR.z0 + 0.1 && z < TRN_DOOR.z1 - 0.1) return true;
   if (D.ops.k > 0.6 && x > COR.x1 - 0.5 && x < COR.x1 + 0.6 && z > OPS_DOOR.z0 + 0.1 && z < OPS_DOOR.z1 - 0.1) return true;
   if (D.staff.k > 0.6 && x > STAFF_DOOR.x0 + 0.1 && x < STAFF_DOOR.x1 - 0.1 && z > CON.z1 - 0.6 && z < CON.z1 + 0.6) return true;
   if (D.lounge.k > 0.6 && x > CON.x1 - 0.6 && x < CON.x1 + 0.9 && z > LOUNGE_DOOR.z - DOOR_W / 2 + 0.15 && z < LOUNGE_DOOR.z + DOOR_W / 2 - 0.15) return true;
@@ -60,6 +64,7 @@ function walkable(x: number, z: number): boolean {
   switch (where(x, z)) {
     case 'museum': { const [mx, mz] = museumLocal(x, z); return !museumBlocked(B.museum, mx, mz); }
     case 'office': return !officeBlocked(B.office, x, z);
+    case 'training': { if (x < TRN.x0 + 0.3 || x > TRN.x1 - 0.3 || z < TRN.z0 + 0.3 || z > TRN.z1 - 0.3) return false; for (const b of B.trn.blocks) if (x > b[0] - r && x < b[2] + r && z > b[1] - r && z < b[3] + r) return false; return true; }
     case 'ops': return !opsBlocked(B.ops, x - OPS_AT.x, z - OPS_AT.z);
     case 'corridor': return x > COR.x0 + 0.3 && x < COR.x1 - 0.3 && z > COR.z0 + 0.3 && z < COR.z1 - 0.3;
     case 'concourse': { if (x < CON.x0 + 0.4 || x > CON.x1 - 0.4 || z < CON.z0 + 0.5 || z > CON.z1 - 0.4) return false; for (const b of B.halls.blocks) if (x > b[0] - r && x < b[2] + r && z > b[1] - r && z < b[3] + r) return false; return true; }
@@ -132,7 +137,11 @@ const Building: Section = {
     const items: Exhibit[] = ((ctx.opts && ctx.opts.data && ctx.opts.data.museum) || []) as Exhibit[]; B.items = items;
     l0 = sc.lights.length; const museum = buildMuseum(sc, items, D.color, D.color2, D.airline); museum.root.rotation.y = Math.PI / 2; museum.root.position.set(CON.x0 - museum.D / 2, 0, MUSEUM_DOOR.z); B.museum = museum; keepLights(sc, l0, museum.root);
     museum.root.computeWorldMatrix(true);
-    B.casters = [...office.casters, ...ops.casters, ...lounge.casters, ...halls.casters, ...museum.casters]; B.metals = [...office.metals, ...ops.metals, ...lounge.metals, ...halls.metals, ...museum.metals];
+    // the Training room, off the corridor's west side, with today's class
+    progress(86, 'Setting out the notebooks…');
+    l0 = sc.lights.length; const trn = buildTraining(sc, D.airline, D.color, D.color2, (D as any).training || {}); B.trn = trn; keepLights(sc, l0, trn.root);
+    B.say = { i: -1, t: 0, line: '' };
+    B.casters = [...office.casters, ...ops.casters, ...lounge.casters, ...halls.casters, ...museum.casters, ...trn.casters]; B.metals = [...office.metals, ...ops.metals, ...lounge.metals, ...halls.metals, ...museum.metals, ...trn.metals];
     // the doors
     progress(88, 'Opening the doors…');
     const doorOf = (root: TransformNode) => root.getChildMeshes().filter(m => m.metadata && m.metadata.act === 'door');
@@ -141,15 +150,17 @@ const Building: Section = {
       office: swingDoor(doorOf(office.root), new Vector3(COR.x1, 0, OFFICE_DOOR.z1), 1),
       ops: swingDoor(doorOf(ops.root), new Vector3(COR.x1, 0, OPS_DOOR.z1), 1),
       staff: swingDoor([halls.staffDoor], new Vector3(STAFF_DOOR.x1, 0, CON.z1), -1),
+      trnA: swingDoor(trn.doors[0], new Vector3(TRN.x1, 0, TRN_DOOR.z0), -1), trnB: swingDoor(trn.doors[1], new Vector3(TRN.x1, 0, TRN_DOOR.z1), 1),
       lounge: { meshes: lounge.leaves, dir: 1, k: 0, to: 0, base: lounge.leaves.map(m => m.position.clone()) },
       museum: { k: 0, to: 0, near: false, leaves: museum.doors.map((m, i) => ({ m, x0: museum.doorBase[i].x, sgn: Math.sign(museum.doorBase[i].x) || 1 })) },   // the portal's glass leaves slide apart
     };
     for (const m of doorOf(office.root).concat(doorOf(ops.root))) m.metadata = { act: m.parent === ops.root ? 'opsdoor' : 'officedoor' };
     halls.staffDoor.metadata = { act: 'staffdoor' };
     // where you arrive, always on open floor
-    const spots: { [k: string]: [number, number, number] } = { museum: [CON.x0 - 2.2, MUSEUM_DOOR.z, -Math.PI / 2], office: [office.spawn.x + 0.4, office.spawn.z + 0.2, office.spawn.yaw], ops: [OPS_AT.x + 0.7, OPS_AT.z - 1.2, 0], lounge: [CON.x1 + 2.6, LOUNGE_DOOR.z, Math.PI / 2], concourse: [8, -10.2, Math.PI / 2] };
+    const spots: { [k: string]: [number, number, number] } = { museum: [CON.x0 - 2.2, MUSEUM_DOOR.z, -Math.PI / 2], office: [office.spawn.x + 0.4, office.spawn.z + 0.2, office.spawn.yaw], ops: [OPS_AT.x + 0.7, OPS_AT.z - 1.2, 0], lounge: [CON.x1 + 2.6, LOUNGE_DOOR.z, Math.PI / 2], concourse: [8, -10.2, Math.PI / 2], training: [trn.spawn.x, trn.spawn.z, trn.spawn.yaw] };
     const sp = spots[at] || spots.concourse, [fx, fz] = freeNear(sp[0], sp[1]);
     if (at === 'lounge') B.doors.lounge.k = B.doors.lounge.to = 1;
+    if (at === 'training') { B.doors.trnA.k = B.doors.trnA.to = 1; B.doors.trnB.k = B.doors.trnB.to = 1; for (const d of [B.doors.trnA, B.doors.trnB]) for (const m of d.meshes) m.rotation.y = d.dir * Math.PI * 0.55; }
     B.hold = null;
     const F = { x: fx, z: fz, yaw: sp[2], pitch: -0.04, v: 0, bob: 0, sit: '' as string }; B.F = F;
     const cam = new UniversalCamera('eyes', new Vector3(F.x, EYE, F.z), sc); cam.minZ = 0.03; cam.maxZ = 260; cam.inertia = 0; B.cam = cam; sc.activeCamera = cam;
@@ -164,10 +175,13 @@ const Building: Section = {
       <button class="v3d-b bd-coll" data-coll="1">${icon('star')}<span>Collection (${items.length})</span></button>
       <div class="bd-list" hidden><div class="bd-lh"><b>Your collection</b><small>${items.length ? 'Everything you and your airline have been given or earned. Tap one to go to it and hold it.' : 'Nothing yet: gifts from the airports, awards and badges appear here.'}</small></div>
         <div class="bd-items">${items.map((e, i) => `<button class="bd-it" data-piece="${i}"><b>${esc(e.title)}</b><small>${esc(e.sub)}</small></button>`).join('')}</div></div>
+      <div class="trn-say" hidden><b></b><span></span><button class="v3d-b trn-voice" data-trn="voice">Voice: off</button></div>
+      <div class="trn-box" hidden><button class="v3d-b trn-x" data-trn="close" aria-label="Close">✕</button><b class="trn-n"></b><small class="trn-r"></small><p class="trn-c"></p></div>
       <div class="ops-bar" hidden>${[['ops', 'Operations'], ['schedule', 'Schedule'], ['dispatch', 'Dispatch'], ['planner', 'Flight planner']].map(([k, l]) => `<button class="v3d-b" data-go="${k}">${l}</button>`).join('')}</div>`;
     ui.appendChild(hud); B.hud = hud; perfAttach(engine, sc, hud); perfShow();
     hud.addEventListener('click', (e: Event) => {
       const t = e.target as HTMLElement, b = t.closest('[data-go]') as HTMLElement; if (b && ctx.toGame) { ctx.toGame(b.getAttribute('data-go') || ''); return; }
+      const tb = t.closest('[data-trn]') as HTMLElement; if (tb) { const k = tb.getAttribute('data-trn'); if (k === 'close') (hud.querySelector('.trn-box') as HTMLElement).hidden = true; else if (k === 'voice') { B.voice = !B.voice; tb.textContent = B.voice ? 'Voice: on' : 'Voice: off'; if (!B.voice) try { speechSynthesis.cancel(); } catch (err) { /* none */ } } return; }
       if (t.closest('[data-coll]')) { const l = hud.querySelector('.bd-list') as HTMLElement; l.hidden = !l.hidden; return; }
       const pc = t.closest('[data-piece]') as HTMLElement; if (pc) { (hud.querySelector('.bd-list') as HTMLElement).hidden = true; goToPiece(Number(pc.getAttribute('data-piece'))); }
     });
@@ -200,11 +214,13 @@ const Building: Section = {
         if (Math.abs(Md.k - Md.to) > 0.001) { Md.k += Math.sign(Md.to - Md.k) * Math.min(Math.abs(Md.to - Md.k), dt * 1.8); const e = Md.k * Md.k * (3 - 2 * Md.k); for (const L of Md.leaves) L.m.position.x = L.x0 + L.sgn * e * (MUSEUM_DOOR.w / 2 - 0.08); } }
       // a piece in your hands: it turns slowly
       if (B.hold) B.hold.node.rotation.y += dt * 0.6;
-      for (const k of ['office', 'ops', 'staff', 'lounge']) { const d = B.doors[k]; if (Math.abs(d.k - d.to) > 0.001) { d.k += Math.sign(d.to - d.k) * Math.min(Math.abs(d.to - d.k), dt * (k === 'lounge' ? 2.2 : 1.6)); const e = d.k * d.k * (3 - 2 * d.k);
+      // the Training room: the instructor's lesson, line by line, on the board and spoken if you like
+      trainStep(now, dt);
+      for (const k of ['office', 'ops', 'staff', 'lounge', 'trnA', 'trnB']) { const d = B.doors[k]; if (Math.abs(d.k - d.to) > 0.001) { d.k += Math.sign(d.to - d.k) * Math.min(Math.abs(d.to - d.k), dt * (k === 'lounge' ? 2.2 : 1.6)); const e = d.k * d.k * (3 - 2 * d.k);
         if (k === 'lounge') d.meshes.forEach((m: AbstractMesh, i: number) => { const b0: Vector3 = d.base[i], s = b0.x > DOOR_X ? 1 : -1; m.position.x = b0.x + s * e * (DOOR_W / 2 - 0.05); });
         else for (const m of d.meshes) m.rotation.y = d.dir * e * Math.PI * 0.55; } }
       // where you are
-      const w = where(F.x, F.z); if (w && w !== here) { here = w; (hud.querySelector('.bd-where .v3d-cs') as HTMLElement).textContent = ({ office: 'Your office', ops: 'The Operations office', corridor: 'The staff corridor', concourse: 'The concourse', lounge: 'The Business lounge', museum: 'The museum' } as any)[w]; (hud.querySelector('.ops-bar') as HTMLElement).hidden = w !== 'ops'; }
+      const w = where(F.x, F.z); if (w && w !== here) { here = w; (hud.querySelector('.bd-where .v3d-cs') as HTMLElement).textContent = ({ office: 'Your office', ops: 'The Operations office', corridor: 'The staff corridor', concourse: 'The concourse', lounge: 'The Business lounge', museum: 'The museum', training: 'The Training room' } as any)[w]; (hud.querySelector('.ops-bar') as HTMLElement).hidden = w !== 'ops'; }
       if (now > hintT) { hintT = now + 0.15; const h = pick(); const el = hud.querySelector('.of-hint') as HTMLElement; let t = h ? HINTS[h.replace(/^(office|ops)door$/, 'door').replace('loungedoor', 'door')] || '' : ''; if (h === 'chair' && F.sit) t = 'Stand up'; el.hidden = !t || IS_TOUCH; if (t) el.textContent = t; }
       if (now > clockT) { clockT = now + 10; opsClock(ops); }
       if (now > boardT) { boardT = now + 30; for (const b of [...lounge.boards, ...halls.boards]) { P.board(b.c, b.kind); (b.tex.getContext() as any).drawImage(b.c, 0, 0); b.tex.update(true); } }
@@ -215,6 +231,7 @@ const Building: Section = {
   },
   close() {
     const sc: Scene = B.scene; if (!sc) return;
+    try { speechSynthesis.cancel(); } catch (e) { /* none */ }
     gameSend({ ampb: 'monitor', on: false });
     try { B.ctx.canvas.removeEventListener('pointerdown', B.pd); B.ctx.canvas.removeEventListener('pointerup', B.pu); } catch (e) { /* gone */ }
     perfDetach(); if (B.hud) B.hud.remove(); sc.dispose(); B.scene = null;
@@ -250,6 +267,12 @@ function use(px?: number, py?: number) {
   if (a === 'officedoor') return door('office');
   if (a === 'opsdoor') return door('ops');
   if (a === 'staffdoor') return door('staff');
+  if (a === 'trndoor') { const o = B.doors.trnA.to > 0.5 ? 0 : 1; B.doors.trnA.to = o; B.doors.trnB.to = o; vibrate(60, 0.2, 0.3); return; }
+  if (a === 'trn') { const m = pickMeta(px, py); if (m) showPerson(m.id); return; }
+  if (a === 'whiteboard') { const T: Training = B.trn; toast(T.subject ? `Today: ${Array.from(new Set(Object.values(T.people).filter(q => q.s).map(q => q.s!.course))).join(' · ')}` : 'No class today: courses are booked in Crew → Training'); return; }
+  if (a === 'books') { toast('Aviation books: flight, cabin crew, ground operations, maintenance and more'); return; }
+  if (a === 'teacherdesk' || a === 'desk') { toast(a === 'desk' ? 'A desk with the Academy notebook' : 'The instructor\'s desk'); return; }
+  if (a === 'clock') { toast(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })); return; }
   if (a === 'loungedoor') return door('lounge');
   if (a === 'museumdoor') { const d = B.doors.museum; d.to = d.to > 0.5 ? 0 : 1; vibrate(60, 0.2, 0.3); return; }
   if (a === 'piece') { const m = pickMeta(px, py); if (m) holdPiece(m.i); return; }
@@ -267,6 +290,29 @@ function use(px?: number, py?: number) {
   if (a === 'phone') { toast('No calls right now'); return; }
   if (a === 'globe') { toast('The world your airline flies'); return; }
   if (a === 'model') { toast('A model of one of your aircraft, in the company colours'); return; }
+}
+/** The lesson: the instructor's lines one after another while there is a class, on the board, under the screen and spoken. */
+function trainStep(now: number, dt: number) {
+  const T: Training = B.trn, S2 = B.say; if (!T) return;
+  const inRoom = where(B.F.x, B.F.z) === 'training', lines = T.lines;
+  T.step(now, dt, !!S2.line && inRoom);
+  if (now - (B.clk || 0) > 5) { B.clk = now; T.clock(); }
+  const bar = B.hud.querySelector('.trn-say') as HTMLElement;
+  if (!inRoom || !lines.length) { bar.hidden = true; S2.line = ''; return; }
+  if (now > S2.t) { S2.i = (S2.i + 1) % lines.length; S2.line = lines[S2.i]; S2.t = now + Math.max(6, S2.line.length / 13 + 2); T.board(S2.line);
+    (bar.querySelector('b') as HTMLElement).textContent = (T.teacher && (B.ctx.opts?.data?.training?.teacher?.name)) || 'Daniel Brandt'; (bar.querySelector('span') as HTMLElement).textContent = S2.line;
+    if (B.voice) try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(S2.line); u.rate = 0.98; u.lang = 'en-GB'; speechSynthesis.speak(u); } catch (e) { /* no voice */ } }
+  bar.hidden = false;
+}
+/** Who someone in the Training room is: their name, their job, the course and how long it still runs. */
+function showPerson(id: string) {
+  const T: Training = B.trn, q = T && T.people[id], box = B.hud.querySelector('.trn-box') as HTMLElement; if (!q) return;
+  const t = B.ctx.opts?.data?.training?.teacher || { name: 'Daniel Brandt', title: 'Instructor, the Academy' };
+  if (id === 'teacher') { (box.querySelector('.trn-n') as HTMLElement).textContent = t.name; (box.querySelector('.trn-r') as HTMLElement).textContent = t.title; (box.querySelector('.trn-c') as HTMLElement).textContent = B.say.line || (T.lines.length ? 'Teaching the class.' : 'Getting the next class ready.'); }
+  else { const s = q.s!, left = Math.max(0, s.until - Date.now()), hrs = left / 36e5;
+    (box.querySelector('.trn-n') as HTMLElement).textContent = s.name; (box.querySelector('.trn-r') as HTMLElement).textContent = s.role;
+    (box.querySelector('.trn-c') as HTMLElement).textContent = `${s.course} · ${hrs >= 24 ? Math.round(hrs / 24) + ' days' : hrs >= 1 ? Math.round(hrs) + ' h' : Math.max(1, Math.round(left / 6e4)) + ' min'} to go`; }
+  box.hidden = false;
 }
 registerSection(Building);
 export {};

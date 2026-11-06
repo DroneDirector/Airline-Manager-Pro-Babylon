@@ -343,3 +343,10 @@ body.photo-on .v3d-top, body.photo-on .v3d-views, body.photo-on .v3d-time, body.
 .v3d-wxchip { position: absolute; left: 50%; transform: translateX(-50%); top: 10px; z-index: 6; padding: 5px 12px; border-radius: 999px; background: rgba(8,14,28,.62); color: #dfe8f6; font-size: 12px; letter-spacing: .02em; pointer-events: none; white-space: nowrap; max-width: 70vw; overflow: hidden; text-overflow: ellipsis; backdrop-filter: blur(6px); }
 body.photo-on .v3d-wxchip { display: none; }
 @media (max-width: 760px) { .v3d-wxchip { top: auto; bottom: 118px; font-size: 11px; } }
+
+/* the Training room: the instructor's words, and who someone is */
+.trn-say { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); max-width: min(760px, 86vw); padding: 10px 14px; border-radius: 12px; background: rgba(8,14,28,.72); color: #eef3fa; font-size: 14px; line-height: 1.4; display: flex; gap: 10px; align-items: flex-start; backdrop-filter: blur(6px); }
+.trn-say b { color: #F2C230; white-space: nowrap; } .trn-say span { flex: 1; } .trn-say .trn-voice { font-size: 12px; padding: 4px 8px; white-space: nowrap; }
+.trn-box { position: absolute; right: 14px; top: 70px; width: min(300px, 80vw); padding: 14px 16px; border-radius: 14px; background: rgba(8,14,28,.82); color: #eef3fa; backdrop-filter: blur(8px); }
+.trn-box .trn-n { display: block; font-size: 16px; padding-right: 30px; } .trn-box .trn-r { color: #9fb0c8; } .trn-box .trn-c { margin: 8px 0 0; font-size: 13px; line-height: 1.4; }
+.trn-box .trn-x { position: absolute; right: 8px; top: 8px; padding: 2px 8px; }
