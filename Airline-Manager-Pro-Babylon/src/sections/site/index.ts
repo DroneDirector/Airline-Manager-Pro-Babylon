@@ -33,12 +33,11 @@ import { buildAirfield, AIRFIELD_VIEWS } from './airfield/build';
 import { AIRFIELD, designate } from './airfield/plan';
 
 const D2R = Math.PI / 180, R = 6371000, HEIGHT_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/';
-/** The sites: the frame's reference point (the terminal's plan origin is 1,482 m from it, south of the runway), the
+/** The site (Iceland only): the frame's reference point (the terminal's plan origin is 1,482 m from it, south of the runway), the
  *  runway's true heading (the gates face 90° to the left of it, towards the mountains), its designators (west end
  *  first), the snow line, the colours of the low ground. Mýrdalssandur is your airport, BIAP / VTX. */
 export const SITES = [
   { id: 'myrdalssandur', name: 'Mýrdalssandur Airport, Iceland', icao: 'BIAP', iata: 'VTX', lat: 63.465, lon: -18.72, hdg: 68, rwy: ['08', '26'], gates: 338, snow: 950, low: 'sand' },
-  { id: 'matanuska', name: 'Matanuska Valley, Alaska', lat: 61.53, lon: -149.02, hdg: 292, rwy: ['29', '11'], gates: 202, snow: 1350, low: 'green' },
 ];
 // the airport in its own frame: u along the runway (the heading), v to its left (towards the gates' view); the plan
 // (the terminal's and the airfield's: x along the runway, y towards it) has its origin at (u, v) = (-81, -1482)
@@ -250,7 +249,7 @@ const Site$: Section = {
     const kx = 111320 * Math.cos(site.lat * D2R);
     hud.insertAdjacentHTML('beforeend', `<div class="site-top"><b>${site.name}</b><small>${site.lat.toFixed(3)}° ${site.lat >= 0 ? 'N' : 'S'} · ${Math.abs(site.lon).toFixed(3)}° ${site.lon < 0 ? 'W' : 'E'} ${site.icao ? `· ${site.icao} / ${site.iata} ` : ''}· runway ${site.rwy[0]}/${site.rwy[1]} true ${String(site.hdg).padStart(3, '0')}°/${String((site.hdg + 180) % 360).padStart(3, '0')}° · gates face ${String(site.gates).padStart(3, '0')}° · ground ${Math.round(elev)} m</small></div>
       <div class="site-dock"><div class="site-speed"><small>Drone speed</small>${[[8, 'Walk'], [40, 'Fast'], [220, 'Plane']].map(([k, l]) => `<button class="wx-o" data-sp2="${k}">${l}</button>`).join('')}</div>
-      <div class="site-views">${VIEWS.map(v => `<button class="wx-b" data-view="${v.id}">${v.name}</button>`).join('')}<button class="wx-b" data-site>${SITES.filter(s => s !== site).map(s => 'Go to ' + s.name.split(',')[0]).join('')}</button></div>
+      <div class="site-views">${VIEWS.map(v => `<button class="wx-b" data-view="${v.id}">${v.name}</button>`).join('')}</div>
 </div>
       <div class="wx-updown site-ud" ${IS_TOUCH ? '' : 'hidden'}><button class="wx-b" data-ud="up">▲</button><button class="wx-b" data-ud="down">▼</button></div>`);
     const CAM = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, speed: 40, up: 0, down: 0 }; O.CAM = CAM;
@@ -281,7 +280,7 @@ const Site$: Section = {
       if (b.hasAttribute('data-services') && ctx.toGame) { ctx.toGame('rental'); return; }
       if (b.hasAttribute('data-view')) place(b.getAttribute('data-view') as string);
       if (b.hasAttribute('data-sp2')) { CAM.speed = Number(b.getAttribute('data-sp2')); hud.querySelectorAll('[data-sp2]').forEach(q => q.classList.toggle('on', q === b)); }
-      if (b.hasAttribute('data-site')) { const other = SITES.find(s => s !== site)!; if (ctx.back) { /* open again at the other site */ } O.reopen = other.id; Site$.close(); Site$.open(Object.assign({}, ctx, { opts: Object.assign({}, ctx.opts || {}, { site: other.id }) })); } });
+    });
     for (const k of ['up', 'down'] as const) { const b = hud.querySelector(`[data-ud="${k}"]`) as HTMLElement; b.addEventListener('pointerdown', e => { e.stopPropagation(); CAM[k] = 1; }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { CAM[k] = 0; }); }
     const keys = new Set<string>(); O.kd = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); keys.add(k); if (!O.walkMode || e.repeat) return; if (k === ' ') O.W.jump = true; else if (k === 'c' || k === 'control') O.setStance('crouch'); else if (k === 'z') O.setStance('prone'); else if (k === 'e') O.liftPress = true; }; O.ku = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase()); window.addEventListener('keydown', O.kd); window.addEventListener('keyup', O.ku);
     if (!walkMode) place((ctx.opts && ctx.opts.view) || 'gate');
