@@ -8,6 +8,7 @@
 // The look speeds, dead zone, inverting and swapping the sticks and vibration are in Settings → Controls.
 import { S } from './settings';
 import { IS_TOUCH } from './app';
+import { toast } from '../ui/icons';
 
 export type Btn = 'confirm' | 'back' | 'menu' | 'up' | 'down' | 'left' | 'right';
 const btnSubs: ((b: Btn) => void)[] = [];
@@ -28,6 +29,8 @@ let navRepeat = 0, navDir = '';
 /** Is a controller connected (its name), for the settings page. */
 export function padConnected(): string { return padName; }
 /** Walking and looking are on (in a 3D place, with no menu open). */
+/** True while the middle button has freed the mouse pointer (no looking round until it is pressed again). */
+export let cursorMode = false;
 export function setPlay(on: boolean) { play = on; if (!on) { stick && stick.el.remove(); stick = null; look = null; if (document.pointerLockElement) document.exitPointerLock(); } const z = document.querySelector('.tz') as HTMLElement; if (z) z.hidden = !on || !IS_TOUCH; }
 export function isPlay(): boolean { return play; }
 
@@ -42,7 +45,12 @@ export function inputInit(canvas: HTMLCanvasElement, ui: HTMLElement) {
   window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
   window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
   // the mouse: click to look (pointer lock); on a PC without the lock, dragging looks too
-  canvas.addEventListener('click', () => { if (play && !IS_TOUCH && !document.pointerLockElement) { try { (canvas as any).requestPointerLock(); } catch (e) { /* drag instead */ } } });
+  canvas.addEventListener('click', () => { if (play && !IS_TOUCH && !cursorMode && !document.pointerLockElement) { try { (canvas as any).requestPointerLock(); } catch (e) { /* drag instead */ } } });
+  // the middle button (pressing the wheel down): between looking round and a free mouse pointer to click on things
+  document.addEventListener('mousedown', e => { if (e.button !== 1 || !play || IS_TOUCH) return; e.preventDefault();
+    if (!cursorMode) { cursorMode = true; try { if (document.pointerLockElement) document.exitPointerLock(); } catch (err) { /* no lock */ } toast('Mouse pointer: click on things · press the wheel again to look round'); }
+    else { cursorMode = false; try { (canvas as any).requestPointerLock(); } catch (err) { /* drag instead */ } toast('Looking round with the mouse'); } });
+  document.addEventListener('auxclick', e => { if (e.button === 1 && play) e.preventDefault(); });
   document.addEventListener('mousemove', e => { if (!play) return; if (document.pointerLockElement === canvas) { lookX += e.movementX * 0.0022 * S.ctl.mouseLook; lookY += e.movementY * 0.0022 * S.ctl.mouseLook * (S.ctl.mouseInvert ? -1 : 1); } });
   // touch: the stick on the left, looking on the right
   const tz = document.createElement('div'); tz.className = 'tz'; tz.hidden = true; ui.appendChild(tz);
@@ -78,9 +86,24 @@ function padLabel(id: string): string {
 }
 function pad(): Gamepad | null {
   const list = navigator.getGamepads ? navigator.getGamepads() : [];
-  if (padIndex >= 0 && list[padIndex]) return list[padIndex];
-  for (const g of Array.from(list)) if (g && g.connected) { padIndex = g.index; padName = padLabel(g.id); return g; }
+  if (padIndex >= 0 && list[padIndex]) return norm(list[padIndex]!);
+  for (const g of Array.from(list)) if (g && g.connected) { padIndex = g.index; padName = padLabel(g.id); return norm(g); }
   return null;
+}
+/** A PlayStation 5 DualSense (or DualShock 4) on a PC that reports its own raw layout (common on Windows, above all over
+ *  Bluetooth) instead of the standard one: its buttons, sticks, triggers and D-pad put into the standard order, so it
+ *  works exactly like any other controller. Square 0, Cross 1, Circle 2, Triangle 3, L1 4, R1 5, L2 6, R2 7, Create 8,
+ *  Options 9, L3 10, R3 11, PS 12, touchpad 13; sticks on axes 0, 1 (left) and 2, 5 (right); the D-pad as one axis (9). */
+const PS_RAW = /054c|DualSense|DualShock|Wireless Controller|PLAYSTATION|0ce6|0df2|09cc|05c4/i;
+function norm(g: Gamepad): Gamepad {
+  if (g.mapping === 'standard' || !PS_RAW.test(g.id) || g.buttons.length < 13) return g;
+  const B = (i: number) => g.buttons[i] || { pressed: false, touched: false, value: 0 };
+  const hat = g.axes.length > 9 ? g.axes[9] : 2, near = (v: number) => Math.abs(hat - v) < 0.12;
+  const up = near(-1) || near(-0.714) || near(1), right = near(-0.714) || near(-0.428) || near(-0.143), down = near(-0.143) || near(0.143) || near(0.428), left = near(0.428) || near(0.714) || near(1);
+  const virt = (p: boolean) => ({ pressed: p, touched: p, value: p ? 1 : 0 });
+  const buttons = [B(1), B(2), B(0), B(3), B(4), B(5), B(6), B(7), B(8), B(9), B(10), B(11), virt(up), virt(down), virt(left), virt(right), B(12), B(13)];
+  const axes = [g.axes[0] || 0, g.axes[1] || 0, g.axes[2] || 0, g.axes[5] || 0];
+  return { id: g.id, index: g.index, connected: g.connected, mapping: 'standard', timestamp: g.timestamp, buttons, axes, vibrationActuator: (g as any).vibrationActuator, hapticActuators: (g as any).hapticActuators } as any;
 }
 /** The controller's buttons each frame: presses become actions (menus, use, back, settings). */
 function pollPad() {
