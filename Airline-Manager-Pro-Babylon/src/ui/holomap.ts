@@ -5,10 +5,53 @@
 // M (or a tap on the map) makes it bigger or smaller.
 import { ROOMS, DOORS, STAIRS, LIFTS, OUTSIDE, COLUMNS, Fl } from '../sections/terminal/plan';
 import { IS_TOUCH } from '../core/app';
+import { TransformNode, Matrix, Vector3, VertexBuffer, Mesh } from '@babylonjs/core';
+import { F2Y } from '../sections/terminal/plan';
+
+/** The walls as they are really built: every wall, column and glass pane of the terminal's 3D model (and the rental
+ *  car centre) cut through at waist height on a floor (y, in the terminal's own frame), as lines. Only one face of each
+ *  wall is kept (so a wall is one line, not two) and the tiny end pieces are dropped. */
+export function traceWalls(root: TransformNode, y: number, floor?: number): Seg[] {
+  const inv = Matrix.Invert(root.computeWorldMatrix(true)), out: Seg[] = [];
+  const meshes = root.getChildMeshes(false).filter(m => m instanceof Mesh && m.getTotalVertices() > 0 && (/STRUCTURE/.test(m.name) || (m.metadata && m.metadata.kind === 'glass')) && !/^(ROOF|STAIRS|DOORS)\b|\/ROOF|STAIR/.test(m.name) && !(m.metadata && /ROOF|STAIR/.test(String(m.metadata.id || ''))));
+  // each wall belongs to the floor of its room (a tall wall rising past the floor above still belongs to its own floor)
+  const floorOf = (m: Mesh) => { const id = (m.metadata && m.metadata.room) || m.name.split('/')[0], r = ROOMS.find(q => q.id === id); return r ? r.f : 1; };
+  for (const m of meshes as Mesh[]) {
+    if (floor != null && floorOf(m) !== floor) continue;
+    const pos = m.getVerticesData(VertexBuffer.PositionKind), idx = m.getIndices(); if (!pos || !idx) continue;
+    const M = m.computeWorldMatrix(true).multiply(inv), v = new Vector3(), P: number[] = new Array(pos.length);
+    for (let i = 0; i < pos.length; i += 3) { Vector3.TransformCoordinatesFromFloatsToRef(pos[i], pos[i + 1], pos[i + 2], M, v); P[i] = v.x; P[i + 1] = v.y; P[i + 2] = v.z; }
+    for (let t = 0; t < idx.length; t += 3) {
+      const a = idx[t] * 3, b = idx[t + 1] * 3, c = idx[t + 2] * 3;
+      const ya = P[a + 1] - y, yb = P[b + 1] - y, yc = P[c + 1] - y;
+      if ((ya > 0 && yb > 0 && yc > 0) || (ya < 0 && yb < 0 && yc < 0)) continue;
+      // the face's direction across the ground: keep one side of each wall only
+      const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2], wx = P[c] - P[a], wy = P[c + 1] - P[a + 1], wz = P[c + 2] - P[a + 2];
+      const nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx, nl = Math.hypot(nx, ny, nz) || 1;
+      if (Math.abs(ny / nl) > 0.5) continue;                                   // floors, ceilings, tops of walls
+      if (nx / nl + 0.37 * nz / nl <= 0.02) continue;
+      const pts: number[] = [];
+      for (const [p, q, yp, yq] of [[a, b, ya, yb], [b, c, yb, yc], [c, a, yc, ya]] as number[][]) {
+        if ((yp <= 0 && yq > 0) || (yp > 0 && yq <= 0)) { const k = yp / (yp - yq); pts.push(P[p] + (P[q] - P[p]) * k, P[p + 2] + (P[q + 2] - P[p + 2]) * k); } }
+      if (pts.length >= 4 && Math.hypot(pts[2] - pts[0], pts[3] - pts[1]) > 0.25) out.push([pts[0], pts[1], pts[2], pts[3]]);
+    }
+  }
+  // joined: pieces of the same straight wall that meet end to end become one line
+  const key = (x: number, z: number) => Math.round(x * 20) + ',' + Math.round(z * 20);
+  const ends = new Map<string, number[]>(); out.forEach((s, i) => { for (const k of [key(s[0], s[1]), key(s[2], s[3])]) { const l = ends.get(k); if (l) l.push(i); else ends.set(k, [i]); } });
+  const dead = new Uint8Array(out.length);
+  for (let i = 0; i < out.length; i++) { if (dead[i]) continue; let grew = true; while (grew) { grew = false; const s = out[i];
+    for (const end of [0, 1]) { const k = end ? key(s[2], s[3]) : key(s[0], s[1]); for (const j of ends.get(k) || []) { if (j === i || dead[j]) continue; const o = out[j];
+      const dx1 = s[2] - s[0], dz1 = s[3] - s[1], dx2 = o[2] - o[0], dz2 = o[3] - o[1]; if (Math.abs(dx1 * dz2 - dz1 * dx2) > 0.02 * Math.hypot(dx1, dz1) * Math.hypot(dx2, dz2)) continue;
+      const pts = [[s[0], s[1]], [s[2], s[3]], [o[0], o[1]], [o[2], o[3]]], ax = Math.abs(dx1) > Math.abs(dz1) ? 0 : 1; pts.sort((p, q) => p[ax] - q[ax]);
+      s[0] = pts[0][0]; s[1] = pts[0][1]; s[2] = pts[3][0]; s[3] = pts[3][1]; dead[j] = 1; grew = true;
+      for (const kk of [key(s[0], s[1]), key(s[2], s[3])]) { const l = ends.get(kk); if (l) l.push(i); else ends.set(kk, [i]); } } } } }
+  const res: Seg[] = []; out.forEach((s, i) => { if (!dead[i]) chop(s, res); }); return res;
+}
 
 export interface HoloState { x: number; z: number; f: Fl; yaw: number }
 
-type Seg = [number, number, number, number];
+export type Seg = [number, number, number, number];
 const CELL = 4, GX0 = -120, GZ0 = -40, GW = 120, GH = 60;   // the reveal grid: 4 m cells over x -120..360, z -40..200
 const REVEAL = 26;                                          // seen within this many metres
 const KEY = 'ampb.holomap';
@@ -43,7 +86,7 @@ const rectSegs = (r: { x0: number; z0: number; x1: number; z1: number }) => { co
 /** A room's name for the map: short, without the notes in brackets. */
 const short = (n: string) => n.replace(/\s*\(.*$/, '').replace(/^Rental car centre · /, 'Rental · ').toUpperCase();
 
-export function holoMap(host: HTMLElement, get: () => HoloState | null) {
+export function holoMap(host: HTMLElement, get: () => HoloState | null, root?: TransformNode) {
   if (!document.getElementById('holomap-css')) { const st = document.createElement('style'); st.id = 'holomap-css'; st.textContent = `
 .holomap { position: absolute; right: max(14px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top)); width: ${IS_TOUCH ? 150 : 214}px; height: ${IS_TOUCH ? 150 : 214}px;
   pointer-events: auto; cursor: pointer; transition: width .25s, height .25s; filter: drop-shadow(0 0 10px rgba(40,150,255,.28)); }
@@ -61,7 +104,11 @@ export function holoMap(host: HTMLElement, get: () => HoloState | null) {
   window.addEventListener('keydown', onKey);
 
   // the plan, once: walls per floor, the outside areas (ground level), stairs, lifts, columns, names
-  const WALLS: { [f: number]: Seg[] } = { 1: wallsOf(1), 2: wallsOf(2) };
+  // the walls: traced from the 3D model when it is there (so the map follows any change to it), else from the plan
+  // (every floor the plan has, so more floors added later show too; each floor's walls cut at waist height)
+  const FLOORS = Array.from(new Set(ROOMS.map(r => r.f as number))).sort((a, b) => a - b);
+  const WALLS: { [f: number]: Seg[] } = {}; for (const f of FLOORS) WALLS[f] = wallsOf(f as Fl);
+  if (root) try { const t: { [f: number]: Seg[] } = {}; for (const f of FLOORS) t[f] = traceWalls(root, (f - 1) * F2Y + 1.2, f); if (t[FLOORS[0]].length > 20) Object.assign(WALLS, t); } catch (e) { /* the plan's walls */ }
   const OUT: Seg[] = []; for (const o of OUTSIDE) if (!/DOOR/.test(o.id)) rectSegs(o).forEach(s => OUT.push(s));
   const NAMES = [...ROOMS.map(r => ({ f: r.f, x: (r.x0 + r.x1) / 2, z: (r.z0 + r.z1) / 2, w: r.x1 - r.x0, h: r.z1 - r.z0, t: short(r.name), r })),
     ...OUTSIDE.filter(o => o.name && !/DOOR/.test(o.id)).map(o => ({ f: 1 as Fl, x: (o.x0 + o.x1) / 2, z: (o.z0 + o.z1) / 2, w: o.x1 - o.x0, h: o.z1 - o.z0, t: short(o.name!), r: o })),
@@ -101,9 +148,9 @@ export function holoMap(host: HTMLElement, get: () => HoloState | null) {
     const segs = (list: Seg[], f: Fl, col: string, w: number, dash: number[] = []) => { cx.strokeStyle = col; cx.lineWidth = w * dpr; cx.setLineDash(dash.map(v => v * dpr)); cx.beginPath();
       for (const s of list) { const mx = (s[0] + s[2]) / 2, mz = (s[1] + s[3]) / 2; if (!inView(mx, mz) || !isSeen(f, mx, mz)) continue; const a = P(s[0], s[1]), b = P(s[2], s[3]); cx.moveTo(a[0], a[1]); cx.lineTo(b[0], b[1]); }
       cx.stroke(); cx.setLineDash([]); };
-    const other: Fl = st.f === 1 ? 2 : 1;
-    // the other floor first, barely there
-    segs(WALLS[other], other, 'rgba(110,190,255,.14)', 1);
+    // the other floors first: only a ghost of them, barely there
+    //  (a hologram's layers: floors above lifted up the panel, floors below sunk down it, thin, dashed, dim, no glow)
+    for (const f of FLOORS) if (f !== st.f && WALLS[f]) { cx.save(); cx.translate(0, (st.f - f) * 7 * dpr); segs(WALLS[f], f as Fl, 'rgba(90,150,230,.16)', 0.7, [2, 2.5]); cx.restore(); }
     // the room you are in, lit
     const here = ROOMS.find(r => r.f === st.f && st.x > r.x0 && st.x < r.x1 && st.z > r.z0 && st.z < r.z1) || OUTSIDE.find(o => st.f === 1 && st.x > o.x0 && st.x < o.x1 && st.z > o.z0 && st.z < o.z1);
     if (here) { const c = [P(here.x0, here.z0), P(here.x1, here.z0), P(here.x1, here.z1), P(here.x0, here.z1)]; cx.fillStyle = 'rgba(60,170,255,.10)'; cx.beginPath(); cx.moveTo(c[0][0], c[0][1]); for (const p of c.slice(1)) cx.lineTo(p[0], p[1]); cx.closePath(); cx.fill(); }
@@ -122,16 +169,18 @@ export function holoMap(host: HTMLElement, get: () => HoloState | null) {
       cx.strokeStyle = 'rgba(160,235,255,.9)'; cx.lineWidth = 1 * dpr; cx.strokeRect(p[0] - s, p[1] - s, s * 2, s * 2);
       cx.fillStyle = 'rgba(160,235,255,.9)'; cx.beginPath(); cx.moveTo(p[0], p[1] - s * .7); cx.lineTo(p[0] - s * .45, p[1] - s * .1); cx.lineTo(p[0] + s * .45, p[1] - s * .1); cx.closePath(); cx.moveTo(p[0], p[1] + s * .7); cx.lineTo(p[0] - s * .45, p[1] + s * .1); cx.lineTo(p[0] + s * .45, p[1] + s * .1); cx.closePath(); cx.fill(); }
     cx.fillStyle = 'rgba(140,215,255,.5)';
-    for (const [, x, z] of COLUMNS) { if (!inView(x, z) || !isSeen(st.f, x, z)) continue; const p = P(x, z); cx.fillRect(p[0] - 1.5 * dpr, p[1] - 1.5 * dpr, 3 * dpr, 3 * dpr); }
+    for (const [, x, z] of COLUMNS) { if (st.f !== 1 || !inView(x, z)) continue; const p = P(x, z); cx.fillRect(p[0] - 1.5 * dpr, p[1] - 1.5 * dpr, 3 * dpr, 3 * dpr); }
     // the names, upright, where they fit
-    cx.textAlign = 'center'; cx.textBaseline = 'middle';
-    for (const n of NAMES) { if (!inView(n.x, n.z) || !isSeen(n.f, n.x, n.z)) continue; const mine = n.f === st.f; if (!mine) continue;
+    cx.textAlign = 'center'; cx.textBaseline = 'middle'; const taken: number[][] = [];
+    for (const n of here ? [...NAMES.filter(q => q.r === here), ...NAMES.filter(q => q.r !== here)] : NAMES) { if (!inView(n.x, n.z) || !isSeen(n.f, n.x, n.z)) continue; const mine = n.f === st.f; if (!mine) continue;
       const fit = Math.min(n.w, n.h) * k; if (fit < 22 * dpr) continue;
       const size = Math.max(7, Math.min(10, fit / dpr / 9)) * dpr; cx.font = `600 ${size}px Inter, sans-serif`;
       const p = P(n.x, n.z); cx.fillStyle = n.r === here ? 'rgba(220,245,255,.95)' : 'rgba(150,215,255,.7)'; cx.shadowColor = 'rgba(40,150,255,.8)'; cx.shadowBlur = 4 * dpr;
       const words = n.t.split(' '), lines: string[] = []; let line = ''; for (const w of words) { if (line && cx.measureText(line + ' ' + w).width > Math.max(n.w, n.h) * k * 0.8) { lines.push(line); line = w; } else line = line ? line + ' ' + w : w; } lines.push(line);
       if (Math.hypot(p[0] - R, p[1] - R) < 16 * dpr) p[1] = R + 20 * dpr;                      // not under you
       const tw = Math.max(...lines.slice(0, 3).map(l => cx.measureText(l).width)) / 2; if (p[0] - tw < 6 * dpr || p[0] + tw > W - 6 * dpr || p[1] < 10 * dpr || p[1] > H - 10 * dpr) { cx.shadowBlur = 0; continue; }
+      const th = Math.min(3, lines.length) * size * 1.15 / 2, bx = [p[0] - tw - 3 * dpr, p[1] - th, p[0] + tw + 3 * dpr, p[1] + th];
+      if (taken.some(b => bx[0] < b[2] && bx[2] > b[0] && bx[1] < b[3] && bx[3] > b[1])) { cx.shadowBlur = 0; continue; } taken.push(bx);
       lines.slice(0, 3).forEach((ln, i) => cx.fillText(ln, p[0], p[1] + (i - (Math.min(3, lines.length) - 1) / 2) * size * 1.15)); cx.shadowBlur = 0; }
     // you: a bright chevron with a soft view cone, always in the middle, always pointing up
     const cone = cx.createRadialGradient(R, R, 0, R, R, 34 * dpr); cone.addColorStop(0, 'rgba(120,210,255,.32)'); cone.addColorStop(1, 'rgba(120,210,255,0)');
@@ -144,6 +193,11 @@ export function holoMap(host: HTMLElement, get: () => HoloState | null) {
     cx.strokeStyle = 'rgba(110,200,255,.45)'; cx.lineWidth = 1 * dpr; cx.strokeRect(.5 * dpr, .5 * dpr, W - dpr, H - dpr);
     cx.strokeStyle = 'rgba(170,230,255,.95)'; cx.lineWidth = 2 * dpr; const L = 14 * dpr;
     for (const [x, y, dx, dy] of [[0, 0, 1, 1], [W, 0, -1, 1], [0, H, 1, -1], [W, H, -1, -1]]) { cx.beginPath(); cx.moveTo(x + dx * dpr, y + dy * L); cx.lineTo(x + dx * dpr, y + dy * dpr); cx.lineTo(x + dx * L, y + dy * dpr); cx.stroke(); }
+    // which floor: the name in the top corner, and the stack of floors at the side (yours lit, the others dim)
+    cx.textAlign = 'left'; cx.textBaseline = 'top'; cx.font = `700 ${10 * dpr}px Inter, sans-serif`; cx.fillStyle = 'rgba(205,240,255,.95)'; cx.shadowColor = 'rgba(40,150,255,.9)'; cx.shadowBlur = 5 * dpr;
+    cx.fillText(`FLOOR ${st.f}`, 10 * dpr, 9 * dpr); cx.shadowBlur = 0;
+    FLOORS.slice().reverse().forEach((f, i) => { const y = 10 * dpr + i * 9 * dpr, on = f === st.f; cx.fillStyle = on ? 'rgba(170,230,255,.95)' : 'rgba(110,170,230,.25)';
+      if (on) { cx.shadowColor = 'rgba(60,170,255,1)'; cx.shadowBlur = 6 * dpr; } cx.fillRect(W - 30 * dpr, y, 20 * dpr, 4 * dpr); cx.shadowBlur = 0; });
     flEl.textContent = `Floor ${st.f}`;
   };
   const iv = setInterval(draw, 50);

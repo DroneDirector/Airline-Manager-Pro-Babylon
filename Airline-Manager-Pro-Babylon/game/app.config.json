@@ -4,8 +4,8 @@
   "shortName": "AMP Babylon",
   "appId": "com.dronedirector.airlinemanagerpro.babylon",
   "publisher": "DroneDirector",
-  "version": "0.3.50",
-  "versionCode": 58,
+  "version": "0.3.51",
+  "versionCode": 59,
   "updates": null,
   "services": {
     "_comment": "Online services that need the provider's permission before the app is sold with them. Set one to true once its permission is in writing. VATSIM: its user agreement forbids use of its data in commercial software without written consent. IVAO, SimBrief's flight plan API and Hoppie ACARS publish no terms for commercial apps: ask first.",

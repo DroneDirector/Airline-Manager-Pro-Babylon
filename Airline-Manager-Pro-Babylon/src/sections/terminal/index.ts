@@ -85,7 +85,7 @@ const Terminal$: Section = {
     const hud = document.createElement('div'); hud.className = 'hud tm-hud'; O.hud = hud;
     hud.innerHTML = `<div class="tm-where"><small></small><b></b></div><div class="aim" hidden></div><div class="of-hint" hidden></div>`;
     ui.appendChild(hud); perfAttach(engine, sc, hud); perfShow();
-    holoMap(hud, () => ({ x: F.x, z: F.z, f: (F.stair ? (F.y > F2Y / 2 ? 2 : 1) : F.f) as Fl, yaw: F.yaw }));
+    holoMap(hud, () => ({ x: F.x, z: F.z, f: (F.stair ? (F.y > F2Y / 2 ? 2 : 1) : F.f) as Fl, yaw: F.yaw }), O.K && O.K.root);
     // the sky, the clouds and the weather, the time of day and its time-lapse, the drone and the photo button
     const wx: Weather = makeWeather({ sc, engine, cam, sun, hemi, glow: O.glow, hud, canvas: ctx.canvas, centre: new Vector3(110, 0, 30),
       indoors: () => { if (!wx.drone) return !!F.stair || !!roomAt(F.f, F.x, F.z); const p = cam.position, f: Fl = p.y > F2Y ? 2 : 1; return p.y < 12.2 && !!roomAt(f, p.x, p.z); } }); O.wx = wx;
