@@ -113,13 +113,18 @@ onPad(() => { if (el) render(); });
 function rows(): Row[] { return tab === 'gfx' ? GFX : tab === 'ctl' ? CTL : tab === 'upd' ? updRows() : NEW; }
 onUpdate(() => { if (el && tab === 'upd') render(); });
 const NT = TABS.length;
+let lastTab = '', lastFocus = -1;
 function render() {
   if (!el) return; const R = rows(); focus = Math.max(0, Math.min(R.length + NT - 1, focus));
+  // the list stays where it was scrolled to when a setting changes (it only moves to follow the controller's focus)
+  const was = el.querySelector('.sp-list') as HTMLElement | null, keep = was && tab === lastTab ? was.scrollTop : 0;
   el.innerHTML = `<div class="sp-head"><b>${icon('gear')}Settings</b><button class="sp-x" data-a="close" aria-label="Close">${icon('close')}</button></div>
     <div class="sp-tabs">${TABS.map(([k, ic, l], i) => `<button data-a="tab" data-v="${k}" class="${tab === k ? 'on' : ''} ${focus === i ? 'f' : ''}">${icon(ic)}<span>${l}</span>${k === 'upd' && U.state === 'available' ? '<i class="sp-dot"></i>' : ''}</button>`).join('')}</div>
     <div class="sp-list">${R.map((r, i) => rowHtml(r, i + NT)).join('')}</div>`;
   if (tab === 'new') whatsNewBind(el);
-  const f = el.querySelector('.sp-row.f') as HTMLElement; if (f) f.scrollIntoView({ block: 'nearest' });
+  const list = el.querySelector('.sp-list') as HTMLElement | null; if (list) list.scrollTop = keep;
+  if (focus !== lastFocus || tab !== lastTab) { const f = el.querySelector('.sp-row.f') as HTMLElement; if (f) f.scrollIntoView({ block: 'nearest' }); }
+  lastTab = tab; lastFocus = focus;
 }
 function rowHtml(r: Row, i: number): string {
   const cls = `sp-row ${focus === i ? 'f' : ''}`, lab = `<span class="sp-l"><b>${esc((r as any).label)}</b>${(r as any).sub ? `<small>${esc((r as any).sub)}</small>` : ''}</span>`;
