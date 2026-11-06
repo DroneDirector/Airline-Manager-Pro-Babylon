@@ -150,8 +150,13 @@ if (EMBED) {
   // the pet editor's picture: drawn by the edition (this page has no 3D of its own), shown when it comes back
   let petPrevN = 0;
   W.petPreviewDraw = (P: any) => { const cv = document.querySelector('[data-pet-prev]') as HTMLCanvasElement; if (!cv || !P || P.kind === 'none') return; petPrevN++; embedTell('petprev', { pet: JSON.parse(JSON.stringify(P)), w: cv.width, h: cv.height, id: petPrevN }); };
+  // the 3D places' notes on replaced parts (your own models in models/) and any problem with them: into the log
+  const partLog = () => { try { const q = JSON.parse(localStorage.getItem('ampb.partlog') || '[]'); localStorage.removeItem('ampb.partlog');
+    for (const p of q) ErrorLog.add('3d models', p.title, p.message, p.detail || '', p.kind === 'problem'); } catch (err) { /* none */ } };
+  partLog();
   window.addEventListener('message', (e: MessageEvent) => {
     const d: any = e.data; if (!d || !d.ampb) return;
+    if (d.ampb === 'partlog') { partLog(); return; }
     if (d.ampb === 'petprev' && d.url) { if (d.id !== petPrevN) return; const cv = document.querySelector('[data-pet-prev]') as HTMLCanvasElement; if (!cv) return; const im = new Image(); im.onload = () => { const x = cv.getContext('2d'); if (x) { x.clearRect(0, 0, cv.width, cv.height); x.drawImage(im, 0, 0, cv.width, cv.height); } }; im.src = d.url; return; }
     if (d.ampb === 'wardrobe') { try { closeAll(); osWardrobe(); } catch (err) { /* later */ } return; }
     if (d.ampb === 'pet') { try { const p: any = petData(); if (typeof d.food === 'number') p.food = d.food; if (typeof d.water === 'number') p.water = d.water; Store.soon(); } catch (err) { /* later */ } return; }

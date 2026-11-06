@@ -11,7 +11,7 @@ import { buildAirliner, repaint, setGear, Airliner } from '../viewer3d/airliner'
 import { IS_PC } from '../../core/app';
 import { buildJetway } from './jetway';
 
-export interface Fixtures { museum: Museum | null; museumDoor: { k: number; base: Vector3[] }; aircraft: Airliner[]; lifts: LiftCtl[] }
+export interface Fixtures { museum: Museum | null; museumDoor: { k: number; base: Vector3[] }; aircraft: Airliner[]; lifts: LiftCtl[]; jetways: any[] }
 
 export function buildFixtures(K: Kit, c1: string, c2: string, airline: string, progress: (p: number, s: string) => void): Fixtures {
   const { sc, M } = K;
@@ -80,7 +80,7 @@ export function buildFixtures(K: Kit, c1: string, c2: string, airline: string, p
   });
   // the jetways J-1 to J-4 from the gates' jetway doors (x0 + 22, on the gate floor) to the front doors at stands 1-4
   for (let k = 0; k < 4; k++) buildJetway(K, k + 1, MOD[k] + 22, STANDS[k * 2]);
-  return { museum, museumDoor, aircraft, lifts };
+  return { museum, museumDoor, aircraft, lifts, jetways: (K as any).jetways || [] };
 }
 /** Where a step's light strip goes (its front edge). */
 function shiftNose(s: Stair, x: number, y: number, z: number, d: number): [number, number, number] {

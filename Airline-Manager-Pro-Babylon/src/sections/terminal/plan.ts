@@ -140,14 +140,18 @@ for (let k = 0; k < 4; k++) { const x0 = MOD[k];
 // ---- the wave roof's tree columns, the jetways, the stands ----
 export const COLUMNS: [string, number, number][] = [['C-1', 46, 6], ['C-2', 46, 22], ['C-3', 75, 6], ['C-4', 75, 22], ['C-5', 104, 6], ['C-6', 104, 22], ['C-7', 56, -9], ['C-8', 94, -9]];
 /** The stands (an aircraft's nose at nz, pointing at the pier): jetway stands 1–4 off gates 1–4, walk-out 5–8 off gates 5–8. */
+/** A jetway gate's static corridor and rotunda for its stand (nose nz): the cab's round part 5.65 m right of the stand's
+ *  centre line at the front door (5.5 m behind the nose), the rotunda 13 m from it (the jetway 18.5 m overall) straight out
+ *  from the gate's jetway door; the corridor runs from the pier's glass (PN) to the rotunda's edge (1.8 m). */
+export function jetwayAt(gateX: number, standX: number, nz: number) { void nz; const dx = standX + 5.65 - gateX, dz = Math.sqrt(13 * 13 - dx * dx), rz = PN + 20 + 5.5 - dz; return { rotunda: [gateX, rz], corridor: rz - 1.8 - PN }; }
 /** The stands' centre lines along the pier, west to east (jetway, walk-out, jetway, ...). */
 export const STAND_X = (i: number) => Math.round((-62 + i * 286 / 7) * 100) / 100;
 export const STANDS: { id: string; x: number; nz: number; kind: 'jetway' | 'walk-out'; gate: string }[] = [];
 for (let k = 0; k < 4; k++) { const x0 = MOD[k];
   // spaced evenly along the pier, 40.86 m apart (x -62 to 224, as on the airport's sheets): every pair of wingtips keeps
   // more than the 4.5 m an A320 / A321 / 737 needs (36 m span); the jetways reach each stand's front door
-  STANDS.push({ id: `STAND-${k + 1}`, x: STAND_X(k * 2), nz: PN + 6, kind: 'jetway', gate: `F2-GATE-${k + 1}` });
-  STANDS.push({ id: `STAND-${k + 5}`, x: STAND_X(k * 2 + 1), nz: PN + 8, kind: 'walk-out', gate: `F1-GATE-${k + 5}` }); }
+  STANDS.push({ id: `STAND-${k + 1}`, x: STAND_X(k * 2), nz: PN + 26, kind: 'jetway', gate: `F2-GATE-${k + 1}` });
+  STANDS.push({ id: `STAND-${k + 5}`, x: STAND_X(k * 2 + 1), nz: PN + 28, kind: 'walk-out', gate: `F1-GATE-${k + 5}` }); }
 /** The wave roof: its underside's height at (x, z), three crests running north at x 45, 75 and 105 (the lens skylights). */
 export const WAVE = { x0: 24, x1: 126, z1: 34 };
 export function waveSouth(x: number) { const t = (x - 75) / 51; return -7 - 9 * Math.max(0, 1 - t * t); }

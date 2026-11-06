@@ -47,7 +47,7 @@ export function makeKit(sc: Scene): Kit {
     if (o.coat) { m.clearCoat.isEnabled = true; m.clearCoat.intensity = o.coat; m.clearCoat.roughness = 0.15; }
     if ((o.metal || 0) >= 0.5 || (o.coat || 0) >= 0.4) metals.push(m); if (o.key) matCache.set(o.key, m); return m; };
   const glow = (hex: string, k = 1.4) => { const m = new StandardMaterial(nm('glow'), sc); m.emissiveColor = Color3.FromHexString(hex).scale(k); m.diffuseColor = Color3.Black(); m.specularColor = Color3.Black(); m.disableLighting = true; return m; };
-  const picture = (c: HTMLCanvasElement, glowK = 0) => { const m = new StandardMaterial(nm('pic'), sc); const t = tex(c); m.diffuseTexture = t; m.specularColor = new Color3(0.05, 0.05, 0.05); m.backFaceCulling = false; if (glowK) { m.emissiveTexture = t; m.disableLighting = true; } return m; };
+  const picture = (c: HTMLCanvasElement, glowK = 0) => { const m = new StandardMaterial(nm('pic'), sc); const t = tex(c); m.diffuseTexture = t; m.specularColor = new Color3(0.05, 0.05, 0.05); m.backFaceCulling = false; if (glowK) { m.emissiveTexture = t; m.emissiveColor = new Color3(1, 1, 1).scale(0.42 * Math.min(1.5, glowK)); (m as any)._soft = true; } return m; };   // lit signs and screens: a soft, readable glow (kept out of the bloom)
   // ---- the materials, each named so a mod can find it ----
   const M: { [k: string]: any } = {
     white: pbr({ key: 'white', col: '#F2F3F5', rough: 0.35 }), whiteGloss: pbr({ key: 'whiteGloss', col: '#F4F6F8', rough: 0.12, coat: 0.5 }), offwhite: pbr({ key: 'offwhite', col: '#E8E4DC', rough: 0.8 }),

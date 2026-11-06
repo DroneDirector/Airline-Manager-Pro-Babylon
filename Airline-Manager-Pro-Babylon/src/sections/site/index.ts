@@ -29,6 +29,7 @@ import { buildFixtures } from '../terminal/fixtures';
 import { buildRental, rentalCars } from '../terminal/rental';
 import { addFlatZone, clearFlatZones, flatHeight, onFlatChange, zoneForModel } from '../../core/flatten';
 import { STANDS as T_STANDS } from '../terminal/plan';
+import { applyReplacements } from '../../core/replace';
 import { buildAirfield, AIRFIELD_VIEWS } from './airfield/build';
 import { AIRFIELD, designate } from './airfield/plan';
 
@@ -142,7 +143,7 @@ const VIEWS: { id: string; name: string; at: [number, number, number]; look: [nu
   // gate 4 (upper floor): standing between the second and third rows of seats, the gate desk and its sign to the right, looking straight out over the seats to the aircraft and the mountains
   { id: 'gate', name: 'Gate 4', at: [PX(MOD[3] + 11), 7.62, PV(75.6)], look: [PX(MOD[3] + 11), 7.62, PV(75.6) + 200] },
   { id: 'carpark', name: 'Over the car park', at: [PX(75), 26, PV(-135)], look: [PX(75), 9, PV(15)] },
-  { id: 'apron', name: 'On the apron', at: [PX(MOD[2] + 40), 1.7, PV(PN + 45)], look: [PX(-600), 120, PV(3000)] },
+  { id: 'apron', name: 'On the apron', at: [PX(MOD[2] + 40), 1.7, PV(PN + 88)], look: [PX(-600), 120, PV(3000)] },
   // the airfield's own views (as its photo renders)
   ...AIRFIELD_VIEWS.map(v => ({ id: v.id, name: v.name, at: [PX(v.at[0]), v.at[2], PV(v.at[1])] as [number, number, number], look: [PX(v.look[0]), v.look[2], PV(v.look[1])] as [number, number, number] })),
 ];
@@ -209,7 +210,7 @@ const Site$: Section = {
         const holder = new TransformNode(id + '/AIRCRAFT', sc); holder.parent = ap; holder.position.set(PX(st.x), 3.9 * k, PV(st.nose - st.dir * 18.8 * k)); holder.rotation.y = st.dir < 0 ? Math.PI : 0; holder.scaling.setAll(k); holder.metadata = { id: id + '/AIRCRAFT', kind: 'aircraft' };
         ac.root.parent = holder; for (const m of ac.casters) casters.push(m); } catch (e) { /* the stand stays empty */ } }
     for (const m of K.casters) casters.push(m);
-    const liftParts = new Set<any>(); for (const l of O.lifts as LiftCtl[]) for (const m of l.moving_parts) liftParts.add(m);
+    const liftParts = new Set<any>(); for (const l of O.lifts as LiftCtl[]) for (const m of l.moving_parts) liftParts.add(m); for (const j of (FX && FX.jetways) || []) for (const m of j.meshes()) liftParts.add(m); O.jetways = (FX && FX.jetways) || [];
     for (const m of sc.meshes) { if (!before.has(m)) { m.renderingGroupId = 1; m.computeWorldMatrix(true); if (!liftParts.has(m)) { m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true; } } }
     // airport mode (from the game's Airport): on foot, with gravity, against the terminal's floors, walls and glass,
     // the levelled ground and the aircraft; the stairs are walked up as ramps; the doors open as you come to them
@@ -238,7 +239,7 @@ const Site$: Section = {
     const hemi = new HemisphericLight('hemi', new Vector3(0, 1, 0), sc); hemi.intensity = 0.8;
     const sun = new DirectionalLight('sun', new Vector3(-0.4, -1, 0.3), sc); sun.intensity = 2.2; sun.shadowMinZ = 1; sun.shadowMaxZ = 9000;
     const cam = new UniversalCamera('cam', new Vector3(0, 10, 0), sc); cam.minZ = 0.5; cam.maxZ = 120000; cam.fov = 0.9; cam.inertia = 0; O.cam = cam; sc.activeCamera = cam;
-    const glow = new GlowLayer('glow', sc, { mainTextureRatio: 0.4 }); glow.intensity = 0.3; glow.isEnabled = S.gfx.glow !== false; for (const g of [inner.m, outer.m, sea].concat(O.AFB.exclude)) glow.addExcludedMesh(g);
+    const glow = new GlowLayer('glow', sc, { mainTextureRatio: 0.4 }); glow.intensity = 0.3; glow.isEnabled = S.gfx.glow !== false; for (const g of [inner.m, outer.m, sea].concat(O.AFB.exclude)) glow.addExcludedMesh(g); for (const m of sc.meshes) if (m.material && (m.material as any)._soft) glow.addExcludedMesh(m as any); sc.onNewMeshAddedObservable.add(m => { setTimeout(() => { if (m.material && (m.material as any)._soft) glow.addExcludedMesh(m as any); }, 0); });
     if (S.gfx.shadows !== 'off') { const sg = new ShadowGenerator(S.gfx.shadows === 'high' ? (IS_PC ? 4096 : 2048) : 1024, sun); sg.usePercentageCloserFiltering = true; sg.bias = 0.0006; sg.normalBias = 0.02; for (const m of casters) sg.addShadowCaster(m, false); }
     const dp = new DefaultRenderingPipeline('dp', true, sc, [cam]); dp.fxaaEnabled = true; dp.imageProcessingEnabled = true; dp.imageProcessing.toneMappingEnabled = true; dp.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES; dp.imageProcessing.exposure = 1.05; dp.imageProcessing.contrast = 1.08;
     dp.bloomEnabled = true; dp.bloomThreshold = 0.9; dp.bloomWeight = 0.15;
@@ -255,6 +256,8 @@ const Site$: Section = {
     const CAM = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, speed: 40, up: 0, down: 0 }; O.CAM = CAM;
     if (ctx.toGame) hud.insertAdjacentHTML('beforeend', `<button class="wx-b site-services" data-services>Services and concessions</button>`);
     hud.insertAdjacentHTML('beforeend', `<div class="site-lift" hidden></div>`);
+    // the jetways' test button: animates all of them (docks parked ones, undocks docked ones). REMOVE BEFORE 1.0
+    hud.insertAdjacentHTML('beforeend', `<button class="wx-b site-jwtest" data-jwtest style="position:absolute;left:12px;bottom:${walkMode ? 168 : 112}px">Animate jetways (test)</button>`);
     if (walkMode) hud.insertAdjacentHTML('beforeend', `<div class="site-moves">${[['jump', 'Jump'], ['crouch', 'Crouch'], ['prone', 'Prone'], ['sprint', 'Sprint']].map(([k, l]) => `<button class="wx-b" data-mv="${k}">${l}</button>`).join('')}</div>`);
     if (walkMode) { hud.classList.add('site-walk'); (hud.querySelector('.site-dock') as HTMLElement).style.display = 'none'; (hud.querySelector('.site-ud') as HTMLElement).style.display = 'none'; }
     // the body you walk in: feet at its position, 1.8 m tall, 0.6 m across
@@ -278,6 +281,7 @@ const Site$: Section = {
     hud.addEventListener('click', e => { const b = (e.target as HTMLElement).closest('button') as HTMLElement | null; if (!b) return;
       if (b.hasAttribute('data-mv')) { const k = b.getAttribute('data-mv'); if (k === 'jump') O.W.jump = true; else if (k === 'sprint') { O.W.sprint = !O.W.sprint; b.classList.toggle('on', O.W.sprint); } else O.setStance(k); }
       if (b.hasAttribute('data-services') && ctx.toGame) { ctx.toGame('rental'); return; }
+      if (b.hasAttribute('data-jwtest')) { const js: any[] = O.jetways || []; for (const j of js) j.test(); const st = js[0] && js[0].state; toast(st === 'docking' ? 'Jetways docking (about 2 minutes)' : st === 'undocking' ? 'Jetways undocking (about 1½ minutes)' : 'Jetways are still moving'); return; }
       if (b.hasAttribute('data-view')) place(b.getAttribute('data-view') as string);
       if (b.hasAttribute('data-sp2')) { CAM.speed = Number(b.getAttribute('data-sp2')); hud.querySelectorAll('[data-sp2]').forEach(q => q.classList.toggle('on', q === b)); }
     });
@@ -286,7 +290,7 @@ const Site$: Section = {
     if (!walkMode) place((ctx.opts && ctx.opts.view) || 'gate');
     perfAttach(engine, sc, hud); perfShow();
     if (walkMode) toast(IS_TOUCH ? 'Your airport · left thumb: walk · right: look' : 'Your airport · W A S D walk · mouse look · Shift run · Space jump · C crouch · Z prone · E lift · P photo · a controller: A jump, B crouch, Y prone, X lift, R3 sprint'); else toast(IS_TOUCH ? 'Pick a view · left thumb: fly · right: look · ▲ ▼ up and down' : 'Pick a view · W A S D fly · mouse look · Space / R up · C / F down · Shift faster · P photo');
-    progress(100, 'Ready');
+    progress(100, 'Ready'); applyReplacements(sc).catch(() => { /* none */ });
     runLoop(() => {
       perfBegin();
       const dt = Math.min(0.05, engine.getDeltaTime() / 1000), now = performance.now() / 1000, inp = inputFrame(dt);
@@ -319,6 +323,13 @@ const Site$: Section = {
       cam.position.set(CAM.x, CAM.y, CAM.z); cam.setTarget(cam.position.add(f));
       }
       try { O.AFB.step(now); } catch (e) { /* still */ }
+      // the jetways: docking and undocking; on foot on a moving one you are carried with it; the warning beep near one moving
+      try { const js: any[] = O.jetways || []; let ride: any = null, m0: any = null;
+        if (walkMode && js.some(j => j.state === 'docking' || j.state === 'undocking')) { const hit = sc.pickWithRay(new Ray(body.position.add(new Vector3(0, 0.3, 0)), new Vector3(0, -1, 0), 1.2), (m: any) => !!(m.metadata && /^J-\d/.test(m.metadata.id || '')) && m !== body);
+          if (hit && hit.pickedMesh) { ride = hit.pickedMesh; m0 = ride.computeWorldMatrix(true).clone(); } }
+        for (const j of js) j.update(dt);
+        if (ride) { const m1 = ride.computeWorldMatrix(true), p = Vector3.TransformCoordinates(Vector3.TransformCoordinates(body.position, m0.clone().invert()), m1); body.position.copyFrom(p); }
+        if (js.some(j => j.moving && Vector3.Distance(cam.position, j.node.getAbsolutePosition()) < 45)) { if (now - (O.beepT || 0) > 1.1) { O.beepT = now; jwBeep(); } } } catch (e) { /* still */ }
       wx.frame(dt, now);
       sc.render(); perfEnd();
     });
@@ -332,3 +343,8 @@ const Site$: Section = {
 };
 registerSection(Site$);
 export {};
+
+/** The jetway's warning beep while it moves (a short tone). */
+let jwAC: AudioContext | null = null;
+function jwBeep() { try { const C = jwAC || (jwAC = new AudioContext()); const o = C.createOscillator(), g = C.createGain(); o.type = 'square'; o.frequency.value = 1250;
+  g.gain.setValueAtTime(0.0001, C.currentTime); g.gain.exponentialRampToValueAtTime(0.05, C.currentTime + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, C.currentTime + 0.28); o.connect(g); g.connect(C.destination); o.start(); o.stop(C.currentTime + 0.3); } catch (e) { /* no sound */ } }

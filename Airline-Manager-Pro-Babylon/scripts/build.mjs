@@ -24,6 +24,13 @@ const html = readFileSync(join(root, 'www/index.template.html'), 'utf8').replace
 writeFileSync(join(root, 'www/index.html'), html);
 console.log(`Built ${cfg.appName} ${cfg.version} (Babylon.js ${babylon})`);
 
+// Your own models and pictures for the replaceable parts (models/, see its README): copied to www/models with a list
+// of them, which the game reads on every start.
+{ const md = join(root, 'models'), out = join(root, 'www/models'); rmSync(out, { recursive: true, force: true });
+  const files = existsSync(md) ? readdirSync(md).filter(f => /\.(glb|png|jpe?g|mp4|webm)$/i.test(f)) : [];
+  cpSync(md, out, { recursive: true, filter: s => !/README\.md$/.test(s) });
+  writeFileSync(join(out, 'index.json'), JSON.stringify({ files }, null, 1) + '\n'); console.log(`Replaceable parts: ${files.length ? files.join(', ') : 'none replaced'}`); }
+
 // The airline game's interface (game/: the Overview, the crew, every menu and screen), built and put in www/game,
 // opened from the title screen (New game, Continue game, Load game, Save game, UI). Its name and version are this
 // edition's.

@@ -14,7 +14,7 @@ import { AIRFIELD as AF, TERMINAL as TL } from './plan';
 import { field } from './field';
 
 const R = AF.runway, Y = AF.ys, PU = AF.airport.planU, PV = AF.airport.planV;
-const M0 = [-2060, -230], M1 = [2300, 1360];
+const M0 = [-2060, -230], M1 = [2300, 1380];
 /** A number as a GLSL float. */
 const f = (n: number) => { const s = String(Math.round(n * 1e4) / 1e4); return /[.e]/.test(s) ? s : s + '.'; };
 /** Plan metres (x along the runway, y towards it) and a height -> the airfield frame's local position. */
@@ -420,7 +420,7 @@ export const AIRFIELD_VIEWS = [
   { id: 'hold', name: 'Holding point A1', at: [R.x0 + 20 - 3.5, R.y - 107.5 - 62, 5], look: [R.x0 + 22, R.y - 30, 0.5] },
   { id: 'tdz', name: 'Touchdown zone', at: [R.x0 + 330, R.y + 24, 7], look: [R.x0 + 900, R.y - 4, 0] },
   { id: 'exit', name: 'Middle exit A2', at: [81 - 230, Y.AY - 70, 55], look: [81 + 20, R.y - 60, 0] },
-  { id: 'a380', name: 'A380 stand 9', at: [470, 240, 48], look: [170, 105, 0] },
+  { id: 'a380', name: 'A380 stand 9', at: [470, 260, 48], look: [170, 125, 0] },
   { id: 'cargo', name: 'Cargo apron', at: [120, Y.KY - 80, 40], look: [420, Y.KY + 90, 0] },
   { id: 'air', name: 'From the air', at: [-700, -560, 430], look: [160, 520, 0] },
   { id: 'flyby', name: 'Low fly-by', at: [2600, 300, 140], look: [0, R.y, 40] },

@@ -69,6 +69,7 @@ const Terminal$: Section = {
     const moving = new Set<AbstractMesh>(); for (const d of O.doors as DoorObj[]) for (const m of d.node.getChildMeshes()) moving.add(m);
     if (O.fx.museum) for (const m of O.fx.museum.root.getChildMeshes()) moving.add(m);
     for (const l of O.fx.lifts as LiftCtl[]) for (const m of l.moving_parts) moving.add(m);
+    for (const j of O.fx.jetways || []) for (const m of j.meshes()) moving.add(m);
     for (const m of sc.meshes) if (!moving.has(m)) { m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true; }
     for (const m of sc.meshes) if (m.name.indexOf('SRC:') === 0) { m.isPickable = false; }
     O.walkways = Array.from(K.objects.values()).filter(o => o.kind === 'MOVING-WALKWAY').map(o => o.node.metadata);
@@ -76,7 +77,7 @@ const Terminal$: Section = {
     const F = { x: SPAWN.x, z: SPAWN.z, f: SPAWN.f as Fl, y: 0, yaw: SPAWN.yaw, pitch: -0.04, v: 0, bob: 0, stair: null as Stair | null }; O.F = F;
     if (!walkable(1, F.x, F.z)) { const s = freeNear(1, F.x, F.z); F.x = s[0]; F.z = s[1]; }
     const cam = new UniversalCamera('eyes', new Vector3(F.x, EYE, F.z), sc); cam.minZ = 0.1; cam.maxZ = 900; cam.inertia = 0; O.cam = cam; sc.activeCamera = cam;
-    O.glow = new GlowLayer('glow', sc, { mainTextureRatio: IS_PC ? 0.5 : 0.3, blurKernelSize: 32 }); O.glow.intensity = 0.35;
+    O.glow = new GlowLayer('glow', sc, { mainTextureRatio: IS_PC ? 0.5 : 0.3, blurKernelSize: 32 }); O.glow.intensity = 0.35; for (const m of sc.meshes) if (m.material && (m.material as any)._soft) O.glow.addExcludedMesh(m as any); sc.onNewMeshAddedObservable.add(m => { setTimeout(() => { if (m.material && (m.material as any)._soft) O.glow.addExcludedMesh(m as any); }, 0); });
     O.dp = new DefaultRenderingPipeline('dp', true, sc, [cam]);
     progress(92, 'Lighting the terminal…');
     apply('all');

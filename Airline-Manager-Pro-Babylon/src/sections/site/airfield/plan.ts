@@ -5,6 +5,10 @@
 // The passenger terminal: every room, door, stair, lift, screen, jetway and stand, each with its own id.
 // Metres. x runs west to east, y from the kerb (y = 0, the main facade) north towards the ramp.
 // Floor 1 is the ground floor (+0.00), Floor 2 is the upper floor (+6.00).
+/** A jetway gate's static corridor and rotunda for its stand: the cab's round part 5.65 m right of the stand's centre line at
+ *  the front door (5.5 m behind the nose), the rotunda 13 m from it (the jetway 18.5 m overall) straight out from the gate's
+ *  door; the corridor runs from the pier (y 82) to the rotunda's edge (1.8 m). Same as terminal/plan.ts jetwayAt. */
+export function jetwayAt(gateX: number, standX: number, nose: number) { void nose; const dx = standX + 5.65 - gateX, dz = Math.sqrt(13 * 13 - dx * dx), rz = 82 + 20 + 5.5 - dz; return { rotunda: [gateX, rz], corridor: rz - 1.8 - 82 }; }   // the rotunda stays put (placed for a nose 20 m out); the stands are further out, the jetway reaches
 export const TERMINAL: any = (() => {
   const R = [], D = [], V = [], M = [], J = [], S = [];
   const room = (id, floor, name, x0, y0, x1, y1, kind, note) => R.push({ id, floor, name, x0, y0, x1, y1, kind: kind || 'room', note: note || '' });
@@ -14,6 +18,8 @@ export const TERMINAL: any = (() => {
   // first, then its Floor 1 walk-out gate (5-8) right beside it, reached by stairs and a lift from the Floor 2 gate.
   // the pier as built in the Babylon.js edition (sections/terminal/plan.ts): the walkway 16 m wide from y 52 (PG 68), the
   // gates' glass wall onto the ramp at PN 82, the modules 80.55 m apart from x -72.6
+  // the stands' noses: 26 m (jetway) and 28 m (walk-out) out from the pier, room for the static corridors and the jetways (about 18.6 m reach, room to extend and retract)
+  const NOSE_J = 82 + 26, NOSE_W = 82 + 28;
   const PIER = [-80, 242], PG = 68, PN = 82, PAIRS = [0, 1, 2, 3].map(i => -72.6 + 80.55 * i - 6);
   const UP = PAIRS.map(a => [a + 6, a + 40]), LO = PAIRS.map(a => [a + 34, a + 74]);
 
@@ -131,9 +137,11 @@ export const TERMINAL: any = (() => {
   PAIRS.forEach((a, i) => { const cx = Math.round((-62 + i * 2 * 286 / 7) * 100) / 100, cw = Math.round((-62 + (i * 2 + 1) * 286 / 7) * 100) / 100;   // 40.86 m apart, as in the 3D terminal
     // as in the Babylon terminal (fixtures.ts): out of the gate at x0 + 22, the rotunda 5.2 m out on its column, the moving
     // tunnel from 6.6 m out down to the aircraft's front door
-    J.push({ id: 'J-' + (i + 1), gate: 'F2-GATE-' + (i + 1), door: 'D-F2-GATE-' + (i + 1) + '-JW', x: a + 28, y: PN, rotunda: [cx + 15, PN + 2.5], cab: [cx + 2.4, PN + 6 + 5.5] });
-    S.push({ id: 'STAND-' + (i + 1), gate: 'F2-GATE-' + (i + 1), kind: 'jetway stand', x: cx, nose: PN + 6 });
-    S.push({ id: 'STAND-' + (i + 5), gate: 'F1-GATE-' + (i + 5), kind: 'walk-out stand', x: cw, nose: PN + 8 }); });
+    // the static corridor straight out from the gate's jetway door, the rotunda at its end, the jetway (18.5 m) to the front door
+    const jg = jetwayAt(a + 28, cx, NOSE_J);
+    J.push({ id: 'J-' + (i + 1), gate: 'F2-GATE-' + (i + 1), door: 'D-F2-GATE-' + (i + 1) + '-JW', x: a + 28, y: PN, corridor: jg.corridor, rotunda: jg.rotunda, cab: [cx + 2.4, NOSE_J + 5.5] });
+    S.push({ id: 'STAND-' + (i + 1), gate: 'F2-GATE-' + (i + 1), kind: 'jetway stand', x: cx, nose: NOSE_J });
+    S.push({ id: 'STAND-' + (i + 5), gate: 'F1-GATE-' + (i + 5), kind: 'walk-out stand', x: cw, nose: NOSE_W }); });
 
   // ---------------- the wave roof over the Grand Hall and the kerb ----------------
   // A leaf-shaped roof: its front edge swings out over the kerb, three long waves run across it, each crest carrying a
@@ -168,7 +176,7 @@ export const AIRFIELD: any = (() => {
     holdingPosition: 107.5,                       // runway-holding position from the runway centre line
     wingtip: { C: 4.5, E: 7.5, F: 7.5 },          // clearance between aircraft on stands and objects
   };
-  const TY = 186, AY = TY + CODE.twyToLane;      // apron taxilane T: 50.5 m behind the tails at the Babylon terminal's stands (y 186); A (y 366)
+  const TY = 206, AY = TY + CODE.twyToLane;      // apron taxilane T: 50.5 m behind the tails at the stands (y 206); A (y 386)
   const RY = AY + CODE.rwyToTwy, RX0 = -1919, RX1 = 2081;   // runway centre line (y 618); 4,000 m: threshold 08 (west), 26 (east)
   const BY = RY + CODE.rwyToTwy, KY = BY + CODE.twyToLane;  // taxiway B (y 878), cargo taxilane K (y 1058)
   const runway = { id: 'RWY 08/26', x0: RX0, x1: RX1, y: RY, w: CODE.rwyWidth, sh: CODE.rwyShoulder, ends: [{ id: '08', x: RX0, dir: 1, disp: 250 }, { id: '26', x: RX1, dir: -1, disp: 250 }], stopway: 60,
@@ -198,8 +206,8 @@ export const AIRFIELD: any = (() => {
   // set back towards the landside so its tail keeps 50.5 m from taxilane T; cargo stands C1-C4 Code F (747-8F).
   const S = [];
   const order = [1, 5, 2, 6, 3, 7, 4, 8];        // west to east along the pier: jetway gate, then its walk-out gate
-  order.forEach((n, i) => S.push({ id: 'STAND-' + n, code: 'C', x: TERMINAL.stands.find(q => q.id === 'STAND-' + n).x, nose: n <= 4 ? 88 : 90, dir: -1, span: 36, len: 44.5, ac: 'A320 · A321 · 737', jetway: n <= 4 ? 'J-' + n : null, from: 'T' }));
-  S.push({ id: 'STAND-9', code: 'F', x: 300, nose: 58, dir: -1, span: 80, len: 72.7, ac: 'A380 · 747-8 · 777-9', jetway: null, from: 'T' });
+  order.forEach((n, i) => S.push({ id: 'STAND-' + n, code: 'C', x: TERMINAL.stands.find(q => q.id === 'STAND-' + n).x, nose: n <= 4 ? TERMINAL.stands[0].nose : TERMINAL.stands[1].nose, dir: -1, span: 36, len: 44.5, ac: 'A320 · A321 · 737', jetway: n <= 4 ? 'J-' + n : null, from: 'T' }));
+  S.push({ id: 'STAND-9', code: 'F', x: 300, nose: 78, dir: -1, span: 80, len: 72.7, ac: 'A380 · 747-8 · 777-9', jetway: null, from: 'T' });
   [260, 347.5, 435, 522.5].forEach((x, i) => S.push({ id: 'C' + (i + 1), code: 'F', x, nose: KY + 130, dir: 1, span: 80, len: 76.3, ac: '747-8F · 777F · A350F', jetway: null, from: 'K', cargo: true }));
   // ---- runway-holding positions (Pattern A), mandatory signs, runway guard lights ----
   const H = [];
@@ -227,7 +235,7 @@ export const AIRFIELD: any = (() => {
   // terminal, its stands and the other buildings) is levelled to the airport's elevation; outside it the ground and its
   // mountains are untouched. The level ground blends into the real ground only within the boundary's outer 100 m, and
   // nothing is built in that band (the nearest pavement or building is more than 100 m in).
-  const boundary = { x0: -2000, y0: -170, x1: 2240, y1: 1300 }, flatten = { inside: 'boundary', blendInsideM: 100, outside: 'untouched' };
+  const boundary = { x0: -2000, y0: -170, x1: 2240, y1: 1320 }, flatten = { inside: 'boundary', blendInsideM: 100, outside: 'untouched' };
   const cargoBuilding = { id: 'CARGO-1', x0: 200, y0: KY + 145, x1: 590, y1: KY + 215 };
   // the airport itself
   const airport = { icao: 'BIAP', iata: 'VTX', name: 'Mýrdalssandur', city: 'Mýrdalssandur', country: 'Iceland', hdg: 68, magvar: -10, elevFt: 130,

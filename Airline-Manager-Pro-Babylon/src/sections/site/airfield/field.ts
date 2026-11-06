@@ -117,12 +117,12 @@ export const field = (x, P, s, o) => {
       const half = st.span / 2 + C.wingtip[st.code] / 2; x.strokeStyle = red; x.lineWidth = Math.max(2, 0.2 * s); x.setLineDash([]); const yN = st.cargo ? st.nose : TL.PN + 0.6; const a = P(st.x - half, Math.max(yN, tailY - d * 3)), b = P(st.x + half, Math.min(yN, tailY - d * 3)); x.strokeRect(a[0], a[1], b[0] - a[0], b[1] - a[1]);
       if (o.planes) plane(x, P, st.x, st.nose, d, st.code === 'F' ? 79.8 : 35.8, st.code === 'F' ? (st.cargo ? 76.3 : 72.7) : 44.5, 'rgba(225,235,250,.42)', '#EAF2FF', Math.max(1.5, 0.12 * s));
       // the stand number painted beside the lead-in line (not on it)
-      if (s >= 3) { const q = P(st.x - (st.code === 'F' ? 10 : 7), st.cargo ? Y.KY + 30 : 160); const num = st.id.replace('STAND-', ''); x.save(); x.translate(q[0], q[1]); x.fillStyle = '#0D0D0D'; const bw = (num.length > 1 ? 6.4 : 4) * s, bh = 5 * s; x.fillRect(-bw / 2, -bh / 2, bw, bh); x.fillStyle = gold; x.font = `900 ${Math.round(4 * s)}px Inter, Arial`; x.textAlign = 'center'; RT(x, num, 0, 1.45 * s); x.restore(); x.textAlign = 'left'; }
+      if (s >= 3) { const q = P(st.x - (st.code === 'F' ? 10 : 7), st.cargo ? Y.KY + 30 : 180); const num = st.id.replace('STAND-', ''); x.save(); x.translate(q[0], q[1]); x.fillStyle = '#0D0D0D'; const bw = (num.length > 1 ? 6.4 : 4) * s, bh = 5 * s; x.fillRect(-bw / 2, -bh / 2, bw, bh); x.fillStyle = gold; x.font = `900 ${Math.round(4 * s)}px Inter, Arial`; x.textAlign = 'center'; RT(x, num, 0, 1.45 * s); x.restore(); x.textAlign = 'left'; }
       if (st.jetway) { const j = TL.jetways.find(q => q.id === st.jetway); if (j) pbb(j, st); }
       if (!st.cargo && !st.jetway && st.code === 'C') walkway(st);
       if (o.standLabels) label(x, st.id.replace('STAND-', 'S') , P(st.x, tailY + d * -8)[0], P(st.x, tailY - d * 12)[1], ink, o.standLabels); }
     // apron service road (white) behind the stands' tails, through to the cargo side nothing
-    if (s >= 3) { for (const yy of [140, 148]) line([[-148, yy], [380, yy]], '#F4F4F4', Math.max(1.5, 0.15 * s)); line([[-148, 144], [380, 144]], '#F4F4F4', Math.max(1.2, 0.12 * s), [3 * s, 3 * s]); }
+    if (s >= 3) { for (const yy of [160, 168]) line([[-148, yy], [380, yy]], '#F4F4F4', Math.max(1.5, 0.15 * s)); line([[-148, 164], [380, 164]], '#F4F4F4', Math.max(1.2, 0.12 * s), [3 * s, 3 * s]); }
     if (o.marks) return;
     // the terminal (from TERMINAL): blocks, pier, museum, roof
     const blk = (x0, y0, x1, y1) => { const a = P(x0, y1), b = P(x1, y0); x.fillStyle = '#25384F'; x.fillRect(a[0], a[1], b[0] - a[0], b[1] - a[1]); x.strokeStyle = '#9FD8FF'; x.lineWidth = Math.max(2, 0.25 * s); x.strokeRect(a[0], a[1], b[0] - a[0], b[1] - a[1]); };
