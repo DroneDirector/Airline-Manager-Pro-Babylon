@@ -63,7 +63,7 @@ onPad(name => toast(name ? `${name} connected` : 'Controller disconnected'));
 /** Into a place of the game (today: the lounge), with its loading screen. */
 async function enter(id: string, title: string, opts?: any) {
   loadingShow(title);
-  const engine = makeEngine(canvas);
+  const engine = await makeEngine(canvas);
   // where the loading got to: if it is still loading after two minutes, that goes to the log (Settings → Updates and errors)
   let at = { p: 0, s: 'Starting' }, opened = false;
   const ctx: SectionCtx = { engine, canvas, ui, progress: (p, s) => { at = { p, s }; loadingProgress(p, s); }, back: backToTitle, opts, toGame: opts && gameExists() ? backToGame : undefined, goTo: goToPlace };

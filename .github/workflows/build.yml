@@ -31,6 +31,12 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npm run build
+      - name: The WebGPU shader translators (glslang, BSD/Apache; Tint as twgsl, Apache 2.0), shipped with the PC app
+        shell: bash
+        run: |
+          mkdir -p www/webgpu
+          for f in glslang/glslang.js glslang/glslang.wasm twgsl/twgsl.js twgsl/twgsl.wasm; do curl -fsSL "https://cdn.babylonjs.com/$f" -o "www/webgpu/$(basename $f)"; done
+          ls -la www/webgpu
       - name: Package for Windows
         working-directory: Airline-Manager-Pro-Babylon/pc
         run: |

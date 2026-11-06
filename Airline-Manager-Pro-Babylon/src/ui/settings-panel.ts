@@ -20,6 +20,7 @@ const pct = (v: number) => Math.round(v * 100) + '%';
 const GFX: Row[] = [
   { k: 'seg', key: 'gfx.preset', label: 'Quality', sub: 'Sets everything below at once', opts: [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra'], ['custom', 'Custom']] },
   { k: 'range', key: 'gfx.scale', label: 'Resolution', sub: 'Lower is faster, higher is sharper', min: 0.4, max: IS_PC ? 1.5 : 1, step: 0.05, fmt: pct },
+  ...(IS_PC ? [{ k: 'seg', key: 'gfx.renderer', label: 'Graphics engine', sub: 'WebGPU takes far less of the processor per thing drawn (new; WebGL if it can\'t start). Applies after restarting the game', opts: [['webgl', 'WebGL'], ['webgpu', 'WebGPU']] } as Row] : []),
   { k: 'seg', key: 'gfx.fps', label: 'Frame rate limit', opts: [[30, '30'], [60, '60'], [0, 'No limit']] },
   { k: 'seg', key: 'gfx.aa', label: 'Anti-aliasing', sub: 'Smooth edges (MSAA after a restart of the 3D view)', opts: [['off', 'Off'], ['fxaa', 'FXAA'], ['msaa', 'MSAA 4×']] },
   { k: 'seg', key: 'gfx.shadows', label: 'Shadows', opts: [['off', 'Off'], ['low', 'Low'], ['high', 'High']] },

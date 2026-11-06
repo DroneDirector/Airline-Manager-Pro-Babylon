@@ -9,6 +9,8 @@ Rule: everything in the game must allow a commercial, paid game. At most, a lice
 | Capacitor 7 (Android shell) | MIT | Yes | Credit; ship the licence text |
 | MapLibre GL JS 5 (world map) | BSD-3-Clause | Yes | Credit; ship the licence text |
 | ONNX Runtime Web 1.20.1 (voices) | MIT | Yes | Credit; ship the licence text |
+| glslang (Khronos; WebGPU shader translation, PC only) | BSD-3-Clause / Apache-2.0 (Khronos glslang licence) | Yes | Credit; ship the licence text |
+| Tint, as twgsl (Google / Babylon.js; WebGPU shader translation, PC only) | Apache-2.0 | Yes | Credit; ship the licence text |
 | Kokoro v1.0 voice model, kokoro-onnx, misaki (character voices) | Apache-2.0 / MIT | Yes | Credit; licence texts are already in the voice pack |
 
 ## Fonts
