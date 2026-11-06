@@ -12,6 +12,7 @@
 import { TransformNode, Mesh, VertexData, PBRMaterial, StandardMaterial, Color3, RawTexture, Texture, DynamicTexture, MaterialPluginBase, Matrix, Vector3, MeshBuilder } from '@babylonjs/core';
 import { AIRFIELD as AF, TERMINAL as TL } from './plan';
 import { field } from './field';
+import { WET_GLSL, WET_UNIFORMS, WET_DECL, bindWet } from '../../../core/look';
 
 const R = AF.runway, Y = AF.ys, PU = AF.airport.planU, PV = AF.airport.planV;
 const M0 = [-2060, -230], M1 = [2300, 1380];
@@ -100,13 +101,13 @@ class AirfieldGroundPlugin extends MaterialPluginBase {
   prepareDefines(defines) { defines.AFGROUND = true; }
   isReadyForSubMesh() { return !this.mask || this.mask.isReady(); }
   getSamplers(samplers) { samplers.push('afMask'); }
-  getUniforms() { return { ubo: [{ name: 'afOrg', size: 2, type: 'vec2' }], vertex: 'uniform vec2 afOrg;', fragment: 'uniform vec2 afOrg;' }; }
-  bindForSubMesh(ubo, scene, engine, subMesh) { const o = orgOf(scene, subMesh.getMesh()); ubo.updateFloat2('afOrg', o[0], o[1]); ubo.setTexture('afMask', this.mask); }
+  getUniforms() { return { ubo: [{ name: 'afOrg', size: 2, type: 'vec2' }, ...WET_UNIFORMS], vertex: 'uniform vec2 afOrg;', fragment: 'uniform vec2 afOrg; ' + WET_DECL }; }
+  bindForSubMesh(ubo, scene, engine, subMesh) { const o = orgOf(scene, subMesh.getMesh()); ubo.updateFloat2('afOrg', o[0], o[1]); ubo.setTexture('afMask', this.mask); bindWet(ubo); }
   getCustomCode(type, lang) {
     if (lang) return null;
     if (type === 'vertex') return { CUSTOM_VERTEX_DEFINITIONS: 'varying vec2 vPlan;', CUSTOM_VERTEX_MAIN_END: `vPlan = positionUpdated.xz - vec2(${f(PU)}, ${f(PV)});` };
     return this._code || (this._code = {
-      CUSTOM_FRAGMENT_DEFINITIONS: `varying vec2 vPlan; uniform sampler2D afMask; float afH = 0.; float afR = .9;\n${glNoise(this.low)}\n${glSurf(this.low)}`,
+      CUSTOM_FRAGMENT_DEFINITIONS: `varying vec2 vPlan; uniform sampler2D afMask; float afH = 0.; float afR = .9;\n${glNoise(this.low)}\n${glSurf(this.low)}\n${WET_GLSL}`,
       CUSTOM_FRAGMENT_UPDATE_ALPHA: `{
         vec2 p = vPlan, pl = p - afOrg; float fw = max(length(fwidth(p)), 1e-4);
         vec4 ms = maskAt(p);
@@ -127,6 +128,7 @@ class AirfieldGroundPlugin extends MaterialPluginBase {
           float tuft = smoothstep(.62, .75, vnA(pl * 5.5, fw * 5.5)) * worn; pc = mix(pc, gc * 1.1, tuft * .8);
           col = mix(gc, pc, pave); hh = mix(gh, ph, pave); rr = mix(.96, pr, pave);
         }
+        wetIt(p, pave, col, rr, hh);
         surfaceAlbedo = col; afH = hh; afR = rr; }
         ${BUMP}`,
       '!float roughness=reflectivityOut\\.roughness;': 'float roughness=clamp(afR,.05,1.);',
@@ -140,9 +142,9 @@ class AirfieldPaintPlugin extends MaterialPluginBase {
   isReadyForSubMesh() { return !this.atlas || this.atlas.isReady(); }
   getAttributes(attributes) { attributes.push('aCol', 'aInfo', 'aSide'); }
   getSamplers(samplers) { samplers.push('afAtlas'); }
-  getUniforms() { return { ubo: [{ name: 'afOrg', size: 2, type: 'vec2' }, { name: 'afPix', size: 1, type: 'float' }], vertex: 'uniform vec2 afOrg; uniform float afPix;', fragment: 'uniform vec2 afOrg; uniform float afPix;' }; }
+  getUniforms() { return { ubo: [{ name: 'afOrg', size: 2, type: 'vec2' }, { name: 'afPix', size: 1, type: 'float' }, ...WET_UNIFORMS], vertex: 'uniform vec2 afOrg; uniform float afPix;', fragment: 'uniform vec2 afOrg; uniform float afPix; ' + WET_DECL }; }
   bindForSubMesh(ubo, scene, engine, subMesh) { const o = orgOf(scene, subMesh.getMesh()), cam = scene.activeCamera;
-    ubo.updateFloat2('afOrg', o[0], o[1]); ubo.updateFloat('afPix', cam ? (cam.fov || 0.8) / Math.max(1, engine.getRenderHeight()) : this.pix); ubo.setTexture('afAtlas', this.atlas); }
+    ubo.updateFloat2('afOrg', o[0], o[1]); ubo.updateFloat('afPix', cam ? (cam.fov || 0.8) / Math.max(1, engine.getRenderHeight()) : this.pix); ubo.setTexture('afAtlas', this.atlas); bindWet(ubo); }
   getCustomCode(type, lang) {
     if (lang) return null;
     if (type === 'vertex') return {
@@ -157,7 +159,7 @@ class AirfieldPaintPlugin extends MaterialPluginBase {
       CUSTOM_VERTEX_MAIN_END: `vPlan = positionUpdated.xz - vec2(${f(PU)}, ${f(PV)});`,
     };
     return this._code || (this._code = {
-      CUSTOM_FRAGMENT_DEFINITIONS: `varying vec4 vCol; varying vec4 vInfo; varying vec2 vPlan; uniform sampler2D afAtlas; float afR = .7;\n${glNoise(this.low)}`,
+      CUSTOM_FRAGMENT_DEFINITIONS: `varying vec4 vCol; varying vec4 vInfo; varying vec2 vPlan; uniform sampler2D afAtlas; float afR = .7;\n${glNoise(this.low)}\n${WET_GLSL}`,
       CUSTOM_FRAGMENT_UPDATE_ALPHA: `{
         vec2 p = vPlan, pl = p - afOrg; float fw = max(length(fwidth(p)), 1e-4);
         vec3 col = vCol.rgb; float a = vCol.a; float edge = (vnA(pl * 28., fw * 28.) - .5) * .012;
@@ -169,7 +171,7 @@ class AirfieldPaintPlugin extends MaterialPluginBase {
         a *= mix(1., smoothstep(.12, .32, vnA(pl * 7., fw * 7.)), .45);
         col = mix(col, col * vec3(.72, .68, .6), dirt(p) * .45);
         float ru = rubber(p); col = mix(col, vec3(.03), ru * .88); a *= 1. - ru * .25;
-        surfaceAlbedo = col; alpha = clamp(a, 0., 1.); afR = .62 + ru * .2; }`,
+        afR = .62 + ru * .2; { float wH = 0.; wetIt(p, 1., col, afR, wH); } surfaceAlbedo = col; alpha = clamp(a, 0., 1.); }`,
       '!float roughness=reflectivityOut\\.roughness;': 'float roughness=clamp(afR,.05,1.);',
     });
   }

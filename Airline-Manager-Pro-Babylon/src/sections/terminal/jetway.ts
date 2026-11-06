@@ -463,6 +463,11 @@ export function buildJetway(K: Kit, n: number, gateX: number, stand: { x: number
     const f = (v: number) => V(v * sgn, 0, 0);
     tyre(g, f(-0.2), f(0.2), 0.56, 0.31, 0.4);
     g.lathe(JRim, f(0.2), f(0.02), [[0.3, 0], [0.336, 0], [0.343, 0.03], [0.34, 0.08], [0.318, 0.16], [0.31, 0.28], [0.31, 1], [0.3, 1]], 40);
+    // closed behind: the barrel's inner half and its back lip, the barrel seen from inside the dish (both faces), and the
+    // brake back plate, so nothing shows through the rim or the holes from any side
+    g.lathe(JRim, f(-0.2), f(0.02), [[0.3, 0], [0.336, 0], [0.343, 0.03], [0.34, 0.08], [0.318, 0.16], [0.31, 0.28], [0.31, 1], [0.3, 1]], 40);
+    for (const pr of [[[0.302, 0], [0.302, 1]], [[0.302, 1], [0.302, 0]]]) g.lathe(JRim, f(-0.2), f(0.2), pr, 40);
+    for (const pr of [[[0, 0], [0.305, 0], [0.305, 1], [0, 1]], [[0, 1], [0.305, 1], [0.305, 0], [0, 0]]]) g.lathe(JD, f(-0.12), f(-0.1), pr, 32);
     g.lathe(JRim, f(0.11), f(0.15), [[0.31, 0], [0.31, 0.25], [0.3, 0.32], [0.215, 0.62], [0.205, 0.7], [0.145, 0.7], [0.14, 0.8], [0.14, 1], [0, 1]], 40);
     g.lathe(JRim, f(0.15), f(0.17), [[0.14, 0], [0.13, 0.2], [0.13, 0.8], [0.12, 1], [0, 1]], 28);
     for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + 0.39, rr = 0.258; g.lathe(JG, V(0.134 * sgn, Math.sin(a) * rr, Math.cos(a) * rr), V(0.14 * sgn, Math.sin(a) * rr, Math.cos(a) * rr), [[0, 0], [0.034, 0], [0.034, 1], [0, 1]], 14); }

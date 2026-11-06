@@ -262,7 +262,7 @@ const Site$: Section = {
       for (const m of O.AFB.exclude || []) if (m && /GROUND/.test(m.name)) pr.renderList!.push(m); pr.refreshRate = IS_PC ? 120 : 600; sc.environmentTexture = pr.cubeTexture; sc.environmentIntensity = HIGH ? 0.75 : 0.55; O.probe = pr; } catch (e) { /* not on this device */ } }
     for (const ps of sc.particleSystems) ps.renderingGroupId = 1;
     // the extra graphics, each its own switch in Settings
-    const lookStep = applyLook({ sc, cam, sun, dp, shadows: SG, ground: sc.meshes.filter(m => /GROUND|APRON|apron|TAXI|RWY|road|ROAD/.test(m.name)), base: ap.position.y, casters });
+    const lookStep = applyLook({ sc, cam, sun, dp, shadows: SG, ground: sc.meshes.filter(m => /ground|apron|taxi|rwy|road|markings|ramp-/i.test(m.name)), base: ap.position.y, casters });
     // what the panel shows: the site, its numbers, the views, the drone's speed
     const kx = 111320 * Math.cos(site.lat * D2R);
     hud.insertAdjacentHTML('beforeend', `<div class="site-top"><b>${site.name}</b><small>${site.lat.toFixed(3)}° ${site.lat >= 0 ? 'N' : 'S'} · ${Math.abs(site.lon).toFixed(3)}° ${site.lon < 0 ? 'W' : 'E'} ${site.icao ? `· ${site.icao} / ${site.iata} ` : ''}· runway ${site.rwy[0]}/${site.rwy[1]} true ${String(site.hdg).padStart(3, '0')}°/${String((site.hdg + 180) % 360).padStart(3, '0')}° · gates face ${String(site.gates).padStart(3, '0')}° · ground ${Math.round(elev)} m</small></div>

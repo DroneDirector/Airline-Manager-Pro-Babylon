@@ -8,6 +8,7 @@ import { Scene, Camera, Vector3, Color3, Color4, Mesh, MeshBuilder, StandardMate
   ClusteredLightContainer, IblShadowsRenderPipeline, TAARenderingPipeline, SSRRenderingPipeline, MotionBlurPostProcess, VolumetricLightScatteringPostProcess,
   LensFlareSystem, LensFlare, DefaultRenderingPipeline, ShadowGenerator, PBRMaterial, AbstractMesh, Constants } from '@babylonjs/core';
 import { S } from './settings';
+import { MaterialPluginBase } from '@babylonjs/core';
 import { IS_PC } from './app';
 
 /** The lights that would like to join the many-lights container (the jetways' panels and the like), added by their builders. */
@@ -24,6 +25,43 @@ void main(void) { vec4 c = texture2D(textureSampler, vUV); float z = texture2D(d
   float integ = abs(dh) > 0.01 ? (exp(-k * h0) - exp(-k * (h0 + dh))) / (k * dh) : exp(-k * h0);
   float f = 1.0 - exp(-density * dist * max(integ, 0.0)); f = clamp(f, 0.0, 0.92);
   gl_FragColor = vec4(mix(c.rgb, fogColor, f), c.a); }`;
+
+/** How wet the ground is now (0 dry, 1 soaked), how hard it rains, and a clock for the ripples: read by the ground's shaders. */
+export const WET = { wet: 0, rain: 0, t: 0 };
+export const WET_UNIFORMS = [{ name: 'wtWet', size: 1, type: 'float' }, { name: 'wtRain', size: 1, type: 'float' }, { name: 'wtT', size: 1, type: 'float' }];
+export const WET_DECL = 'uniform float wtWet; uniform float wtRain; uniform float wtT;';
+export const bindWet = (ubo: any) => { ubo.updateFloat('wtWet', WET.wet); ubo.updateFloat('wtRain', WET.rain); ubo.updateFloat('wtT', WET.t); };
+/** The wet ground in GLSL: wetIt(plan position, how paved (0 grass, 1 asphalt/concrete), colour, roughness, relief).
+ *  Damp: darker, asphalt and concrete most, grass only a little and barely glossier. Puddles where the ground dips (a
+ *  slow pattern of hollows), spreading as the rain goes on and drying from the edges, mirror-smooth with a darker damp
+ *  ring round them; raindrops ring out across them while it rains. */
+export const WET_GLSL = `
+float wtH1(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float wtN(vec2 p){ vec2 i = floor(p), q = fract(p); vec2 u = q * q * (3. - 2. * q); return mix(mix(wtH1(i), wtH1(i + vec2(1., 0.)), u.x), mix(wtH1(i + vec2(0., 1.)), wtH1(i + vec2(1., 1.)), u.x), u.y); }
+float wtRip(vec2 p, float t){ float h = 0.; for (int k = 0; k < 3; k++) { vec2 q = p * 2.6 + float(k) * 7.31; vec2 c = floor(q), f = fract(q); vec2 o = vec2(wtH1(c), wtH1(c + 13.7)) * .7 + .15;
+  float ph = fract(t * (.7 + .3 * wtH1(c + 3.3)) + wtH1(c + 5.1)), d = length(f - o), r = ph * .42; h += sin((d - r) * 75.) * (1. - ph) * (1. - smoothstep(0., .06, abs(d - r))); } return h; }
+void wetIt(vec2 p, float pave, inout vec3 col, inout float rr, inout float hh){
+  float w = wtWet; if (w < .002) return;
+  float damp = w * mix(.4, 1., pave); col *= 1. - damp * mix(.2, .36, pave); rr = mix(rr, rr * mix(.88, .42, pave), damp);
+  float n = wtN(p * .045) * .55 + wtN(p * .19 + 3.1) * .3 + wtN(p * .9 + 7.7) * .15, th = mix(.84, .64, w);
+  float ring = smoothstep(th - .06, th, n) * pave; col *= 1. - .16 * ring * w; rr = mix(rr, rr * .55, ring * w);
+  float pud = smoothstep(th, th + .02, n) * pave;
+  if (pud > 0.) { col = mix(col, col * .5, pud); rr = mix(rr, .02, pud); hh = mix(hh, wtRain * .0022 * wtRip(p, wtT), pud); } }
+`;
+/** Wet ground and puddles on a plain material (the roads): its colour, gloss and relief while it is wet. */
+export class WetPlugin extends MaterialPluginBase {
+  constructor(mat: any) { super(mat, 'Wet', 220, { WETGROUND: false }); this._enable(true); }
+  getClassName() { return 'WetPlugin'; }
+  prepareDefines(d: any) { d.WETGROUND = true; }
+  getUniforms() { return { ubo: WET_UNIFORMS, fragment: WET_DECL }; }
+  bindForSubMesh(ubo: any) { bindWet(ubo); }
+  getCustomCode(type: string, lang?: any): any { if (lang || type === 'vertex') return null;
+    return { CUSTOM_FRAGMENT_DEFINITIONS: 'float wtR = 1.; float wtHH = 0.;\n' + WET_GLSL,
+      CUSTOM_FRAGMENT_UPDATE_ALPHA: `{ vec3 c = surfaceAlbedo; wetIt(vPositionW.xz, 1., c, wtR, wtHH); surfaceAlbedo = c;
+        vec3 dpx = dFdx(vPositionW), dpy = dFdy(vPositionW); vec3 r1 = cross(dpy, normalW), r2 = cross(normalW, dpx); float det = dot(dpx, r1);
+        vec3 grd = sign(det) * (dFdx(wtHH) * r1 + dFdy(wtHH) * r2); normalW = normalize(abs(det) * normalW - grd * 1.6); }`,
+      '!float roughness=reflectivityOut\\.roughness;': 'float roughness=clamp(reflectivityOut.roughness*wtR,.02,1.);' }; }
+}
 
 const glowDot = (sz: number, a: number, col: string) => { const c = document.createElement('canvas'); c.width = c.height = sz; const x = c.getContext('2d')!, g = x.createRadialGradient(sz / 2, sz / 2, 0, sz / 2, sz / 2, sz / 2);
   g.addColorStop(0, col.replace('A', String(a))); g.addColorStop(1, col.replace('A', '0')); x.fillStyle = g; x.fillRect(0, 0, sz, sz); return c; };
@@ -82,9 +120,13 @@ export function applyLook(P: LookParts): (dt: number) => void {
     steps.push(dt => { t += dt; if (t > 0.3) { t = 0; const hit = sc.pickWithRay(new Ray(cam.globalPosition, Vector3.Up(), 25), m => m.isPickable && m.isVisible && !/sky|look-/i.test(m.name)); target = hit && hit.hit ? 1.32 : 1; }
       cur += (target - cur) * Math.min(1, dt * (target > cur ? 0.6 : 1.4)); ip.exposure = baseExp * cur; }); }
 
-  // rain on the ground: wet, darker and glossier while it rains, drying slowly after
-  if (g.wetRain) { const mats = new Map<any, { r: number; c: Color3 | null }>(); for (const m of P.ground) { const mt: any = m.material; if (mt && 'roughness' in mt && !mats.has(mt)) mats.set(mt, { r: mt.roughness ?? 0.9, c: mt.albedoColor ? mt.albedoColor.clone() : null }); }
-    let wet = 0; steps.push(dt => { wet += ((WX.rain > 0.05 ? 1 : 0) - wet) * Math.min(1, dt * (WX.rain > 0.05 ? 0.08 : 0.02)); for (const [mt, b] of mats) { mt.roughness = b.r * (1 - 0.65 * wet); if (b.c && mt.albedoColor) mt.albedoColor.copyFrom(b.c.scale(1 - 0.32 * wet)); } }); }
+  // rain on the ground: wet, darker and glossier while it rains, puddles spreading as it goes on, drying slowly after
+  //  (the airfield, its markings and the roads in their shaders; the far landscape here: a little darker, barely glossier)
+  if (g.wetRain) { const mats = new Map<any, { r: number; c: Color3 | null }>(); for (const m of P.ground) { const mt: any = m.material; if (mt && 'roughness' in mt && !mats.has(mt) && !/^AIRFIELD\/(GROUND|PAINT)$|^ROAD$/.test(mt.name)) mats.set(mt, { r: mt.roughness ?? 0.9, c: mt.albedoColor ? mt.albedoColor.clone() : null }); }
+    for (const m of P.ground) { const mt: any = m.material; if (mt && mt.name === 'ROAD' && !mt._wet) mt._wet = new WetPlugin(mt); }
+    let wet = 0; steps.push(dt => { const r = WX.rain; wet += ((r > 0.05 ? Math.min(1, 0.4 + r) : 0) - wet) * Math.min(1, dt * (r > 0.05 ? 0.012 : 0.004));
+      WET.wet = wet; WET.rain = Math.min(1, r * 1.4); WET.t = (WET.t + dt) % 1000;
+      for (const [mt, b] of mats) { mt.roughness = b.r * (1 - 0.15 * wet); if (b.c && mt.albedoColor) mt.albedoColor.copyFrom(b.c.scale(1 - 0.2 * wet)); } }); }
 
   void Color4; void Light;
   return (dt: number) => { for (const s of steps) s(dt); };
