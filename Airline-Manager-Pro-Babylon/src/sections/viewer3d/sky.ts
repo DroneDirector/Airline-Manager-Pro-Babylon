@@ -22,7 +22,8 @@ uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 moonDir; uniform vec3 lit
 uniform float alt; uniform vec2 drift; uniform float time; uniform float cover; uniform float steps; uniform float lsteps;
 uniform float lat; uniform float lst; uniform float starK; uniform float nightK; uniform float gnd; uniform float landK;
 uniform sampler2D stars;
-const float R = 6371000.0, BASE = 2100.0, TOP = 5600.0, PI = 3.14159265;
+uniform float BASE; uniform float TOP;
+const float R = 6371000.0, PI = 3.14159265;
 
 float hash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float noise(vec3 x) {
@@ -144,7 +145,7 @@ export function makeSky(sc: Scene): Sky {
   dome.infiniteDistance = false; dome.isPickable = false; dome.renderingGroupId = 0;
   const mat = new ShaderMaterial('skyMat', sc, { vertex: 'amSky', fragment: 'amSky' }, {
     attributes: ['position'],
-    uniforms: ['worldViewProjection', 'sunDir', 'sunCol', 'moonDir', 'litDir', 'litCol', 'alt', 'drift', 'time', 'cover', 'steps', 'lsteps', 'lat', 'lst', 'starK', 'nightK', 'gnd', 'landK'],
+    uniforms: ['worldViewProjection', 'sunDir', 'sunCol', 'moonDir', 'litDir', 'litCol', 'alt', 'drift', 'time', 'cover', 'steps', 'lsteps', 'lat', 'lst', 'starK', 'nightK', 'gnd', 'landK', 'BASE', 'TOP'],
     samplers: ['stars'],
   });
   mat.backFaceCulling = false; mat.disableDepthWrite = true;
@@ -184,12 +185,12 @@ function bvColour(bv: number): string {
   return `${r},${Math.max(140, Math.min(255, g))},${Math.max(90, b)}`;
 }
 /** Each frame: the sun, the moon, the light on the clouds, the camera's height, how far the ground has moved. */
-export function skyFrame(s: Sky, o: { sun: number[]; sunCol: number[]; moon: number[]; lit: number[]; litCol: number[]; alt: number; drift: number[]; time: number; cover: number; steps: number; lsteps: number; lat: number; lst: number; starK: number; nightK: number; gnd?: number; landK?: number }) {
+export function skyFrame(s: Sky, o: { sun: number[]; sunCol: number[]; moon: number[]; lit: number[]; litCol: number[]; alt: number; drift: number[]; time: number; cover: number; steps: number; lsteps: number; lat: number; lst: number; starK: number; nightK: number; gnd?: number; landK?: number; base?: number; top?: number }) {
   const m = s.mat;
   m.setVector3('sunDir', new Vector3(o.sun[0], o.sun[1], o.sun[2])); m.setColor3('sunCol', new Color3(o.sunCol[0], o.sunCol[1], o.sunCol[2]));
   m.setVector3('moonDir', new Vector3(o.moon[0], o.moon[1], o.moon[2])); m.setVector3('litDir', new Vector3(o.lit[0], o.lit[1], o.lit[2]));
   m.setColor3('litCol', new Color3(o.litCol[0], o.litCol[1], o.litCol[2]));
   m.setFloat('alt', o.alt); m.setVector2('drift', new Vector2(o.drift[0], o.drift[1]));
-  m.setFloat('time', o.time); m.setFloat('cover', o.cover); m.setFloat('steps', o.steps); m.setFloat('lsteps', o.lsteps);
+  m.setFloat('time', o.time); m.setFloat('cover', o.cover); m.setFloat('BASE', o.base || 2100); m.setFloat('TOP', o.top || 5600); m.setFloat('steps', o.steps); m.setFloat('lsteps', o.lsteps);
   m.setFloat('lat', o.lat); m.setFloat('lst', o.lst); m.setFloat('starK', o.starK); m.setFloat('nightK', o.nightK); m.setFloat('gnd', o.gnd || 0); m.setFloat('landK', o.landK || 0);
 }

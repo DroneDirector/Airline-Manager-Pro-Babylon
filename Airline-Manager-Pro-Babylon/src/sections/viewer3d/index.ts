@@ -17,6 +17,7 @@ import { icon, esc, toast } from '../../ui/icons';
 import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core/perf-meter';
 import { makeSky, skyFrame, Sky } from './sky';
 import { makePhotoMode } from './photo';
+import { makeRealWx } from './realwx';
 import { buildAirliner, Airliner, repaint, setGear } from './airliner';
 import { buildAirport, placeAirport, Airport } from './airport';
 import { buildTerrain, placeTerrain, terrainStale, Terrain } from './terrain';
@@ -138,10 +139,12 @@ function sky(now: number) {
   const pos = V.pos, s = sunAt(V.t, pos[0], pos[1]), m = moonAt(V.t, pos[0], pos[1]), sd = dirOf(s), md = dirOf(m);
   const sc = sunlight(s.alt), phase = (1 - (sd[0] * md[0] + sd[1] * md[1] + sd[2] * md[2])) / 2;
   const moonK = m.alt > -1 ? 0.06 * phase * Math.min(1, (m.alt + 1) / 6) : 0, nightK = Math.max(0, Math.min(1, (-s.alt - 1) / 7));
-  const lit = s.alt > -3 || moonK < 0.002 ? sd : md, lc = s.alt > -3 ? sc : [moonK * 0.75, moonK * 0.85, moonK * 1.1];
+  const lit = s.alt > -3 || moonK < 0.002 ? sd : md;
+  let lc = s.alt > -3 ? sc : [moonK * 0.75, moonK * 0.85, moonK * 1.1];
   V.sunAlt = s.alt;
-  const q = CLOUDQ[S.gfx.clouds] || CLOUDQ.medium;
-  skyFrame(V.sky, { sun: sd, sunCol: sc, moon: md, lit, litCol: lc, alt: (V.alt || FL) + V.cam.position.y, drift: V.drift, time: now, cover: 0.82, steps: V.steps || q[0], lsteps: V.lsteps || q[1],
+  const q = CLOUDQ[S.gfx.clouds] || CLOUDQ.medium, W = V.rwx, dk = W ? 1 - W.dark : 1;
+  const lc0 = lc; lc = [lc0[0] * dk, lc0[1] * dk, lc0[2] * dk];
+  skyFrame(V.sky, { sun: sd, sunCol: sc, moon: md, lit, litCol: lc, alt: (V.alt || FL) + V.cam.position.y, drift: V.drift, time: now, cover: W ? W.cover : 0.82, base: W ? W.base : 2100, top: W ? W.top : 5600, steps: V.steps || q[0], lsteps: V.lsteps || q[1],
     lat: pos[0] * D2R, lst: lst(V.t, pos[1]) * D2R, starK: Math.min(1.4, nightK * 1.4), nightK, gnd: V.gnd || 0, landK: V.land || 0 });
   // the sun (or the moon) on the aircraft, its shadows, the sky's light from above and the clouds' from below
   const L: DirectionalLight = V.sun, ld = new Vector3(-lit[0], -lit[1], -lit[2]), mx = Math.max(lc[0], lc[1], lc[2], 1e-4);
@@ -150,7 +153,7 @@ function sky(now: number) {
   L.shadowEnabled = mx > 0.02;
   const day = Math.max(0, Math.min(1, (s.alt + 6) / 16));
   const H: HemisphericLight = V.hemi; H.diffuse = Color3.Lerp(new Color3(0.02, 0.03, 0.07), new Color3(0.42, 0.56, 0.86), day); H.groundColor = Color3.Lerp(new Color3(0.02, 0.02, 0.04), new Color3(0.85, 0.82, 0.78).scale(0.6 + 0.4 * sc[1]), day);
-  H.intensity = 0.25 + 0.55 * day + moonK * 2;
+  H.intensity = (0.25 + 0.55 * day + moonK * 2) * (1 - (W ? W.dark : 0) * 0.6);
   // the logo lights on the fin, at dusk and at night
   V.logoLight.intensity = s.alt < 4 ? 14 * Math.min(1, (4 - s.alt) / 6) : 0;
   // the contrails take the colour of the light
@@ -175,6 +178,7 @@ function hudHtml(): string {
       ${V.live ? `<button class="v3d-b v3d-game" data-v="game" aria-label="Back to the game">${icon('back')}<span>Back to the game</span></button>` : ''}
       <button class="v3d-b v3d-site" data-v="site" aria-label="To the airport: your gate, gate 4">${icon('mountain')}<span>Airport</span></button>
       <button class="v3d-b v3d-photo" data-v="photo" aria-label="Photo mode: looks, a wide frame, depth of field, a caption"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M4 8h3l2-3h6l2 3h3v11H4V8Zm8 2.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/></svg><span>Photo mode</span></button>
+      <button class="v3d-b v3d-rwx on" data-v="rwx" aria-label="Real weather: the nearest airport report, on or off"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M7 16h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.6 1.6A3.2 3.2 0 0 0 7 16Zm1 3-1 2m5-2-1 2m5-2-1 2"/></svg><span>Real weather</span></button>
       <div class="v3d-info"><div class="v3d-csr">${V.live ? `<button class="v3d-b v3d-pk" data-v="prev" aria-label="The previous flight">‹</button>` : ''}<b class="v3d-cs">${V.live ? 'Waiting for the flight…' : `AMP 214 · ${esc(FROM.name)} → ${esc(TO.name)}`}</b>${V.live ? `<button class="v3d-b v3d-pk" data-v="next" aria-label="The next flight">›</button>` : ''}</div><small class="v3d-al"></small><div class="v3d-rows"></div></div>
     </div>
     <div class="v3d-views" role="toolbar" aria-label="Camera">${VIEWS.map((v, i) => `<button class="v3d-b ${i === 0 ? 'on' : ''}" data-view="${v.id}">${esc(v.label)}</button>`).join('')}</div>
@@ -184,6 +188,7 @@ function hudHtml(): string {
       <div class="v3d-speed">${[[0, 'Pause'], [1, '1×'], [60, '60×'], [600, '600×'], [2000, '2000×'], [3200, '3200×']].map(([k, l]) => `<button class="v3d-b ${k === 60 ? 'on' : ''}" data-speed="${k}">${l}</button>`).join('')}</div>
       <small class="v3d-demo">Demo: drag the slider to move the sun</small>
     </div>
+    <small class="v3d-wxchip">Real weather: looking for a report…</small>
     <div class="v3d-perf"></div>
     <small class="v3d-credit" hidden>Terrain: Terrain Tiles on AWS (SRTM, GMTED2010, ETOPO1, 3DEP, EU-DEM) · imagery: Sentinel-2 cloudless 2016 by EOX (CC BY 4.0)</small>
   </div>`;
@@ -234,6 +239,7 @@ const Viewer: Section = {
     const hud = document.createElement('div'); hud.className = 'hud v3d-hud'; hud.innerHTML = hudHtml(); ui.appendChild(hud); V.hud = hud;
     // photo mode: looks, a wide frame, depth of field (focused on the aircraft), a caption, and the picture
     V.photo = makePhotoMode({ hud, root: document.body, engine, canvas: ctx.canvas, dp: () => V.dp, cam: () => V.cam, focus: () => (V.cam && V.ac ? V.cam.globalPosition.subtract(V.ac.root.getAbsolutePosition()).length() : 300), caption: () => '' });
+    V.rwx = makeRealWx(sc, () => V.cam, hud);
     perfAttach(engine, sc, hud.querySelector('.v3d-perf') as HTMLElement); perfShow();
     hud.addEventListener('click', (e: Event) => {
       const b = (e.target as HTMLElement).closest('button') as HTMLElement; if (!b) return;
@@ -241,6 +247,7 @@ const Viewer: Section = {
       else if (b.hasAttribute('data-speed')) setSpeed(Number(b.getAttribute('data-speed')));
       else if (b.getAttribute('data-v') === 'game' && ctx.toGame) ctx.toGame();
       else if (b.getAttribute('data-v') === 'photo' && V.photo) V.photo.toggle();
+      else if (b.getAttribute('data-v') === 'rwx' && V.rwx) { const on = V.rwx.toggle(); b.classList.toggle('on', on); toast(on ? 'Real weather on: the nearest airport report' : 'Real weather off'); }
       else if (b.getAttribute('data-v') === 'site' && ctx.goTo) ctx.goTo('site', { site: 'myrdalssandur', view: 'carpark' });
       else if ((b.getAttribute('data-v') === 'prev' || b.getAttribute('data-v') === 'next') && V.live) { const l = V.live.list || [], i = l.findIndex((x: any) => x.id === V.live.id); if (l.length) follow(l[(i + (b.getAttribute('data-v') === 'next' ? 1 : l.length - 1) + l.length) % l.length].id); }
     });
@@ -338,10 +345,11 @@ const Viewer: Section = {
       if (V.blend >= 1) { V.lastEye = eye.clone(); V.lastAt = at.clone(); }
       cam.position.copyFrom(eye); cam.setTarget(at);
       V.sky.dome.position.copyFrom(cam.position);
+      if (V.rwx) V.rwx.frame(dt, { lat: V.pos[0], lon: V.pos[1], alt: (V.alt || FL) + cam.position.y, gnd: V.gnd || 0, drift: V.drift });
       sky(now);
       // the sky's reflection on the paint: refreshed now and then, and at once when the slider moves
       if (V.probeOn && (V.envDirty || now > envT)) { pr.cubeTexture.resetRefreshCounter(); envT = now + (V.speed >= 2000 ? 0.2 : V.speed >= 600 ? 0.4 : 1.2); V.envDirty = false; }
-      if (now > infoT) { infoT = now + 0.25; info(); }
+      if (now > infoT) { infoT = now + 0.25; info(); const wc = V.hud && V.hud.querySelector('.v3d-wxchip'); if (wc && V.rwx) wc.textContent = V.rwx.chip(); }
       if (V.photo) V.photo.frame();
       sc.render();
       perfEnd();
@@ -349,6 +357,7 @@ const Viewer: Section = {
   },
   close() {
     const sc: Scene = V.scene; if (!sc) return;
+    try { if (V.rwx) { V.rwx.dispose(); V.rwx = null; } } catch (e) { /* gone */ }
     try { if (V.photo) { V.photo.dispose(); V.photo = null; } document.body.classList.remove('photo-on'); } catch (e) { /* gone */ }
     try { V.ctx.canvas.removeEventListener('wheel', V.wheel); } catch (e) { /* gone */ }
     window.removeEventListener('keydown', V.key);

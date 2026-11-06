@@ -338,3 +338,8 @@ body.photo-on .v3d-top, body.photo-on .v3d-views, body.photo-on .v3d-time, body.
 .ph-bars i { display: block; height: calc((100vh - 100vw / 2.39) / 2); background: #000; }
 .v3d-flash { position: absolute; inset: 0; z-index: 50; background: #fff; pointer-events: none; animation: v3dFlash .5s ease-out forwards; }
 @keyframes v3dFlash { from { opacity: .85; } to { opacity: 0; } }
+
+/* real weather in the 3D viewer: the station and its report */
+.v3d-wxchip { position: absolute; left: 50%; transform: translateX(-50%); top: 10px; z-index: 6; padding: 5px 12px; border-radius: 999px; background: rgba(8,14,28,.62); color: #dfe8f6; font-size: 12px; letter-spacing: .02em; pointer-events: none; white-space: nowrap; max-width: 70vw; overflow: hidden; text-overflow: ellipsis; backdrop-filter: blur(6px); }
+body.photo-on .v3d-wxchip { display: none; }
+@media (max-width: 760px) { .v3d-wxchip { top: auto; bottom: 118px; font-size: 11px; } }

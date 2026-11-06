@@ -138,6 +138,23 @@ if (EMBED) {
     else if (d.ampb === 'go' && d.screen) { try { closeAll(); go(d.screen); } catch (err) { /* stays */ } }
     else if (d.ampb === 'follow') { follow = d.id || ''; clearInterval(timer); if (follow) { send(); timer = setInterval(send, 250); } }
     else if (d.ampb === 'stop') { follow = ''; clearInterval(timer); }
+    else if (d.ampb === 'wx' && typeof d.lat === 'number') {
+      // the weather where the 3D viewer is: the nearest real airport report (asked for if not yet fetched)
+      try {
+        const lon = d.lon, lat = d.lat, seen: any = {};
+        for (const [dx, dy] of [[0, 0], [0.9, 0], [-0.9, 0], [0, 0.6], [0, -0.6]]) { const k = World.nearest(lon + dx, lat + dy, 120); if (k && !seen[k]) { seen[k] = 1; LiveWx.get(k); } }
+        const list = cloudStations(lon, lat, 160), st = cloudNearest(list, lon, lat, 160);
+        if (!st) embedTell('wx', { none: true });
+        else {
+          let icao = ''; for (const k in LiveWx.cache) { const A: any = apt(k); if (A && A.pos[0] === st.pos[0] && A.pos[1] === st.pos[1]) { icao = k; break; } }
+          const m: any = icao ? LiveWx.cache[icao] : null, pr = cloudPrecip(st.wx || '');
+          const ls = st.layers.filter(l => CLOUD_COV[l.cover]), cover = ls.reduce((a, l) => Math.max(a, CLOUD_COV[l.cover]), 0);
+          const low = ls.map(l => +l.base).sort((a, b) => a - b)[0], cb = st.layers.some(l => l.type === 'CB'), tcu = st.layers.some(l => l.type === 'TCU');
+          embedTell('wx', { icao, raw: m ? m.raw : '', cover, base: low == null ? 0 : low, elev: st.elev || 0, cb, tcu, precip: pr && !pr.vc ? pr.kind : '', k: pr ? pr.k : 0, ts: !!(pr && pr.ts), vc: !!(pr && pr.vc),
+            dir: m ? m.dir : -1, kt: m ? m.kt : 0, gust: m ? m.gust : 0, vis: m ? m.vis : '', temp: st.temp, wx: st.wx || '' });
+        }
+      } catch (err) { embedTell('wx', { none: true }); }
+    }
     else if (d.ampb === 'airport' && d.icao) {
       // an airport's layout for the 3D viewer: what is known now, and again if a better one arrives
       const A: any = apt(d.icao), elev = A && A.elev ? A.elev * 0.3048 : 0;
