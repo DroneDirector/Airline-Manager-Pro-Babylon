@@ -23,7 +23,7 @@ function v3dSupported(): boolean {
   try { const c = document.createElement('canvas'); return !!(window as any).THREE && !!(c.getContext('webgl2') || c.getContext('webgl')); } catch (e) { return false; }
 }
 function view3dBtn(): string {
-  return `<button class="icon-btn v3d-btn" data-act="v3d-open" aria-label="3D view"><b>3D</b></button>`;
+  return `<button class="icon-btn v3d-btn" data-act="v3d-open" aria-label="3D view"><b>3D</b></button><button class="icon-btn v3d-btn own-apt-btn" data-act="own-apt-3d" aria-label="Your airport in 3D" title="Your airport in 3D">${icon('airport')}</button>`;
 }
 
 ACTIONS['v3d-open'] = () => {
@@ -40,6 +40,8 @@ function v3dOpenAirport(icao: string) {
   const m = _curMap(); v3dOpen('apt:' + icao, m, m ? m.el : null);
 }
 ACTIONS['apt-3d'] = el => v3dOpenAirport(el.getAttribute('data-icao'));
+/** Your own airport in the 3D view: its runway, taxiways, stands and the terminal's outline (the walk-in airport is PC only). */
+ACTIONS['own-apt-3d'] = () => { const own = (typeof OWN_AIRPORT_LIST !== 'undefined' && OWN_AIRPORT_LIST[0]) ? OWN_AIRPORT_LIST[0][0] : 'BIAP'; closeAll(); v3dOpenAirport(own); };
 /** At an airport without following an aircraft: a stand-in "flight" parked at the airport. */
 /** The flight the view follows: yours or your airline's, or another airline's aircraft opened from the map. */
 function v3dTargetFlight(): any {

@@ -65,7 +65,8 @@ onGameAirport((d: any) => {
   if (!V.scene || !V.apts || !d.L || !(d.icao in V.apts)) return;
   try { const old: Airport = V.apts[d.icao]; if (old) old.dispose(); const A = isOwnLayout(d.L) ? buildOwnAirport(V.scene, d.L) : buildAirport(V.scene, d.L); V.apts[d.icao] = A;
     if (d.crash) { try { const c: Crash = buildCrash(V.scene, A.root, d.L, d.crash, { elev: A.elev, sea: (la: number, lo: number) => { try { const hh = V.ter ? V.ter.heightAt(la, lo) : null; return hh != null && hh < 0.6 && A.elev < 60 && !!(V.ter && (V.ter as any).isSea ? (V.ter as any).isSea(la, lo) : hh <= 0.1); } catch (e) { return false; } } }); (V.crashes = V.crashes || {})[d.icao] = c; const dis = A.dispose.bind(A); A.dispose = () => { try { c.dispose(); } catch (e) { /* gone */ } delete V.crashes[d.icao]; dis(); }; if (V.crashFocus === d.icao) V.crashAt = { A, c }; } catch (e) { console.error(e); } }
-    else if (V.crashFocus === d.icao) toast('The crash site there has been cleared'); farDiscs(); for (const l of A.lights) V.glow.addIncludedOnlyMesh(l); if (V.sg) A.root.getChildMeshes().forEach(m => m.receiveShadows = true); } catch (e) { console.error(e); }
+    else if (V.crashFocus === d.icao) toast('The crash site there has been cleared');
+    if (V.aptFocus === d.icao && !V.crashAt) V.crashAt = { A, c: null }; farDiscs(); for (const l of A.lights) V.glow.addIncludedOnlyMesh(l); if (V.sg) A.root.getChildMeshes().forEach(m => m.receiveShadows = true); } catch (e) { console.error(e); }
 });
 /** The real ground under the flight (below 33,000 ft, when Real terrain is on): laid out again as the aircraft flies on. */
 function terrainStep(lat: number, lon: number, alt: number) {
@@ -222,7 +223,7 @@ const Viewer: Section = {
     if (crashIcao) { V.apts = V.apts || {}; V.apts[crashIcao] = null; gameSend({ ampb: 'airport', icao: crashIcao }); }
     const liveId = ctx.opts && ctx.opts.live; V.live = liveId ? { id: liveId, s0: null, s1: null, list: [], near: [], painted: '', prev: null } : null; V.others = {}; V.turn = 0; V.cur = null;
     if (liveId) gameSend({ ampb: 'follow', id: liveId });
-    V.apts = {}; V.gnd = 0; V.land = 0; V.ter = null;
+    V.apts = {}; const aptIcao = ctx.opts && ctx.opts.apt; V.aptFocus = aptIcao || ''; if (aptIcao) { V.apts[aptIcao] = null; gameSend({ ampb: 'airport', icao: aptIcao }); } V.gnd = 0; V.land = 0; V.ter = null;
     progress(10, 'Filling the sky…'); await new Promise(r => setTimeout(r, 30));
     const sc = new Scene(engine); V.scene = sc; V.sc = sc; sc.clearColor = new Color4(0, 0, 0, 1); sc.skipPointerMovePicking = true;
     V.frac = 0.14; V.pos = gcAt([FROM.lat, FROM.lon], [TO.lat, TO.lon], V.frac); V.hdg = gcBrg(V.pos, [TO.lat, TO.lon]); V.drift = [0, 0];
@@ -374,7 +375,7 @@ const Viewer: Section = {
         const ahead = Vector3.Dot(V.fb, new Vector3(Math.sin(h), 0, Math.cos(h))); if (ahead < -420 && fbPrev >= -420) placeFlyby(); fbPrev = ahead;
         at = Vector3.TransformCoordinates(new Vector3(0, 0, 0), wm);
       }
-      if (V.crashAt) { const c: Crash = V.crashAt.c; c.root.computeWorldMatrix(true); const ctr = Vector3.TransformCoordinates(c.centre, c.root.getWorldMatrix()), yaw = 0.7 + V.uYaw, pp = Math.max(0.08, Math.min(1.3, 0.3 + V.uPitch)), d = 230 * V.zoom;
+      if (V.crashAt) { const c: Crash = V.crashAt.c; let ctr: Vector3; if (c) { c.root.computeWorldMatrix(true); ctr = Vector3.TransformCoordinates(c.centre, c.root.getWorldMatrix()); } else { const A2: Airport = V.crashAt.A; A2.root.computeWorldMatrix(true); ctr = A2.root.getAbsolutePosition().clone(); } const yaw = 0.7 + V.uYaw, pp = Math.max(0.08, Math.min(1.3, (c ? 0.3 : 0.55) + V.uPitch)), d = (c ? 230 : 1600) * V.zoom;
         at = ctr; eye = ctr.add(new Vector3(Math.cos(yaw) * Math.cos(pp) * d, Math.sin(pp) * d, Math.sin(yaw) * Math.cos(pp) * d)); }
       V.blend = v.cabin || V.inCabin ? 1 : Math.min(1, V.blend + dt * 2.2);   // straight into the cabin and out, no glide through the fuselage
       if (V.blend < 1 && V.lastEye) { const k = V.blend * V.blend * (3 - 2 * V.blend); eye = Vector3.Lerp(V.lastEye, eye, k); at = Vector3.Lerp(V.lastAt, at, k); }

@@ -30,6 +30,7 @@ const ICON_PATHS: { [k: string]: string } = {
   alert: '<path d="M12 3.5 21.5 20h-19z"/><path d="M12 10v4.5M12 17.4v.1"/>',
   pin: '<path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5.2l3.4 2"/>',
+  airport: '<path d="M2 21h20"/><path d="M4 21v-7h11v7"/><path d="M4 14l5.5-3 5.5 3"/><path d="M18 21V9"/><path d="M15.5 9h5l-.8-3h-3.4z"/><path d="M7 17.5h5"/>',
   land: '<path d="M3 20h18"/><path d="M4.5 9.5 18 14l1.3-1.6-6.2-3.6-1.4-5.6-1.7-.5.3 4.6-4.7-.9L4 4.6l-1-.3.5 3.7z"/>',
   swap: '<path d="M7 4 3.5 7.5 7 11M3.5 7.5H17M17 13l3.5 3.5L17 20M20.5 16.5H7"/>',
   radio: '<path d="M4 9h16v11H4z"/><path d="M7 9 17 4"/><circle cx="9" cy="14.5" r="2.2"/><path d="M14 13h3M14 16h3"/>',

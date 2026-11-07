@@ -119,7 +119,7 @@ if (EMBED) {
     try { saveNow(true); } catch (e) { /* saved */ }
     const m: any = (typeof _curMap === 'function') ? _curMap() : null;
     const fid = id || (m && (m.following || m.selected)) || (liveOf().filter(f => f.you)[0] || liveOf()[0] || {} as any).id || '';
-    if (!fid || String(fid).indexOf('apt:') === 0) { embedTell('viewer3d', { id: '' }); return; }
+    if (!fid) { embedTell('viewer3d', { id: '' }); return; }
     embedTell('viewer3d', { id: fid });
   };
   // a crash site from the map or a notification: the 3D viewer at that airport, looking at the wreck
