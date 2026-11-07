@@ -14,7 +14,7 @@
 //    what the touchpad does itself.
 //  - a short rumble on each click (Settings → Controller).
 
-const Pad: any = { gp: null, prev: [] as boolean[], x: 0, y: 0, shown: false, downEl: null, dragged: false, last: 0, raf: 0, name: '', idleT: 0, wheelT: 0, navT: 0, hid: null, hidOk: false };
+const Pad: any = { gp: null, prev: [] as boolean[], x: 0, y: 0, shown: false, downEl: null, dragged: false, last: 0, raf: 0, name: '', idleT: 0, wheelT: 0, navT: 0, hid: null, hidOk: false, rest: {} as { [id: string]: number[] } };
 const PAD_PID = 9999;   // the controller's own pointer
 function padOpt(k: string, d: any): any { const v = (State.settings as any)[k]; return v == null ? d : v; }
 
@@ -125,7 +125,13 @@ function padLoop() {
   const step = (now: number) => {
     Pad.raf = requestAnimationFrame(step);
     const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
-    const g: any = pads.filter((x: any) => x.mapping === 'standard')[0] || pads[0];
+    // never flight gear (sticks, throttles, pedals, yokes): a gamepad, else nothing; axes resting off-centre are left out
+    const FLIGHT = /stick|throttle|hotas|rudder|pedal|yoke|x-?5[26]|x-?4[05]|t\.?16000|t\.?flight|thrustmaster|extreme 3d|saitek|pro flight|vkb|virpil|winwing|honeycomb|alpha flight|bravo|warthog|gladiator|crosswind|cougar|sidewinder|fighterstick|flight|joystick|wheel|panel/i;
+    const ok = pads.filter((x: any) => !(x.mapping !== 'standard' && FLIGHT.test(x.id)));
+    const g0: any = ok.filter((x: any) => x.mapping === 'standard')[0] || ok[0];
+    if (g0 && !Pad.rest[g0.id]) Pad.rest[g0.id] = Array.from(g0.axes);
+    const r0: number[] = g0 ? Pad.rest[g0.id] : [];
+    const g: any = g0 && r0.some(v => Math.abs(v) > 0.5) ? { id: g0.id, mapping: g0.mapping, buttons: g0.buttons, axes: Array.from(g0.axes).map((v: any, i: number) => Math.abs(r0[i] || 0) > 0.5 ? 0 : v), vibrationActuator: g0.vibrationActuator } : g0;
     if (!g) { Pad.gp = null; return; }
     Pad.gp = g; if (!Pad.name) Pad.name = padName(g);
     const dt = Pad.t ? Math.min(0.05, (now - Pad.t) / 1000) : 0; Pad.t = now;

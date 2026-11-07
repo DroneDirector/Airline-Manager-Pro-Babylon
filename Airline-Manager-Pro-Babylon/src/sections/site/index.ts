@@ -13,7 +13,7 @@ import { CascadedShadowGenerator, SSAO2RenderingPipeline, ReflectionProbe } from
 import { Ray, Scene, Vector3, Color3, Color4, UniversalCamera, HemisphericLight, DirectionalLight, ShadowGenerator, GlowLayer, DefaultRenderingPipeline, ImageProcessingConfiguration, MeshBuilder, Mesh, VertexData, TransformNode, PBRMaterial, StandardMaterial, DynamicTexture, Texture, AbstractMesh } from '@babylonjs/core';
 import { registerSection, Section, SectionCtx } from '../../core/sections';
 import { runLoop } from '../../core/engine';
-import { inputFrame } from '../../core/input';
+import { inputFrame, activePad } from '../../core/input';
 import { IS_PC, IS_TOUCH } from '../../core/app';
 import { S } from '../../core/settings';
 import { toast } from '../../ui/icons';
@@ -22,7 +22,7 @@ import { buildAirliner, setGear } from '../viewer3d/airliner';
 import { makeWeather, Weather } from '../terminal/weather';
 import { applyLook, slimGlow } from '../../core/look';
 import { mergeStatic, freezeStatic } from '../../core/batch';
-import { jetwayInteriors } from '../../core/hide';
+import { jetwayInteriors, tinyFar } from '../../core/hide';
 import { cachedUrl, releaseUrl } from '../../core/tilecache';
 import { makeKit } from '../terminal/kit';
 import { buildShell } from '../terminal/shell';
@@ -334,6 +334,7 @@ const Site$: Section = {
     if (walkMode) toast(IS_TOUCH ? 'Your airport · left thumb: walk · right: look' : 'Your airport · W A S D walk · mouse look · Shift run · Space jump · C crouch · Z prone · E lift · P photo · a controller: A jump, B crouch, Y prone, X lift, R3 sprint'); else toast(IS_TOUCH ? 'Pick a view · left thumb: fly · right: look · ▲ ▼ up and down' : 'Pick a view · W A S D fly · mouse look · Space / R up · C / F down · Shift faster · P photo');
     // the shaders compiled while still loading (no stutter the first time something comes into view), at most 25 s
     const insides = jetwayInteriors(sc);   // the jetways' insides only drawn from close by
+    try { tinyFar(sc); } catch (e) { /* all drawn */ }   // tiny things far away left out
     progress(97, 'Preparing the graphics…');
     try { await Promise.race([sc.whenReadyAsync(), new Promise(r => setTimeout(r, 25000))]); } catch (e) { /* compiled as they come into view */ }
     progress(100, 'Ready');
@@ -347,7 +348,7 @@ const Site$: Section = {
       CAM.yaw += inp.lx; CAM.pitch = Math.max(-1.55, Math.min(1.55, CAM.pitch - inp.ly));
       if (walkMode) {
         // a controller: Cross / A jumps, Circle / B crouches, Triangle / Y lies prone, Square / X uses a lift, R3 sprints (L3 too, while held)
-        const gp = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(x => x && x.connected)[0] : null;
+        const gp = activePad();
         if (gp) { const pb: boolean[] = O.pb || (O.pb = []), hit = (i: number) => { const p = !!(gp.buttons[i] && gp.buttons[i].pressed), e = p && !pb[i]; pb[i] = p; return e; };
           if (hit(0)) W.jump = true; if (hit(1)) setStance('crouch'); if (hit(3)) setStance('prone'); if (hit(2)) O.liftPress = true; if (hit(11)) { W.sprint = !W.sprint; const sb = hud.querySelector('[data-mv="sprint"]'); if (sb) sb.classList.toggle('on', W.sprint); } }
         const st = STANCE[W.stance], sprinting = (inp.run || keys.has('shift') || W.sprint) && Math.hypot(inp.mx, inp.my) > 0.1;

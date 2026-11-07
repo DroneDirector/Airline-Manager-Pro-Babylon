@@ -10,7 +10,7 @@ export interface Gfx {
   eyeAdapt: boolean; flares: boolean; dof: boolean; mblur: boolean; parallax: boolean; wetRain: boolean; glint: boolean; renderer: 'webgl' | 'webgpu'; autoRes: boolean;
 }
 export interface Controls {
-  padLook: number; padDead: number; padInvert: boolean; padSwap: boolean; padVibrate: boolean;
+  pad: string; padLook: number; padDead: number; padInvert: boolean; padSwap: boolean; padVibrate: boolean;
   touchLook: number; touchStick: number; mouseLook: number; mouseInvert: boolean;
 }
 export interface Settings { gfx: Gfx; ctl: Controls; music: boolean }
@@ -23,7 +23,7 @@ export const PRESETS: { [k: string]: Partial<Gfx> } = {
 };
 const DEF: Settings = {
   gfx: Object.assign({ renderer: 'webgl', autoRes: !IS_PC, preset: (IS_PC ? 'high' : 'medium') as Preset, fps: IS_PC ? 0 : 60, terrain: true, aces: true, exposure: 1, fov: 70, showFps: false, showCpu: false, showGpu: false, showMem: false } as any, PRESETS[IS_PC ? 'high' : 'medium']),
-  ctl: { padLook: 1, padDead: 0.15, padInvert: false, padSwap: false, padVibrate: true, touchLook: 1, touchStick: 1, mouseLook: 1, mouseInvert: false },
+  ctl: { pad: '', padLook: 1, padDead: 0.15, padInvert: false, padSwap: false, padVibrate: true, touchLook: 1, touchStick: 1, mouseLook: 1, mouseInvert: false },
   music: true,
 };
 const KEY = 'ampb-settings';

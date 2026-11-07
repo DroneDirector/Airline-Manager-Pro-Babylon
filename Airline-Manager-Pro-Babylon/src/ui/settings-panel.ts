@@ -4,7 +4,7 @@
 import { S, saveSettings, applyPreset, resetControls, PRESETS } from '../core/settings';
 import { APP, IS_PC } from '../core/app';
 import { gpuInfo } from '../core/engine';
-import { padConnected, vibrate, onPad } from '../core/input';
+import { padConnected, vibrate, onPad, padList } from '../core/input';
 import { icon, esc } from './icons';
 import { U, onUpdate, updateCheck, updateInstall, updatePermission, updateStatus, canSelfUpdate } from '../core/update';
 import { whatsNewHtml, whatsNewBind, mdHtml } from './whats-new';
@@ -111,7 +111,10 @@ export function settingsHide() {
   const f = onClose; onClose = null; if (f) f();
 }
 onPad(() => { if (el) render(); });
-function rows(): Row[] { return tab === 'gfx' ? GFX : tab === 'ctl' ? CTL : tab === 'upd' ? updRows() : NEW; }
+/** The controller to use, when more than one is connected (flight gear is marked, and never chosen by itself). */
+function padRow(): Row[] { const L = padList(); if (L.length < 2 && !(S.ctl as any).pad) return [];
+  return [{ k: 'seg', key: 'ctl.pad', label: 'Controller to use', sub: 'Automatic takes a gamepad and never flight gear (sticks, throttles, pedals), which stays free for flying', opts: [['', 'Automatic'], ...L.map(p => [p.id, p.name + (p.flight ? ' · flight gear' : '')] as [any, string])] }]; }
+function rows(): Row[] { return tab === 'gfx' ? GFX : tab === 'ctl' ? [...padRow(), ...CTL] : tab === 'upd' ? updRows() : NEW; }
 onUpdate(() => { if (el && tab === 'upd') render(); });
 const NT = TABS.length;
 let lastTab = '', lastFocus = -1;
@@ -129,7 +132,7 @@ function render() {
 }
 function rowHtml(r: Row, i: number): string {
   const cls = `sp-row ${focus === i ? 'f' : ''}`, lab = `<span class="sp-l"><b>${esc((r as any).label)}</b>${(r as any).sub ? `<small>${esc((r as any).sub)}</small>` : ''}</span>`;
-  if (r.k === 'seg') { const v = get(r.key); return `<div class="${cls}" data-i="${i}">${lab}<span class="sp-seg">${r.opts.map(o => `<button data-a="seg" data-key="${r.key}" data-v="${o[0]}" class="${String(v) === String(o[0]) ? 'on' : ''}">${esc(o[1])}</button>`).join('')}</span></div>`; }
+  if (r.k === 'seg') { const v = get(r.key); return `<div class="${cls}" data-i="${i}">${lab}<span class="sp-seg">${r.opts.map(o => `<button data-a="seg" data-key="${r.key}" data-v="${esc(String(o[0]))}" class="${String(v) === String(o[0]) ? 'on' : ''}">${esc(o[1])}</button>`).join('')}</span></div>`; }
   if (r.k === 'tog') { const v = !!get(r.key); return `<div class="${cls}" data-i="${i}">${lab}<button class="sp-tog ${v ? 'on' : ''}" data-a="tog" data-key="${r.key}" aria-pressed="${v}"><i></i></button></div>`; }
   if (r.k === 'range') { const v = get(r.key); return `<div class="${cls}" data-i="${i}">${lab}<span class="sp-rng"><input type="range" min="${r.min}" max="${r.max}" step="${r.step}" value="${v}" data-key="${r.key}"><em>${esc(r.fmt(v))}</em></span></div>`; }
   if (r.k === 'html') return `<div class="${cls} html" data-i="${i}">${r.html()}</div>`;

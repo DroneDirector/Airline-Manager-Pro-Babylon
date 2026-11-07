@@ -79,8 +79,8 @@ export function inputInit(canvas: HTMLCanvasElement, ui: HTMLElement) {
   }, { passive: false });
   const end = (e: TouchEvent) => { for (const t of Array.from(e.changedTouches)) { if (stick && t.identifier === stick.id) { stick.el.remove(); stick = null; } if (look && t.identifier === look.id) look = null; } };
   tz.addEventListener('touchend', end); tz.addEventListener('touchcancel', end);
-  window.addEventListener('gamepadconnected', (e: any) => { padIndex = e.gamepad.index; padName = padLabel(e.gamepad.id); for (const f of padSubs) f(padName); });
-  window.addEventListener('gamepaddisconnected', (e: any) => { if (e.gamepad.index === padIndex) { padIndex = -1; padName = ''; for (const f of padSubs) f(''); } });
+  window.addEventListener('gamepadconnected', () => { pad(); });
+  window.addEventListener('gamepaddisconnected', (e: any) => { if (e.gamepad.index === padIndex) { padIndex = -1; padName = ''; for (const f of padSubs) f(''); pad(); } });
   const loop = () => { requestAnimationFrame(loop); pollPad(); };
   requestAnimationFrame(loop);
 }
@@ -90,12 +90,40 @@ function padLabel(id: string): string {
   if (/xbox|045e|xinput/i.test(id)) return 'Xbox controller';
   return id.replace(/\(.*?\)/g, '').trim() || 'Game controller';
 }
-function pad(): Gamepad | null {
-  const list = navigator.getGamepads ? navigator.getGamepads() : [];
-  if (padIndex >= 0 && list[padIndex]) return norm(list[padIndex]!);
-  for (const g of Array.from(list)) if (g && g.connected) { padIndex = g.index; padName = padLabel(g.id); return norm(g); }
-  return null;
+/** Flight gear (sticks, throttles, rudder pedals, yokes, panels): never used for walking or the menus, kept free
+ *  for flying. Recognised by name, when the device doesn't report itself as a standard gamepad. */
+const FLIGHT = /stick|throttle|hotas|rudder|pedal|yoke|x-?5[26]|x-?4[05]|t\.?16000|t\.?flight|thrustmaster|extreme 3d|saitek|pro flight|vkb|virpil|winwing|honeycomb|alpha flight|bravo|warthog|gladiator|crosswind|cougar|sidewinder|fighterstick|flight|joystick|wheel|panel/i;
+export const isFlightGear = (g: Gamepad) => g.mapping !== 'standard' && FLIGHT.test(g.id);
+/** The controller for walking and the menus: the one chosen in Settings → Controls if it is connected, else a standard
+ *  gamepad, else a PlayStation one in its raw layout, else anything that isn't flight gear. */
+export function choosePad(list: (Gamepad | null)[]): Gamepad | null {
+  const all = list.filter((g): g is Gamepad => !!g && g.connected), want = (S.ctl as any).pad as string;
+  if (want) { const g = all.find(x => x.id === want); if (g) return g; }
+  return all.find(g => g.mapping === 'standard' && !isFlightGear(g)) || all.find(g => PS_RAW.test(g.id) && !isFlightGear(g)) || all.find(g => !isFlightGear(g)) || null;
 }
+/** The controllers connected now, for the choice in Settings → Controls. */
+export function padList(): { id: string; name: string; flight: boolean }[] {
+  const list = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+  return list.filter((g): g is Gamepad => !!g && g.connected).map(g => ({ id: g.id, name: padLabel(g.id), flight: isFlightGear(g) }));
+}
+function pad(): Gamepad | null {
+  const list = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+  const g = choosePad(list); if (!g) { if (padIndex >= 0) { padIndex = -1; padName = ''; } return null; }
+  if (g.index !== padIndex) { padIndex = g.index; padName = padLabel(g.id); for (const f of padSubs) f(padName); }
+  return calm(norm(g));
+}
+/** Axes that rest away from the centre (a slider or a throttle set at one end) are left out, so they can't steer the
+ *  menus or walk you away: each axis's resting place is noted when the controller is first seen. */
+const rest = new Map<string, number[]>();
+function calm(g: Gamepad): Gamepad {
+  const key = g.index + '|' + g.id; let r = rest.get(key);
+  if (!r) { r = Array.from(g.axes); rest.set(key, r); }
+  if (!r.some(v => Math.abs(v) > 0.5)) return g;
+  const axes = Array.from(g.axes).map((v, i) => Math.abs(r![i] || 0) > 0.5 ? 0 : v);
+  return { id: g.id, index: g.index, connected: g.connected, mapping: g.mapping, timestamp: g.timestamp, buttons: g.buttons, axes, vibrationActuator: (g as any).vibrationActuator } as any;
+}
+/** The chosen controller (for the places' own buttons: jump, crouch, the views…). */
+export function activePad(): Gamepad | null { return pad(); }
 /** A PlayStation 5 DualSense (or DualShock 4) on a PC that reports its own raw layout (common on Windows, above all over
  *  Bluetooth) instead of the standard one: its buttons, sticks, triggers and D-pad put into the standard order, so it
  *  works exactly like any other controller. Square 0, Cross 1, Circle 2, Triangle 3, L1 4, R1 5, L2 6, R2 7, Create 8,

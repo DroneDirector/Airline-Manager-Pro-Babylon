@@ -11,7 +11,7 @@ import {
 import { registerSection, Section, SectionCtx } from '../../core/sections';
 import { S } from '../../core/settings';
 import { runLoop } from '../../core/engine';
-import { inputFrame } from '../../core/input';
+import { inputFrame, activePad } from '../../core/input';
 import { IS_PC, IS_TOUCH } from '../../core/app';
 import { icon, esc, toast } from '../../ui/icons';
 import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd } from '../../core/perf-meter';
@@ -293,7 +293,7 @@ const Viewer: Section = {
       perfBegin();
       const dt = Math.min(0.05, engine.getDeltaTime() / 1000), now = performance.now() / 1000;
       // the controller: L1 / R1 change the camera, the D-pad left and right move the sun
-      const g = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(x => x && x.connected)[0] : null;
+      const g = activePad();
       if (g) { const press = (i: number) => { const p = !!(g.buttons[i] && g.buttons[i].pressed), e = p && !pb[i]; pb[i] = p; return e; };
         if (press(4)) setView(VIEWS[(VIEWS.indexOf(V.view) + VIEWS.length - 1) % VIEWS.length].id); if (press(5)) setView(VIEWS[(VIEWS.indexOf(V.view) + 1) % VIEWS.length].id);
         if (g.buttons[14] && g.buttons[14].pressed) setLocalMin((localMin() + 1440 - 90 * dt) % 1440); if (g.buttons[15] && g.buttons[15].pressed) setLocalMin((localMin() + 90 * dt) % 1440); }

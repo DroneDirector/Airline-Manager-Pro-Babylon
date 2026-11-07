@@ -114,25 +114,46 @@ function buildNodes(): NNode[] {
 }
 /** May a route go from node u to node v inside area X? (a one-way door is walked only from its b side to its a side) */
 const okIn = (u: NNode | null, v: NNode | null, X: string) => !(v && v.oneway && X === v.oneway.a) && !(u && u.oneway && X === u.oneway.b);
-export function findRoute(from: { x: number; z: number; f: number }, to: { x: number; z: number; f: number }): RoutePt[] | null {
-  if (!NODES) NODES = buildNodes(); const N = NODES;
-  const S = areaAt(from.f, from.x, from.z) || nearestArea(from.f, from.x, from.z), T = areaAt(to.f, to.x, to.z) || nearestArea(to.f, to.x, to.z); if (!S || !T) return null;
+/** The route search on its own (it uses nothing from outside itself), so it can run in a background thread:
+ *  from where you are, through the doors (one-way ones only the right way), the stairs and the lifts, to the waypoint. */
+function routeCore(D: { areas: any[]; nodes: any[] }, from: { x: number; z: number; f: number }, to: { x: number; z: number; f: number }): any[] | null {
+  const inA = (a: any, x: number, z: number, m = 0) => x > a.x0 - m && x < a.x1 + m && z > a.z0 - m && z < a.z1 + m;
+  const areaAt = (f: number, x: number, z: number) => { const on = D.areas.filter((a: any) => a.f === f); return on.find((a: any) => inA(a, x, z)) || on.find((a: any) => inA(a, x, z, 0.8)) || null; };
+  const nearest = (f: number, x: number, z: number) => { let best: any = null, bd = 1e9; for (const a of D.areas) { if (a.f !== f) continue; const d = Math.hypot(Math.max(a.x0 - x, 0, x - a.x1), Math.max(a.z0 - z, 0, z - a.z1)); if (d < bd) { bd = d; best = a; } } return best; };
+  const okIn = (u: any, v: any, X: string) => !(v && v.oneway && X === v.oneway.a) && !(u && u.oneway && X === u.oneway.b);
+  const N = D.nodes, S = areaAt(from.f, from.x, from.z) || nearest(from.f, from.x, from.z), T = areaAt(to.f, to.x, to.z) || nearest(to.f, to.x, to.z); if (!S || !T) return null;
   if (S.id === T.id && from.f === to.f) return [{ x: from.x, z: from.z, f: from.f }, { x: to.x, z: to.z, f: to.f }];
   const n = N.length, dist = new Float64Array(n + 1).fill(Infinity), prev = new Int32Array(n + 1).fill(-2), done = new Uint8Array(n + 1);
   for (let i = 0; i < n; i++) if (N[i].f === from.f && N[i].areas.includes(S.id) && okIn(null, N[i], S.id)) { dist[i] = Math.hypot(N[i].x - from.x, N[i].z - from.z) + (N[i].pen || 0); prev[i] = -1; }
   const goal = n;
   for (;;) { let u = -1, bd = Infinity; for (let i = 0; i <= n; i++) if (!done[i] && dist[i] < bd) { bd = dist[i]; u = i; } if (u < 0 || u === goal) break; done[u] = 1; const U = N[u];
-    // to the goal: inside the goal's area
     if (U.f === to.f && U.areas.includes(T.id) && okIn(U, null, T.id)) { const d = bd + Math.hypot(to.x - U.x, to.z - U.z); if (d < dist[goal]) { dist[goal] = d; prev[goal] = u; } }
     if (U.link != null) { const v = U.link; const d = bd + (U.cost || 20); if (d < dist[v]) { dist[v] = d; prev[v] = u; } }
     for (let v = 0; v < n; v++) { if (done[v] || v === u) continue; const V = N[v]; if (V.f !== U.f) continue;
-      const shared = U.areas.find(a => V.areas.includes(a) && okIn(U, V, a)); if (!shared) continue;
+      const shared = U.areas.find((a: string) => V.areas.includes(a) && okIn(U, V, a)); if (!shared) continue;
       const d = bd + Math.hypot(V.x - U.x, V.z - U.z) + (V.pen || 0); if (d < dist[v]) { dist[v] = d; prev[v] = u; } } }
   if (!isFinite(dist[goal])) return null;
   const chain: number[] = []; for (let c = prev[goal]; c >= 0; c = prev[c]) chain.unshift(c);
-  const pts: RoutePt[] = [{ x: from.x, z: from.z, f: from.f }];
+  const pts: any[] = [{ x: from.x, z: from.z, f: from.f }];
   for (let i = 0; i < chain.length; i++) { const A = N[chain[i]], B = i > 0 ? N[chain[i - 1]] : null; pts.push({ x: A.x, z: A.z, f: A.f, via: B && B.link === chain[i] ? B.kind : undefined }); }
   pts.push({ x: to.x, z: to.z, f: to.f }); return pts;
+}
+export function findRoute(from: { x: number; z: number; f: number }, to: { x: number; z: number; f: number }): RoutePt[] | null {
+  if (!NODES) NODES = buildNodes(); return routeCore({ areas: AREAS, nodes: NODES }, from, to);
+}
+/** The route search in a background thread (phone and PC alike); where a thread can't be made, it runs here. */
+let routeWorker: Worker | null | false = null; let routeAsk = 0; const routeWait = new Map<number, (r: RoutePt[] | null) => void>();
+function findRouteAsync(from: { x: number; z: number; f: number }, to: { x: number; z: number; f: number }): Promise<RoutePt[] | null> {
+  if (routeWorker === null) { try {
+      const src = `const routeCore = ${routeCore.toString()}; let D = null; onmessage = e => { const m = e.data; if (m.D) { D = m.D; return; } let r = null; try { r = routeCore(D, m.from, m.to); } catch (err) { r = null; } postMessage({ id: m.id, r }); };`;
+      const w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      if (!NODES) NODES = buildNodes(); w.postMessage({ D: { areas: AREAS, nodes: NODES } });
+      w.onmessage = e => { const f = routeWait.get(e.data.id); if (f) { routeWait.delete(e.data.id); f(e.data.r); } };
+      w.onerror = () => { routeWorker = false; for (const [, f] of routeWait) f(null); routeWait.clear(); };
+      routeWorker = w;
+    } catch (e) { routeWorker = false; } }
+  if (!routeWorker) return Promise.resolve(findRoute(from, to));
+  const id = ++routeAsk; return new Promise(ok => { routeWait.set(id, ok); (routeWorker as Worker).postMessage({ id, from: { x: from.x, z: from.z, f: from.f }, to: { x: to.x, z: to.z, f: to.f } }); setTimeout(() => { if (routeWait.has(id)) { routeWait.delete(id); ok(findRoute(from, to)); } }, 1500); });
 }
 
 export function holoMap(host: HTMLElement, get: () => HoloState | null, root?: TransformNode) {
@@ -177,7 +198,7 @@ export function holoMap(host: HTMLElement, get: () => HoloState | null, root?: T
     ...OUTSIDE.filter(o => o.id === 'KERB' || o.id === 'APRON').map(o => ({ f: 1, x: (o.x0 + o.x1) / 2, z: o.id === 'APRON' ? o.z0 + 8 : (o.z0 + o.z1) / 2, w: o.x1 - o.x0, h: 10, t: o.id === 'KERB' ? 'KERB · DEPARTURES' : 'APRON', r: o as any }))];
 
   // the waypoint and its route
-  let dest: { x: number; z: number; f: number; name: string } | null = null, route: RoutePt[] | null = null, routeT = 0, routeLen = 0;
+  let dest: { x: number; z: number; f: number; name: string } | null = null, route: RoutePt[] | null = null, routeT = 0, routeLen = 0, routeBusy = false;
   const setDest = (d: typeof dest) => { dest = d; route = null; routeT = 0; xBtn.hidden = !d; goBtn.textContent = d ? '◎ Route' : '◎ Navigate'; };
 
   // ---------- drawing one view of the map ----------
@@ -329,7 +350,8 @@ export function holoMap(host: HTMLElement, get: () => HoloState | null, root?: T
     const now = performance.now();
     // the route, kept up as you walk; arriving clears it
     if (dest) { if (st.f === dest.f && Math.hypot(st.x - dest.x, st.z - dest.z) < 2.5) { toast(`You've arrived: ${dest.name.toLowerCase().replace(/(^|\s)\S/g, s => s.toUpperCase())}`); setDest(null); }
-      else if (now > routeT) { routeT = now + 400; route = findRoute(st, dest); routeLen = 0; if (route) for (let i = 1; i < route.length; i++) routeLen += Math.hypot(route[i].x - route[i - 1].x, route[i].z - route[i - 1].z); } }
+      else if (now > routeT && !routeBusy) { routeT = now + 400; routeBusy = true; const d0 = dest;
+        findRouteAsync(st, dest).then(r => { routeBusy = false; if (dest !== d0) return; route = r; routeLen = 0; if (r) for (let i = 1; i < r.length; i++) routeLen += Math.hypot(r[i].x - r[i - 1].x, r[i].z - r[i - 1].z); }); } }
     const dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.round(box.clientWidth * dpr), H = Math.round(box.clientHeight * dpr);
     if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     render(cx, W, H, dpr, { cx: st.x, cz: st.z, yaw: st.yaw, k: W / 90, f: st.f, full: false }, st);

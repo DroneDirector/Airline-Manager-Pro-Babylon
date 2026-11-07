@@ -24,3 +24,17 @@ export function jetwayInteriors(sc: Scene, near = 35): (cam: Vector3) => void {
     });
   };
 }
+
+/** Tiny things far away (under about a metre across, further than `far` metres: a pixel or two on screen) are left out.
+ *  Lights and anything that glows always stay, so lamps still twinkle in the distance. Phone and PC alike. */
+export function tinyFar(sc: Scene, far = 180, size = 1.0): number {
+  let n = 0;
+  for (const m of sc.meshes as any[]) {
+    if (m.isAnInstance || m.hasInstances || m.hasThinInstances || !m.isVisible || !m.material || typeof m.addLODLevel !== 'function' || m.getTotalVertices() <= 0) continue;
+    const mt: any = m.material, e = mt.emissiveColor; if (mt.emissiveTexture || (e && e.r + e.g + e.b > 0.02) || /LIGHT|LAMP|GLOW|BEACON|STROBE|NAV|sky|look-/i.test(m.name + ' ' + mt.name)) continue;
+    let d = 99; try { const bb = m.getBoundingInfo().boundingBox; d = bb.maximumWorld.subtract(bb.minimumWorld).length(); } catch (err) { continue; }
+    if (d >= size) continue;
+    try { m.addLODLevel(far, null); n++; } catch (err) { /* always drawn */ }
+  }
+  return n;
+}
