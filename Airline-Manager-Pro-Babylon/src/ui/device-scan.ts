@@ -70,7 +70,7 @@ export function scanDevice(): Rec {
 
 const NAMES: { [k: string]: string } = { scale: 'Resolution', aa: 'Anti-aliasing', shadows: 'Shadows', autoRes: 'Automatic resolution', fps: 'Frame rate limit', heightFog: 'Height fog',
   ssao: 'Ambient occlusion', volLight: 'Light rays', taa: 'Temporal anti-aliasing', pcss: 'Soft contact shadows', manyLights: 'Many real lights', iblShadows: 'Sky shadows',
-  parallax: 'Surface depth', flares: 'Lens flares', bloom: 'Bloom', clouds: 'Volumetric clouds', mirror: 'Mirror', probe: 'Reflections', particles: 'Fire and contrails' };
+  parallax: 'Surface depth', flares: 'Lens flares', bloom: 'Bloom', clouds: 'Volumetric clouds', mirror: 'Mirror', probe: 'Sky reflections', particles: 'Fire and contrails' };
 const show = (k: string, v: any) => typeof v === 'boolean' ? (v ? 'On' : 'Off') : k === 'scale' ? Math.round(v * 100) + '%' : k === 'fps' ? (v ? String(v) : 'No limit') : String(v).replace(/^./, c => c.toUpperCase());
 
 /** Opens the scan: a moment of "Scanning…", then the result with Apply and Keep my settings. */

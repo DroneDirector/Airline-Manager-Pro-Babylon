@@ -9,3 +9,6 @@
 
 - Airport layouts (OpenStreetMap): build them with instancing from the start (runway and taxiway lights, stand markings, signs and repeated buildings as thin instances).
 - Animated people and animals in groups: baked-animation instancing (each walks its own path); one taken out of the group for a special moment (a chase, an arrest, a bird strike).
+
+## At alpha
+- Set DEMO_DATA to false in src/sections/terminal/fids.ts: no dummy or demo data anywhere from alpha on.

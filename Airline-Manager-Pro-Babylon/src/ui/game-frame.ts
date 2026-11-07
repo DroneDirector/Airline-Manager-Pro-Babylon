@@ -24,6 +24,9 @@ export function onGameAirport(f: (d: any) => void) { airportSubs.push(f); }
 /** The game's pet editor asking for a picture of your pet. */
 export function onGamePetPreview(f: (d: any) => void) { petSubs.push(f); }
 export function onGameWx(f: (d: any) => void) { wxSubs.push(f); }
+/** The departures and arrivals for the timetable screens, as the game sends them when asked. */
+const fidsSubs: ((d: any) => void)[] = [];
+export function onGameFids(f: (d: any) => void) { fidsSubs.push(f); return () => { const i = fidsSubs.indexOf(f); if (i >= 0) fidsSubs.splice(i, 1); }; }
 /** The flight the 3D viewer follows, as the game sends it (several times a second). */
 export function onGameFlight(f: (d: any) => void) { flightSubs.push(f); }
 /** A message to the game (follow a flight, stop, save). */
@@ -63,5 +66,6 @@ window.addEventListener('message', (e: MessageEvent) => {
   else if (d.amp === 'airport') { for (const f of airportSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'petprev') { for (const f of petSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'wx') { for (const f of wxSubs) { try { f(d); } catch (err) { console.error(err); } } }
+  else if (d.amp === 'fids') { for (const f of fidsSubs) { try { f(d); } catch (err) { console.error(err); } } }
   else if (d.amp === 'flight') { for (const f of flightSubs) { try { f(d); } catch (err) { console.error(err); } } }
 });

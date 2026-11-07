@@ -3,6 +3,8 @@
 //  - CPU: how much of each frame the processor spends working (the app's own work and preparing the drawing).
 //  - GPU: how long the graphics chip takes to draw a frame, measured by the chip itself where the device reports it
 //    (otherwise it says so), with the draw calls and triangles.
+// It sits low in the middle at the bottom (clear of the other buttons), in three rows: the names, their figures, and
+// a line saying what holds the frame rate back when it struggles. It can be dragged anywhere (double-tap: back home).
 //  - Memory: the app's memory (where the device reports it) and what its pictures and models take on the graphics chip.
 import { Engine, Scene, EngineInstrumentation, SceneInstrumentation } from '@babylonjs/core';
 import { S } from './settings';
@@ -12,11 +14,23 @@ let t0 = 0, work = 0, frames = 0, last = 0, interval = 16.7, nextShow = 0, memT 
 /** Start measuring a place's scene; the overlay goes in host. */
 export function perfAttach(engine: Engine, scene: Scene, host: HTMLElement) {
   perfDetach(); eng = engine; scn = scene;
-  el = document.createElement('div'); el.className = 'perf'; host.appendChild(el);
+  el = document.createElement('div'); el.className = 'perf'; host.appendChild(el); drag(el);
   try { ei = new EngineInstrumentation(engine); ei.captureGPUFrameTime = true; } catch (e) { ei = null; }
   try { si = new SceneInstrumentation(scene); si.captureFrameTime = true; si.captureRenderTime = true; } catch (e) { si = null; }
   perfShow();
 }
+/** The overlay can be dragged anywhere (by mouse or finger); where it was left is kept on the device. */
+function drag(e: HTMLElement) {
+  try { const p = JSON.parse(localStorage.getItem('ampb.perfpos') || 'null'); if (p) place(e, p.x, p.y); } catch (err) { /* default place */ }
+  let sx = 0, sy = 0, ox = 0, oy = 0, on = false;
+  e.addEventListener('pointerdown', ev => { on = true; const r = e.getBoundingClientRect(); sx = ev.clientX; sy = ev.clientY; ox = r.left; oy = r.top; try { e.setPointerCapture(ev.pointerId); } catch (err) { /* fine */ } ev.stopPropagation(); });
+  e.addEventListener('pointermove', ev => { if (!on) return; place(e, ox + ev.clientX - sx, oy + ev.clientY - sy); ev.stopPropagation(); });
+  const up = (ev: PointerEvent) => { if (!on) return; on = false; const r = e.getBoundingClientRect(); try { localStorage.setItem('ampb.perfpos', JSON.stringify({ x: r.left, y: r.top })); } catch (err) { /* not kept */ } ev.stopPropagation(); };
+  e.addEventListener('pointerup', up); e.addEventListener('pointercancel', up);
+  e.addEventListener('dblclick', () => { e.style.left = e.style.top = e.style.bottom = e.style.transform = ''; e.classList.remove('moved'); try { localStorage.removeItem('ampb.perfpos'); } catch (err) { /* fine */ } });
+}
+function place(e: HTMLElement, x: number, y: number) { const w = e.offsetWidth || 300, h = e.offsetHeight || 60;
+  x = Math.max(0, Math.min(innerWidth - w, x)); y = Math.max(0, Math.min(innerHeight - h, y)); e.classList.add('moved'); e.style.left = x + 'px'; e.style.top = y + 'px'; }
 export function perfDetach() { if (el) el.remove(); el = null; try { ei && ei.dispose(); si && si.dispose(); } catch (e) { /* gone */ } ei = null; si = null; eng = null; scn = null; }
 /** Show or hide the overlay's parts as the settings say. */
 export function perfShow() { if (!el) return; const g = S.gfx; el.hidden = !(g.showFps || g.showCpu || g.showGpu || g.showMem); nextShow = 0; }
@@ -43,24 +57,30 @@ function draw() {
   const g = S.gfx, now = performance.now(); nextShow = now + 500;
   const fps = eng.getFps(), cpu = frames ? work / frames : 0;
   for (const k of Object.keys(parts)) { partsShown[k] = frames ? parts[k] / frames : 0; parts[k] = 0; } work = 0; frames = 0;
-  const rows: string[] = [];
-  if (g.showFps) rows.push(`<div><b>FPS</b><span>${Math.round(fps)}</span><small>${interval.toFixed(1)} ms</small></div>`);
-  if (g.showCpu) { const k = cpu / Math.max(1, interval); const pl = Object.keys(partsShown).filter(n => partsShown[n] >= 0.05).sort((a, b) => partsShown[b] - partsShown[a]).map(n => `${n} ${partsShown[n].toFixed(1)}`).join(' · ');
-    rows.push(`<div><b>CPU</b><span>${Math.round(k * 100)}%</span><small>${cpu.toFixed(1)} ms</small>${bar(k)}${pl ? `<small class="sub">${pl} ms</small>` : ''}</div>`); }
+  // three rows: the names, their figures under them, and a line saying what (if anything) holds the frame rate back
+  const head: string[] = [], val: string[] = [], warn: string[] = [];
+  const col = (k: number, w = 0.7, b = 0.9) => k > b ? 'bad' : k > w ? 'warn' : '';
+  if (g.showFps) { head.push('Frames'); val.push(`<span class="${fps < 20 ? 'bad' : fps < 40 ? 'warn' : ''}">${Math.round(fps)} fps</span><small>${interval.toFixed(1)} ms</small>`); if (fps < 25) warn.push(`low frame rate (${Math.round(fps)} fps)`); }
+  if (g.showCpu) { const k = cpu / Math.max(1, interval); head.push('CPU'); val.push(`<span class="${col(k)}">${Math.round(k * 100)}%</span><small>${cpu.toFixed(1)} ms</small>`);
+    if (k > 0.85) { const top = Object.keys(partsShown).filter(n => partsShown[n] >= 0.5).sort((a, b) => partsShown[b] - partsShown[a]).slice(0, 3).map(n => `${n} ${partsShown[n].toFixed(0)} ms`).join(', ');
+      warn.push(`the processor is the limit${top ? ' — ' + top : ''}`); } }
   if (g.showGpu) {
     const c: any = ei && ei.gpuFrameTimeCounter, ms = c && c.lastSecAverage ? c.lastSecAverage * 1e-6 : 0;
     const dc = si ? Math.round(si.drawCallsCounter.lastSecAverage || si.drawCallsCounter.current) : 0, tris = scn ? Math.round(scn.getActiveIndices() / 3) : 0;
-    const extra = `<small class="sub">${dc} draw calls · ${(tris / 1000).toFixed(0)}k triangles</small>`;
-    if (ms > 0) { const k = ms / Math.max(1, interval); rows.push(`<div><b>GPU</b><span>${Math.round(k * 100)}%</span><small>${ms.toFixed(1)} ms</small>${bar(k)}${extra}</div>`); }
-    else rows.push(`<div><b>GPU</b><span class="na">not reported</span><small>this device doesn't measure it</small>${extra}</div>`);
+    if (ms > 0) { const k = ms / Math.max(1, interval); head.push('GPU'); val.push(`<span class="${col(k)}">${Math.round(k * 100)}%</span><small>${ms.toFixed(1)} ms</small>`); if (k > 0.9) warn.push('the graphics chip is the limit — lower the resolution or the shadows'); }
+    else { head.push('GPU'); val.push('<span class="na">n/a</span><small>not reported</small>'); }
+    head.push('Drawing'); val.push(`<span class="${dc > 3000 ? 'warn' : ''}">${dc}</span><small>calls · ${(tris / 1000).toFixed(0)}k tris</small>`); if (dc > 3500) warn.push(`many draw calls (${dc})`);
   }
   if (g.showMem) {
     if (now > memT) { memT = now + 3000; gpuMem = estimateGpu(); }
     const pm: any = (performance as any).memory, used = pm ? pm.usedJSHeapSize / 1048576 : 0, lim = pm ? pm.jsHeapSizeLimit / 1048576 : 0;
-    rows.push(`<div><b>RAM</b>${pm ? `<span>${used.toFixed(0)} MB</span><small>of ${lim.toFixed(0)} MB</small>${bar(used / Math.max(1, lim), 0.6, 0.85)}` : '<span class="na">not reported</span><small>on this device</small>'}</div>`);
-    rows.push(`<div><b>VRAM</b><span>≈ ${gpuMem.toFixed(0)} MB</span><small>pictures and models</small></div>`);
+    head.push('RAM'); val.push(pm ? `<span class="${col(used / Math.max(1, lim), 0.6, 0.85)}">${used.toFixed(0)} MB</span><small>of ${lim.toFixed(0)}</small>` : '<span class="na">n/a</span><small>not reported</small>');
+    if (pm && used / Math.max(1, lim) > 0.85) warn.push('memory nearly full');
+    head.push('VRAM'); val.push(`<span>≈ ${gpuMem.toFixed(0)} MB</span><small>pictures, models</small>`);
   }
-  el.innerHTML = rows.join('');
+  const n = head.length;
+  el.innerHTML = `<div class="pf-g" style="grid-template-columns:repeat(${n},auto)">${head.map(h => `<b>${h}</b>`).join('')}${val.map(v => `<div>${v}</div>`).join('')}</div>`
+    + `<div class="pf-m ${warn.length ? 'bad' : ''}">${warn.length ? '⚠ ' + warn.join(' · ') : 'Running smoothly'}</div>`;
 }
 /** What the pictures (with their smaller copies) and the models take on the graphics chip, roughly. */
 function estimateGpu(): number {

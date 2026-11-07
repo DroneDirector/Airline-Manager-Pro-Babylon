@@ -9,6 +9,7 @@ import { MeshBuilder, Mesh, Vector3, TransformNode } from '@babylonjs/core';
 import { Kit, signC, P } from './kit';
 import { ROOMS, Room, F2Y, MOD, STAIRS, PG, PN } from './plan';
 import { IS_PC } from '../../core/app';
+import { makeFids, OPS_W } from './fids';
 
 export function furnish(K: Kit, progress: (p: number, s: string) => void) {
   const { sc, M } = K;
@@ -223,7 +224,8 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
   /** Operations: the monitor wall along the north side, the duty desk and its chair as drawn, more desks for the planners. */
   function ops(r: Room) {
     const w = K.obj(r.id, 'MONITOR-WALL', 123, 0, 33.6, Math.PI, 'F1-OPS/MONITOR-WALL'); K.box(w, 16, 3.0, 0.2, M.black, 0, 2.2, 0);
-    for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) { K.box(w, 2.5, 1.35, 0.04, i === 2 && j === 1 ? M.lightCool : M.sky, -6.6 + i * 2.62, 1.45 + j * 1.42, -0.12); }
+    // the video wall: six monitors of departures and arrivals in turn, the whole width (see fids.ts)
+    { const p = MeshBuilder.CreatePlane(K.nm('opsw'), { width: 15.7, height: 15.7 / (OPS_W[0] / OPS_W[1]) }, sc); p.material = makeFids(sc, 'BIAP').get('dep', 'opswall'); p.parent = w; p.position.set(0, 2.2, -0.11); p.rotation.y = Math.PI; p.metadata = w.metadata; }
     K.block(1, 115, 33.3, 131, 34);
     desk(r, 119.5, 27.9, Math.PI, 3.0, 0.9, M.white, 3); officeChair(r, 119.5, 26.8, 0);
     for (const [x, z] of [[126, 27.9], [126, 30.5]]) { desk(r, x, z, Math.PI, 2.4, 0.8, M.white, 2); officeChair(r, x, z - 0.95, 0); }

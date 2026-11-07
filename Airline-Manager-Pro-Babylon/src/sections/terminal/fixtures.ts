@@ -10,6 +10,7 @@ import { buildMuseum, Museum, Exhibit } from '../building/museum';
 import { buildAirliner, repaint, setGear, Airliner } from '../viewer3d/airliner';
 import { IS_PC } from '../../core/app';
 import { buildJetway } from './jetway';
+import { makeFids } from './fids';
 
 export interface Fixtures { museum: Museum | null; museumDoor: { k: number; base: Vector3[] }; aircraft: Airliner[]; lifts: LiftCtl[]; jetways: any[] }
 
@@ -17,16 +18,17 @@ export function buildFixtures(K: Kit, c1: string, c2: string, airline: string, p
   const { sc, M } = K;
   progress(62, 'Switching on the timetable screens…');
   // ---- the screens: one departures and one arrivals picture shared by all, the gate screens each their own ----
-  const board = (kind: 'dep' | 'arr') => { const [big] = P.canvas(1600, 900); P.board(big, kind); const [c, x] = P.canvas(IS_PC ? 1024 : 768, IS_PC ? 576 : 432); x.drawImage(big, 0, 0, c.width, c.height); return K.picture(c, 1); };
-  const depM = board('dep'), arrM = board('arr');
+  // the real timetable from the game (sample flights when the game isn't running), one picture per kind and shape of screen
+  const fids = makeFids(sc, 'BIAP'), F = (k: 'dep' | 'arr', sh: 'wall' | 'totem' | 'wide') => fids.get(k, sh);
   for (const s of SCREENS) {
     const y = (s.f === 2 ? F2Y : 0) + s.y, o = K.obj(s.room, 'SCREEN', s.x, y, s.z, s.face, s.id); o.metadata.kind = 'screen'; o.metadata.screen = s.kind;
     const face = (w: number, h: number, m: any, ox = 0, oy = 0, back = false) => { const p = MeshBuilder.CreatePlane(K.nm('scr'), { width: w, height: h }, sc); p.material = m; p.parent = o; p.position.set(ox, oy, back ? 0.07 : -0.05); p.rotation.y = back ? 0 : Math.PI; p.metadata = o.metadata; return p; };
-    if (s.kind === 'departures wall' || s.kind === 'arrivals wall') { K.box(o, 5.2, 2.0, 0.12, M.screenBlack, 0, 0, 0); face(5, 1.82, s.kind === 'arrivals wall' ? arrM : depM); }
-    else if (s.kind === 'departures totem' || s.kind === 'arrivals totem') { K.box(o, 1.4, 2.6, 0.32, M.screenBlack, 0, 1.6, 0); K.box(o, 0.9, 0.3, 0.5, M.black, 0, 0.15, 0); const m = s.kind === 'arrivals totem' ? arrM : depM;
-      const f1 = face(1.25, 0.72 * 1.25 * 1.6, m, 0, 1.75); f1.position.z = -0.17; const f2 = face(1.25, 0.72 * 1.25 * 1.6, m, 0, 1.75, true); f2.position.z = 0.17; K.circle(s.f, s.x, s.z, 0.75); }
-    else if (s.kind === 'departures pair') { for (const [k, m] of [[-1, depM], [1, arrM]] as [number, any][]) { K.box(o, 1.7, 0.98, 0.08, M.screenBlack, k * 0.9, 0, 0); face(1.6, 0.9, m, k * 0.9, 0); } }
-    else if (s.kind === 'departures') { K.box(o, 2.1, 1.22, 0.08, M.screenBlack, 0, 0, 0); face(2.0, 1.12, depM); }
+    if (s.kind === 'departures wall' || s.kind === 'arrivals wall') { K.box(o, 5.2, 2.0, 0.12, M.screenBlack, 0, 0, 0); face(5, 1.82, F(s.kind === 'arrivals wall' ? 'arr' : 'dep', 'wall')); }
+    else if (s.kind === 'departures totem' || s.kind === 'arrivals totem') { // a little wider than before (its stand too), so the timetable's columns fit in large type
+      K.box(o, 1.95, 2.6, 0.32, M.screenBlack, 0, 1.6, 0); K.box(o, 1.25, 0.3, 0.5, M.black, 0, 0.15, 0); const m = F(s.kind === 'arrivals totem' ? 'arr' : 'dep', 'totem');
+      const f1 = face(1.75, 1.3, m, 0, 1.75); f1.position.z = -0.17; const f2 = face(1.75, 1.3, m, 0, 1.75, true); f2.position.z = 0.17; K.circle(s.f, s.x, s.z, 1.0); }
+    else if (s.kind === 'departures pair') { for (const [k, m] of [[-1, F('dep', 'wide')], [1, F('arr', 'wide')]] as [number, any][]) { K.box(o, 1.7, 0.98, 0.08, M.screenBlack, k * 0.9, 0, 0); face(1.6, 0.9, m, k * 0.9, 0); } }
+    else if (s.kind === 'departures') { K.box(o, 2.1, 1.22, 0.08, M.screenBlack, 0, 0, 0); face(2.0, 1.12, F('dep', 'wide')); }
     else { const g = s.id.replace(/^M-F\d-G/, ''), [c, x] = P.canvas(512, 288); x.fillStyle = '#0B1A33'; x.fillRect(0, 0, 512, 288); x.fillStyle = '#F2C230'; x.fillRect(0, 0, 512, 64); x.fillStyle = '#14202E'; x.font = '700 44px Arial, sans-serif'; x.fillText(`GATE ${g}`, 20, 48);
       x.fillStyle = '#FFFFFF'; x.font = '700 40px Arial, sans-serif'; x.fillText(['AM 210 · Copenhagen', 'AM 344 · London', 'AM 118 · Oslo', 'AM 512 · Reykjavik', 'AM 230 · Amsterdam', 'AM 610 · Barcelona', 'AM 402 · Frankfurt', 'AM 120 · Vágar'][(+g - 1) % 8], 20, 130);
       x.fillStyle = '#3BD16F'; x.font = '700 36px Arial, sans-serif'; x.fillText(+g % 3 === 0 ? 'Boarding' : 'Gate open', 20, 200); x.fillStyle = '#8FA6BD'; x.font = '500 28px Arial, sans-serif'; x.fillText('Scheduled ' + ['06:40', '07:35', '07:20', '07:55', '08:10', '08:35', '09:00', '09:25'][(+g - 1) % 8], 20, 254);

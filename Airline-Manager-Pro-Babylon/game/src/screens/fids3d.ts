@@ -8,7 +8,7 @@
 interface FidsRow { key: string; sched: number; exp: number; flight: string; place: string; ac: string; status: string; col: string }
 
 /** The day's rows for a board (departures from, or arrivals at, the airport). */
-function fidsRows(kind: 'dep' | 'arr', base: string, now: number): FidsRow[] {
+function fidsRows(kind: 'dep' | 'arr', base: string, now: number, max = 10): FidsRow[] {
   const out: FidsRow[] = [], mid = new Date(now); mid.setHours(0, 0, 0, 0); const day0 = mid.getTime();
   // your own flights (the schedule's day, minutes since midnight)
   let blocks: any[] = []; try { blocks = scheduleBlocks().filter((b: any) => b.kind === 'flight'); } catch (e) { blocks = []; }
@@ -46,7 +46,7 @@ function fidsRows(kind: 'dep' | 'arr', base: string, now: number): FidsRow[] {
       else { r.status = 'On time'; r.col = '#7FC4F5'; }
     }
   }
-  return out.filter(r => r.exp > now - 25 * 60e3 && r.sched < now + 18 * 3600e3).sort((a, b) => a.sched - b.sched).slice(0, 10);
+  return out.filter(r => r.exp > now - 25 * 60e3 && r.sched < now + 18 * 3600e3).sort((a, b) => a.sched - b.sched).slice(0, max);
 }
 function fidsHm(t: number): string { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
 

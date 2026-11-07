@@ -157,6 +157,9 @@ if (EMBED) {
   window.addEventListener('message', (e: MessageEvent) => {
     const d: any = e.data; if (!d || !d.ampb) return;
     if (d.ampb === 'partlog') { partLog(); return; }
+    if (d.ampb === 'fids') { try { const now = Date.now(); let base = String(d.icao || ''); let dep = fidsRows('dep', base, now, 48), arr = fidsRows('arr', base, now, 48);
+        if (!dep.length && !arr.length) { const c: any = company(); const home = c && (c.base || c.hub || ''); if (home && home !== base) { base = home; dep = fidsRows('dep', base, now, 48); arr = fidsRows('arr', base, now, 48); } }
+        embedTell('fids', { base, dep, arr, at: now }); } catch (err) { embedTell('fids', { base: d.icao, dep: [], arr: [], at: Date.now() }); } return; }
     if (d.ampb === 'petprev' && d.url) { if (d.id !== petPrevN) return; const cv = document.querySelector('[data-pet-prev]') as HTMLCanvasElement; if (!cv) return; const im = new Image(); im.onload = () => { const x = cv.getContext('2d'); if (x) { x.clearRect(0, 0, cv.width, cv.height); x.drawImage(im, 0, 0, cv.width, cv.height); } }; im.src = d.url; return; }
     if (d.ampb === 'wardrobe') { try { closeAll(); osWardrobe(); } catch (err) { /* later */ } return; }
     if (d.ampb === 'pet') { try { const p: any = petData(); if (typeof d.food === 'number') p.food = d.food; if (typeof d.water === 'number') p.water = d.water; Store.soon(); } catch (err) { /* later */ } return; }
