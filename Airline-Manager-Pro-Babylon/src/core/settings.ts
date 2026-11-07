@@ -17,9 +17,9 @@ export interface Settings { gfx: Gfx; ctl: Controls; music: boolean }
 
 export const PRESETS: { [k: string]: Partial<Gfx> } = {
   low: { scale: 0.6, aa: 'off', shadows: 'off', mirror: 'low', probe: false, glow: true, bloom: false, ssao: false, sharpen: false, particles: 'low', clouds: 'low', iblShadows: false, manyLights: false, volLight: false, heightFog: false, ssr: false, pcss: false, taa: false, eyeAdapt: true, flares: false, dof: false, mblur: false, parallax: false, wetRain: true, glint: true },
-  medium: { scale: 0.8, aa: 'fxaa', shadows: 'low', mirror: 'low', probe: true, glow: true, bloom: true, ssao: false, sharpen: false, particles: 'high', clouds: 'medium', iblShadows: false, manyLights: false, volLight: false, heightFog: true, ssr: false, pcss: false, taa: false, eyeAdapt: true, flares: true, dof: false, mblur: false, parallax: false, wetRain: true, glint: true },
-  high: { scale: 1, aa: 'msaa', shadows: 'high', mirror: 'high', probe: true, glow: true, bloom: true, ssao: false, sharpen: true, particles: 'high', clouds: 'high', iblShadows: false, manyLights: IS_PC, volLight: true, heightFog: true, ssr: false, pcss: true, taa: true, eyeAdapt: true, flares: true, dof: false, mblur: false, parallax: true, wetRain: true, glint: true },
-  ultra: { scale: IS_PC ? 1.25 : 1, aa: 'msaa', shadows: 'high', mirror: 'high', probe: true, glow: true, bloom: true, ssao: true, sharpen: true, particles: 'high', clouds: 'ultra', iblShadows: IS_PC, manyLights: true, volLight: true, heightFog: true, ssr: IS_PC, pcss: true, taa: true, eyeAdapt: true, flares: true, dof: false, mblur: false, parallax: true, wetRain: true, glint: true },
+  medium: { scale: 0.8, aa: 'fxaa', shadows: 'low', mirror: 'low', probe: true, glow: true, bloom: true, ssao: false, sharpen: false, particles: 'high', clouds: 'medium', iblShadows: false, manyLights: false, volLight: false, heightFog: IS_PC, ssr: false, pcss: false, taa: false, eyeAdapt: true, flares: true, dof: false, mblur: false, parallax: false, wetRain: true, glint: true },
+  high: { scale: 1, aa: 'msaa', shadows: 'high', mirror: 'high', probe: true, glow: true, bloom: true, ssao: false, sharpen: true, particles: 'high', clouds: 'high', iblShadows: false, manyLights: IS_PC, volLight: true, heightFog: IS_PC, ssr: false, pcss: true, taa: true, eyeAdapt: true, flares: true, dof: false, mblur: false, parallax: true, wetRain: true, glint: true },
+  ultra: { scale: IS_PC ? 1.25 : 1, aa: 'msaa', shadows: 'high', mirror: 'high', probe: true, glow: true, bloom: true, ssao: true, sharpen: true, particles: 'high', clouds: 'ultra', iblShadows: IS_PC, manyLights: true, volLight: true, heightFog: IS_PC, ssr: IS_PC, pcss: true, taa: true, eyeAdapt: true, flares: true, dof: false, mblur: false, parallax: true, wetRain: true, glint: true },
 };
 const DEF: Settings = {
   gfx: Object.assign({ renderer: 'webgl', autoRes: !IS_PC, preset: (IS_PC ? 'high' : 'medium') as Preset, fps: IS_PC ? 0 : 60, terrain: true, aces: true, exposure: 1, fov: 70, showFps: false, showCpu: false, showGpu: false, showMem: false } as any, PRESETS[IS_PC ? 'high' : 'medium']),
@@ -28,7 +28,10 @@ const DEF: Settings = {
 };
 const KEY = 'ampb-settings';
 function load(): Settings {
-  try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s) return { gfx: Object.assign({}, DEF.gfx, s.gfx), ctl: Object.assign({}, DEF.ctl, s.ctl), music: s.music !== false }; } catch (e) { /* the defaults */ }
+  try { const s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    // once, on phones and tablets: height fog off (it draws the whole place a second time every frame)
+    if (s && s.gfx && !IS_PC && !s.gfx.fogOff1) { s.gfx.heightFog = false; s.gfx.fogOff1 = true; }
+    if (s) return { gfx: Object.assign({}, DEF.gfx, s.gfx), ctl: Object.assign({}, DEF.ctl, s.ctl), music: s.music !== false }; } catch (e) { /* the defaults */ }
   return JSON.parse(JSON.stringify(DEF));
 }
 export const S: Settings = load();
