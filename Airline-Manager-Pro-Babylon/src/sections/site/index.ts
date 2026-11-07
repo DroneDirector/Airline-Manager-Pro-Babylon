@@ -12,7 +12,7 @@
 import { logIssue } from '../../core/errlog';
 import { glassMirrors } from '../../core/glassmirror';
 import { glassLook } from '../terminal/kit';
-import { thinStatic } from '../../core/thin';
+import { thinStatic, thinMoving } from '../../core/thin';
 import { shareMaterials } from '../../core/texarray';
 import { CascadedShadowGenerator, SSAO2RenderingPipeline, ReflectionProbe } from '@babylonjs/core';
 import { Ray, Scene, Vector3, Color3, Color4, UniversalCamera, HemisphericLight, DirectionalLight, ShadowGenerator, GlowLayer, DefaultRenderingPipeline, ImageProcessingConfiguration, MeshBuilder, Mesh, VertexData, TransformNode, PBRMaterial, StandardMaterial, DynamicTexture, Texture, AbstractMesh } from '@babylonjs/core';
@@ -278,6 +278,11 @@ const Site$: Section = {
     // the fixed copies (furniture, fittings) as thin instances: nothing per copy left for the processor each frame
     try { const moving = new Set<any>(); for (const d of doors) for (const m of d.node.getChildMeshes()) moving.add(m);
       thinStatic(sc, m => !before.has(m) && !liftParts.has(m) && !hidden.has(m) && !moving.has(m), casters, walkMode); } catch (e) { logIssue('Airport', 'Thin instances could not be made', String((e as any)?.message || e)); }
+    // the jetways' wheels, stair wheels, steps, posts and rails: one list per kind of piece per jetway, following the
+    // pieces only while that jetway docks or undocks (the pieces stay, unseen, to be walked on)
+    try { const fs: (() => void)[] = []; for (const j of (O.jetways || []) as any[]) { const rx = new RegExp('^' + j.id + '/(STEP|STAIR-POST|STAIR-RAIL|STAIR-WHEEL|WHEEL)');
+        fs.push(thinMoving(sc, sc.meshes.filter((m: any) => rx.test(m.name)) as any, casters, () => j.state === 'docking' || j.state === 'undocking', j.id)); } O.jwThin = fs; }
+    catch (e) { logIssue('Airport', 'The jetways\' pieces could not be combined', String((e as any)?.message || e)); }
     O.doors = doors;
     progress(92, 'Setting up the views…');
     // lights, camera, the sky and its weather
@@ -447,7 +452,7 @@ const Site$: Section = {
       try { const js: any[] = O.jetways || []; let ride: any = null, m0: any = null;
         if (walkMode && js.some(j => j.state === 'docking' || j.state === 'undocking')) { const hit = sc.pickWithRay(new Ray(body.position.add(new Vector3(0, 0.3, 0)), new Vector3(0, -1, 0), 1.2), (m: any) => !!(m.metadata && /^J-\d/.test(m.metadata.id || '')) && m !== body);
           if (hit && hit.pickedMesh) { ride = hit.pickedMesh; m0 = ride.computeWorldMatrix(true).clone(); } }
-        for (const j of js) j.update(dt);
+        for (const j of js) j.update(dt); for (const f of O.jwThin || []) f();
         if (ride) { const m1 = ride.computeWorldMatrix(true), p = Vector3.TransformCoordinates(Vector3.TransformCoordinates(body.position, m0.clone().invert()), m1); body.position.copyFrom(p); }
         if (js.some(j => j.moving && Vector3.Distance(cam.position, j.node.getAbsolutePosition()) < 45)) { if (now - (O.beepT || 0) > 1.1) { O.beepT = now; jwBeep(); } } } catch (e) { /* still */ }
       try { insides(cam.globalPosition); } catch (e) { /* all drawn */ }

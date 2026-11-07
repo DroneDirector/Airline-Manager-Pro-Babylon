@@ -96,3 +96,29 @@ export function thinStatic(sc: Scene, ok: (m: AbstractMesh) => boolean, casters:
   for (const m of gone) m.dispose(true, false);
   return n;
 }
+
+/** Moving parts that come in many identical pieces (the jetways' wheels, stair steps, posts and rails): each piece keeps
+ *  its own moving node (a wheel still spins, a step still tips to stay level), but they are drawn as one thin-instance
+ *  list per kind of piece. The lists take the pieces' places again only while `moving()` says something moves; when all
+ *  is still they cost nothing. The pieces themselves stay, unseen, to be walked on. Returns the step to call each frame. */
+export function thinMoving(sc: Scene, parts: Mesh[], casters: AbstractMesh[], moving: () => boolean, label: string): () => void {
+  const groups = new Map<string, Mesh[]>();
+  for (const m of parts) { if (!(m instanceof Mesh) || m.isDisposed() || (m as any).isAnInstance || m.skeleton || !m.material || m.getTotalVertices() <= 0 || !m.isEnabled() || !m.isVisible) continue;
+    const e = m.getBoundingInfo().boundingBox.extendSize, k = [label, m.name.replace(/[0-9]+/g, '#'), m.material.uniqueId, m.getTotalVertices(), m.getTotalIndices(), e.x.toFixed(3), e.y.toFixed(3), e.z.toFixed(3)].join('|');
+    (groups.get(k) || groups.set(k, []).get(k)!).push(m); }
+  const lists: { host: Mesh; list: Mesh[]; buf: Float32Array }[] = [], cast = new Set(casters);
+  for (const [k, list] of groups) {
+    if (list.length < 2) continue;
+    try { const m0 = list[0], host = m0.clone('THINMOVE/' + k.split('|').slice(0, 2).join('/'), null, true, false) as Mesh;
+      host.parent = null; host.position.setAll(0); host.rotation.setAll(0); host.rotationQuaternion = null; host.scaling.setAll(1); host.unfreezeWorldMatrix(); host.makeGeometryUnique();
+      host.checkCollisions = false; host.isPickable = false; host.isVisible = true; host.setEnabled(true); host.metadata = { kind: 'thin', id: host.name };
+      const buf = new Float32Array(16 * list.length); list.forEach((m, i) => m.computeWorldMatrix(true).copyToArray(buf, i * 16));
+      host.thinInstanceSetBuffer('matrix', buf, 16, false); host.thinInstanceRefreshBoundingInfo(false); host.alwaysSelectAsActiveMesh = false;
+      if (list.some(m => cast.has(m))) casters.push(host);
+      for (const m of list) { m.isVisible = false; const i = casters.indexOf(m); if (i >= 0) casters.splice(i, 1); }   // still walked on, no longer drawn
+      lists.push({ host, list, buf }); } catch (e) { logIssue('Thin instances', `${label}: ${list.length} moving pieces left as they were`, String((e as any)?.message || e)); }
+  }
+  let wasMoving = true;
+  return () => { const mv = moving(); if (!mv && !wasMoving) return; wasMoving = mv;
+    for (const L of lists) { L.list.forEach((m, i) => m.computeWorldMatrix(true).copyToArray(L.buf, i * 16)); L.host.thinInstanceBufferUpdated('matrix'); L.host.thinInstanceRefreshBoundingInfo(false); } };
+}
