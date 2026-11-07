@@ -126,14 +126,21 @@ export function buildJetway(K: Kit, n: number, gateX: number, stand: { x: number
   // the hoses' cloth: worked out in place (no new objects every frame), the tube rebuilt only when a hose has really
   // moved (half a centimetre) and at most 30 times a second, and nothing at all while you are more than 90 m away
   const HW = V(0.75, 0, 0.66), HG = V(0, -1.5, 0), hv = V(0, 0, 0), ha = V(0, 0, 0), hdv = V(0, 0, 0), hl = V(0, 0, 0), hm = new Matrix();
-  let hoseT = 0;
+  let hoseT = 0, hoseMats = false, hoseAcc = 0;
   const stepHoses = (dt: number, iters = 1) => {
     const cam = sc.activeCamera; if (cam && Vector3.Distance(cam.globalPosition, o.getAbsolutePosition()) > 90) return;
-    for (const cl of colliders as any[]) { if (!cl.m) { cl.m = new Matrix(); cl.inv = new Matrix(); } cl.nd.computeWorldMatrix(true).multiplyToRef(oInv, cl.m); cl.m.invertToRef(cl.inv); }
+    // out of view: nothing to see, so nothing worked out (it carries on from where it was when it comes back into view)
+    const hm0 = hoses.length && hoses[0].mesh; if (cam && hm0 && !cam.isInFrustum(hm0)) return;
+    // where the hoses hang from and what they touch only moves while the jetway does: worked out again only then
+    const still = (rig as any) && !rig.moving && (rig.state === 'parked' || rig.state === 'docked');
+    if (!still || !hoseMats) { hoseMats = true;
+      for (const cl of colliders as any[]) { if (!cl.m) { cl.m = new Matrix(); cl.inv = new Matrix(); } cl.nd.computeWorldMatrix(true).multiplyToRef(oInv, cl.m); cl.m.invertToRef(cl.inv); }
+      for (const H of hoses) { if (!H.pm) H.pm = new Matrix(); H.par.computeWorldMatrix(true).multiplyToRef(oInv, H.pm); H.rwOk = false; } }
+    if (!still) hoseMats = false;
     const now = performance.now(), mayBuild = now >= hoseT; if (mayBuild) hoseT = now + 33;
     for (const H of hoses) {
       if (!H.rw) H.rw = H.rest.map(() => V(0, 0, 0));
-      for (let k = 0; k < H.rest.length; k++) { H.par.computeWorldMatrix(true).multiplyToRef(oInv, hm); Vector3.TransformCoordinatesToRef(H.rest[k], hm, H.rw[k]); }
+      if (!H.rwOk) { for (let k = 0; k < H.rest.length; k++) Vector3.TransformCoordinatesToRef(H.rest[k], H.pm, H.rw[k]); H.rwOk = true; }
       const rw: Vector3[] = H.rw;
       if (!H.x.length) { H.x = rw.map((v: Vector3) => v.clone()); H.p = rw.map((v: Vector3) => v.clone()); }
       for (let it = 0; it < iters; it++) { const t = clock + it * dt, gust = 0.5 + 0.35 * Math.sin(t * 0.8 + H.ph) + 0.15 * Math.sin(t * 2.3 + H.ph * 2);
@@ -628,7 +635,7 @@ export function buildJetway(K: Kit, n: number, gateX: number, stand: { x: number
       { const RPM = 75, ph = clock * RPM / 60 * Math.PI * 2, fl = mv ? Math.pow(Math.max(0, Math.cos(ph)), 6) : 0; beaRot.rotation.y = ph;
         BEA.emissiveColor.set(1, 0.6, 0.05).scaleInPlace(mv ? 0.35 + 2.4 * fl : 0.12); DLAMP.emissiveColor.set(1, 0.54, 0).scaleInPlace(mv ? 0.15 + 1.6 * fl : 0.1);
         if (beaSpot) { beaSpot.setEnabled(mv); beaSpot.intensity = mv ? 40 : 0; } }
-      const want = rig.state === 'docked' ? 1.5 : 0.85; lightK += (want - lightK) * Math.min(1, dt * 1.5); lights(); stepHoses(Math.min(1 / 30, dt), dt > 0.04 ? 2 : 1);
+      const want = rig.state === 'docked' ? 1.5 : 0.85; lightK += (want - lightK) * Math.min(1, dt * 1.5); lights(); hoseAcc += dt; if (hoseAcc >= 1 / 30) { const st = Math.min(0.1, hoseAcc); hoseAcc = 0; stepHoses(Math.min(1 / 30, st), st > 0.04 ? 2 : 1); }   // the hoses 30 times a second
       // the gate number: on once the sun is under 4° (sunset, the night, until just after sunrise), off by day
       const on = SUN.alt < 4 ? 1 : 0; signK += (on - signK) * Math.min(1, dt * 0.8); GNUM.emissiveColor.set(signK, signK, signK); },
     meshes() { const out: any[] = [belA, belB, linA, linB, canLin, ...hoses.map(H => H.mesh).filter(Boolean), ...CAB, ...plates.flatMap(q => [q.p, q.a, q.b])]; for (const nd of moving) out.push(...nd.getChildMeshes(false)); return out; } };

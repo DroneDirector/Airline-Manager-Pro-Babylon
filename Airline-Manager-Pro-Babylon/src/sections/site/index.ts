@@ -354,7 +354,16 @@ const Site$: Section = {
         for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, q = new Vector3(p.x + Math.cos(a) * rr, p.y, p.z + Math.sin(a) * rr); if (ok(q)) return q; } }
       return p; };
     /** Puts you on one of the quick viewpoints (plan metres), standing, facing its look point, never inside anything. */
+    /** Walking is tested only against the solid things near you (within 20 m of their edge), the list kept fresh four
+     *  times a second; everything solid is looked for again every 5 s, so things added later are walked against too. */
+    let solidAll: AbstractMesh[] = [], solidScan = 0; const NEAR = 20;
+    const nearSolids = (p: Vector3, now: number) => {
+      if (now - solidScan > 5000) { solidScan = now; solidAll = sc.meshes.filter((m: any) => m !== body && (m.checkCollisions || m._farOff)); }
+      for (const m of solidAll as any[]) { if (m.isDisposed()) continue; const bs = m.getBoundingInfo().boundingSphere, near = Vector3.Distance(p, bs.centerWorld) - bs.radiusWorld < NEAR;
+        if (near) { if (m._farOff) { m.checkCollisions = true; m._farOff = false; } } else if (m.checkCollisions) { m.checkCollisions = false; m._farOff = true; } } };
+    O.nearSolids = nearSolids; let nearT = 0;
     const goView = (i: number) => { const v = WALK_VIEWS[i] || WALK_VIEWS[WALK_START], p = toWorld(v.at[0], v.y + 0.3, v.at[1]); if (W.stance !== 'stand') setStance('stand');
+      if (walkMode) nearSolids(p, performance.now());   // the floor and walls where you land are solid at once
       body.position.copyFrom(clearSpot(p)); W.vy = 0;
       const f = toWorld(v.look[0], v.y + 0.3, v.look[1]).subtract(p).normalize(); CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = v.pitch;
       hud.querySelectorAll('[data-wv]').forEach(b => b.classList.toggle('on', b.getAttribute('data-wv') === String(i))); };
@@ -406,6 +415,7 @@ const Site$: Section = {
         W.vy = W.ground ? -0.5 : Math.max(-30, W.vy - 9.81 * dt);
         // the step along the floor and the fall (or the jump) are moved separately, so touching the floor doesn't eat the step
         const len = Math.min(1, Math.hypot(inp.mx, inp.my)), dir = fw.scaleToRef(inp.my, SV.dir).addInPlace(rt.scaleToRef(inp.mx, SV.tmp)); if (dir.lengthSquared() > 1e-6) dir.normalize();
+        nearT -= dt; if (nearT <= 0) { nearT = 0.25; nearSolids(body.position, performance.now()); }
         lap('input'); body.moveWithCollisions(dir.scaleInPlace(len * spd));
         const y0 = body.position.y, dy = W.vy * dt; body.moveWithCollisions(SV.down.set(0, dy, 0)); W.ground = dy < 0 && body.position.y > y0 + dy + 0.001; if (body.position.y < y0 + dy - 0.001 || (dy > 0 && body.position.y < y0 + dy - 0.001)) W.vy = 0; if (W.ground) W.vy = 0;
         lap('walking'); if (body.position.y < elev - 40) { body.position.copyFrom(toWorld(75, 0.5, -21.5)); W.vy = 0; }
