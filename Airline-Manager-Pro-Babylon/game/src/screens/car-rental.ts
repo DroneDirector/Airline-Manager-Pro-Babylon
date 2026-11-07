@@ -121,7 +121,7 @@ SCREENS.rental = {
     const tabs = [['companies', 'Companies', CR_COS.length], ['agreements', 'Agreements', R.open.length], ['returned', 'Returned', R.closed.length], ['terms', 'Return terms', 0], ['income', 'Income', 0]];
     return `
     <div class="screen-head"><div><h1>Car rental</h1><p class="sub">Airport → Services and concessions · the rental car centre at ${esc((hub as any).name || '')}</p></div>
-      <button class="btn ghost sm" data-act="cr-site">${icon('land')}Go to the rental car centre</button></div>
+      ${/Android/i.test(navigator.userAgent) ? '' : `<button class="btn ghost sm" data-act="cr-site">${icon('land')}Go to the rental car centre</button>`}</div>
     <div class="log-totals">
       <div class="stat"><small>Companies signed</small><b>${Object.keys(R.signed).length}<span> of ${CR_COS.length}</span></b></div>
       <div class="stat"><small>Cars out now</small><b>${R.open.length}</b></div>

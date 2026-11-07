@@ -12,7 +12,7 @@ import { loadingShow, loadingProgress, loadingHide } from './ui/loading';
 import { icon, toast } from './ui/icons';
 import { exitGame } from './core/exit';
 import { gameOpen, gameIsOpen, gameClose, gameShow, gameExists, gameSend, onGameRoom } from './ui/game-frame';
-import { APP } from './core/app';
+import { APP, IS_PC } from './core/app';
 import { updateInit } from './core/update';
 import { whatsNewOnStart, whatsNewIsOpen, whatsNewClose } from './ui/whats-new';
 import './sections/lounge/index';
@@ -102,7 +102,7 @@ function pickPlace(id: string) {
 }
 splashOpen(pickPlace);
 // a 3D place opened from the game (your office…): the game waits behind it
-onGameRoom(d => { if (d.room === 'site') { enter('site', 'Your airport', { site: 'myrdalssandur', walk: true, data: d.data || {} }); return; } if (d.room === 'court') enter('court', d.data && d.data.mode === 'hearing' ? 'Court is in session' : 'The courtroom', { data: d.data || {} }); else if (d.room === 'salute') enter('salute', 'Water salute', { data: d.data || {} }); else if (d.room === 'building') enter('building', ({ office: 'Your office', ops: 'The Operations office', lounge: 'The Business lounge', museum: 'Your museum' } as any)[d.at] || 'The airport', { at: d.at || 'concourse', data: d.data || {} }); else if (d.room === 'office') enter('office', 'Your office', { data: d.data || {} }); else if (d.room === 'lounge') enter('lounge', 'Business lounge', { data: d.data || {} }); else if (d.room === 'ops') enter('ops', 'The Operations office', { data: d.data || {} }); else if (d.room === 'hangar') enter('hangar', 'The hangar', { data: d.data || {} }); });
+onGameRoom(d => { if (d.room === 'site') { if (!IS_PC) return; enter('site', 'Your airport', { site: 'myrdalssandur', walk: true, data: d.data || {} }); return; } if (d.room === 'court') enter('court', d.data && d.data.mode === 'hearing' ? 'Court is in session' : 'The courtroom', { data: d.data || {} }); else if (d.room === 'salute') enter('salute', 'Water salute', { data: d.data || {} }); else if (d.room === 'building') enter('building', ({ office: 'Your office', ops: 'The Operations office', lounge: 'The Business lounge', museum: 'Your museum' } as any)[d.at] || 'The airport', { at: d.at || 'concourse', data: d.data || {} }); else if (d.room === 'office') enter('office', 'Your office', { data: d.data || {} }); else if (d.room === 'lounge') enter('lounge', 'Business lounge', { data: d.data || {} }); else if (d.room === 'ops') enter('ops', 'The Operations office', { data: d.data || {} }); else if (d.room === 'hangar') enter('hangar', 'The hangar', { data: d.data || {} }); });
 // after an update: what's new, once; and a quiet look for a newer version now and then
 whatsNewOnStart();
 updateInit(v => toast(`Version ${v} is ready: Settings → Updates`));
