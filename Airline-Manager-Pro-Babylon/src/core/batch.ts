@@ -3,10 +3,12 @@
 //    of many). Never merged: anything that moves, is switched on and off, can be swapped for your own model (a slot), is a
 //    rental car, a door or a lift, glass the map traces, an instance or the source of instances, or is named as one of
 //    the parts other code looks for. Shadow casters stay shadow casters.
+//  - octreeStatic: the things that never move are sorted into blocks of space, so each frame whole blocks out of view
+//    are skipped instead of testing every object on its own (the picture is the same; moving things are always tested).
 //  - freezeStatic: materials that never change after loading are frozen (Babylon stops re-checking them every frame).
 //    Never frozen: anything with its own shader code (the ground, wet surfaces, snow, glint), anything that glows or is
 //    lit up and down (lamps, beacons, signs, screens), the sky and weather, and anything named as changing.
-import { Scene, Mesh, AbstractMesh, Material, MultiMaterial, ShaderMaterial, Node } from '@babylonjs/core';
+import { Scene, Mesh, AbstractMesh, Material, MultiMaterial, ShaderMaterial, Node, Vector3 } from '@babylonjs/core';
 
 const NEVER = /STRUCTURE|COLLIDE|sky|look-|ramp-|GROUND|PAINT|MARKINGS|ROAD|holo|SCREEN|MONITOR|DOOR|LIFT|AIRFIELD\//i;
 const metaBlocks = (n: Node | null): boolean => { for (let p: any = n; p; p = p.parent) { const md = p.metadata; if (md && (md.slot || md.rental || md.kind === 'glass' || md.door || md.lift)) return true; } return false; };
@@ -56,4 +58,20 @@ export function freezeStatic(sc: Scene, keep: Set<Material> = new Set()): number
     try { mt.freeze(); n++; } catch (err) { /* stays live */ }
   }
   return n;
+}
+
+/** Fixed things (their place frozen) go into an octree for picking what is in view; everything else, and anything made
+ *  later, is always looked at. A fixed thing that starts moving again is taken out of the blocks within two seconds. */
+export function octreeStatic(sc: Scene): () => void {
+  const fixed: AbstractMesh[] = [], moving: AbstractMesh[] = [];
+  for (const m of sc.meshes) { if (m.isDisposed()) continue; (m.isWorldMatrixFrozen && !m.skeleton && !(m as any).hasThinInstances && !m.alwaysSelectAsActiveMesh && !m.infiniteDistance ? fixed : moving).push(m); }
+  if (fixed.length < 300) return () => { /* too few to be worth it */ };
+  const lo = new Vector3(Infinity, Infinity, Infinity), hi = new Vector3(-Infinity, -Infinity, -Infinity);
+  for (const m of fixed) { const b = m.getBoundingInfo().boundingBox; lo.minimizeInPlace(b.minimumWorld); hi.maximizeInPlace(b.maximumWorld); }
+  const oct: any = (sc as any).createOrUpdateSelectionOctree(64, 2); oct.update(lo, hi, fixed); oct.dynamicContent = moving;
+  const inBlocks = new Set<AbstractMesh>(fixed);
+  const added = sc.onNewMeshAddedObservable.add(m => { if (oct.dynamicContent.indexOf(m) < 0) oct.dynamicContent.push(m); });
+  const gone = sc.onMeshRemovedObservable.add(m => { if (inBlocks.delete(m)) oct.removeMesh(m); const i = oct.dynamicContent.indexOf(m); if (i >= 0) oct.dynamicContent.splice(i, 1); });
+  const timer = setInterval(() => { for (const m of inBlocks) if (!m.isWorldMatrixFrozen) { inBlocks.delete(m); oct.removeMesh(m); oct.dynamicContent.push(m); } }, 2000);
+  return () => { clearInterval(timer); sc.onNewMeshAddedObservable.remove(added); sc.onMeshRemovedObservable.remove(gone); };
 }
