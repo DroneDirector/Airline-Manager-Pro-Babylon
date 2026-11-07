@@ -166,7 +166,13 @@ export function applyLook(P: LookParts): (dt: number) => void {
     steps.push(() => { vls.exposure = 0.18 * Math.max(0, Math.min(1, (-P.sun.direction.y + 0.03) * 6)); }); });
   // lens flares on the sun
   if (g.flares && sunDisc) tryIt(() => { const fs = new LensFlareSystem('look-flares', sunDisc, sc); const tx = (a: number, c: string) => { const t = new DynamicTexture('flare', glowDot(128, a, c), sc, false); t.hasAlpha = true; t.update(); return t as any as Texture; };
-    new LensFlare(0.32, 0, new Color3(1, 0.95, 0.85), null as any, fs).texture = tx(0.9, 'rgba(255,240,220,A)'); for (const [s, p, c] of [[0.06, 0.25, 'rgba(255,200,140,A)'], [0.1, 0.5, 'rgba(180,220,255,A)'], [0.05, 0.75, 'rgba(255,180,120,A)'], [0.14, 1.1, 'rgba(160,200,255,A)']] as [number, number, string][]) new LensFlare(s, p, new Color3(1, 1, 1), null as any, fs).texture = tx(0.35, c); });
+    // small and faint ghosts (no big discs across the middle of the view); only big solid things hide the sun
+    const fl: [LensFlare, number[]][] = []; const add = (sz: number, p: number, rgb: number[], a: number, c: string) => { const f = new LensFlare(sz, p, new Color3(rgb[0], rgb[1], rgb[2]), null as any, fs); f.texture = tx(a, c); fl.push([f, rgb]); };
+    add(0.16, 0, [1, 0.95, 0.85], 0.8, 'rgba(255,240,220,A)'); for (const [sz, p, c] of [[0.025, 0.3, 'rgba(255,200,140,A)'], [0.04, 0.55, 'rgba(180,220,255,A)'], [0.02, 0.8, 'rgba(255,180,120,A)'], [0.05, 1.15, 'rgba(160,200,255,A)']] as [number, number, string][]) add(sz, p, [0.35, 0.35, 0.35], 0.3, c);
+    fs.meshesSelectionPredicate = (m: AbstractMesh) => m !== sunDisc && m.isVisible && m.isEnabled() && !!m.material && ((m.material as any).alpha === undefined || (m.material as any).alpha > 0.9) && isBig(m) && !/sky|look-/i.test(m.name);
+    // shown only while the sun is up and seen through the clouds, fading with how much of it shows
+    steps.push(() => { const k = Math.max(0, Math.min(1, (SUN.alt + 1) / 5)) * Math.max(0, Math.min(1, (SUN.vis - 0.35) / 0.5)); fs.isEnabled = k > 0.02;
+      if (fs.isEnabled) for (const [f, rgb] of fl) f.color.set(rgb[0] * k, rgb[1] * k, rgb[2] * k); }); });
 
   // height fog: a low haze over the ground that thins with height (the distance gets depth)
   if (g.heightFog) tryIt(() => { const dr = sc.enableDepthRenderer(cam, false, true, Texture.NEAREST_SAMPLINGMODE, true);

@@ -167,6 +167,7 @@ const Site$: Section = {
     const { engine, ui, progress } = ctx, site = SITES.find(s => s.id === (ctx.opts && ctx.opts.site)) || SITES[0]; O.ctx = ctx; O.site = site;
     progress(4, `Finding ${site.name}…`); await new Promise(r => setTimeout(r, 30));
     engine.useReverseDepthBuffer = true; O.engine = engine; const sc = new Scene(engine); O.scene = sc; sc.clearColor = new Color4(0.6, 0.72, 0.86, 1); sc.skipPointerMovePicking = true;
+    sc.blockMaterialDirtyMechanism = true;   // while the airport is built: materials are not re-checked after every change (released before the graphics are prepared)
     // the real ground's heights: fine round the site, coarse further out
     await loadArea(13, site.lat, site.lon, 9500, k => progress(6 + Math.round(k * 44), 'Loading the terrain round the site…'));
     await loadArea(11, site.lat, site.lon, 36000, k => progress(50 + Math.round(k * 20), 'Loading the mountains further out…'));
@@ -346,6 +347,7 @@ const Site$: Section = {
     // the shaders compiled while still loading (no stutter the first time something comes into view), at most 25 s
     const insides = jetwayInteriors(sc);   // the jetways' insides only drawn from close by
     try { tinyFar(sc); } catch (e) { /* all drawn */ }   // tiny things far away left out
+    sc.blockMaterialDirtyMechanism = false;
     progress(97, 'Preparing the graphics…');
     try { await Promise.race([sc.whenReadyAsync(), new Promise(r => setTimeout(r, 25000))]); } catch (e) { /* compiled as they come into view */ }
     progress(100, 'Ready');
