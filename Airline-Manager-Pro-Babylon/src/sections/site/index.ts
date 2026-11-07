@@ -457,10 +457,10 @@ const Site$: Section = {
         if (!inside) { const up = sc.pickWithRay(new Ray(cam.globalPosition, Vector3.Up(), 4), (m: any) => !!(m.metadata && /^J-\d/.test(m.metadata.id || '')), true); inside = !!(up && up.hit); }
         glassLook(gm, inside); O.glIn = inside;
         // live reflections (off unless turned on): set up the first time they are wanted
-        const gx: any = S.gfx, live = gx.reflMode === 'live'; if (live && !O.GM) { const sky = sc.meshes.filter((m: any) => /^sky/i.test(m.name));
+        const gx: any = S.gfx, live = gx.reflMode === 'live' || gx.reflMode === 'both'; if (live && !O.GM) { const sky = sc.meshes.filter((m: any) => /^sky/i.test(m.name));
           const extra = () => sc.meshes.filter((m: any) => m.isEnabled() && m.isVisible && (/^AIRFIELD\//.test(m.name) || (O.AFB && m === O.AFB.ground)) && !/COLLIDE/.test(m.name));
           O.GM = glassMirrors(sc, cam, gm, sky, extra, (g: any) => glassLook(g, !!O.glIn)); }
-        if (O.GM) { O.GM.tick(live, gx.liveReflQ || 0.5, inside); for (const m of O.GM.mats()) glassLook(m, inside); } } } catch (e) { /* stays as it is */ } }
+        if (O.GM) { O.GM.tick(live, gx.liveReflQ || 0.5, inside, gx.liveJet !== false); for (const m of O.GM.mats()) glassLook(m, inside); } } } catch (e) { /* stays as it is */ } }
       lap('jetways'); wx.frame(dt, now); lap('weather');
       sc.render(); lap('drawing'); perfEnd();
     });

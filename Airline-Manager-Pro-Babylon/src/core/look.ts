@@ -145,7 +145,7 @@ export function applyLook(P: LookParts): (dt: number) => void {
 
   // real-time reflections: glossy floors, glass and the wet apron reflect what is round them (heavy)
   // screen reflections (Settings → Graphics → Reflections: Screen), their quality from the slider (kept up to date)
-  if (g.reflMode === 'screen') tryIt(() => { const ssr = new SSRRenderingPipeline('look-ssr', sc, [cam], false, Constants.TEXTURETYPE_UNSIGNED_BYTE); ssr.reflectionSpecularFalloffExponent = 2; ssr.thickness = 0.6; ssr.maxDistance = 240; ssr.roughnessFactor = 0.15; ssr.enableAutomaticThicknessComputation = false; ssr.selfCollisionNumSkip = 2;
+  if (g.reflMode === 'screen' || g.reflMode === 'both') tryIt(() => { const ssr = new SSRRenderingPipeline('look-ssr', sc, [cam], false, Constants.TEXTURETYPE_UNSIGNED_BYTE); ssr.reflectionSpecularFalloffExponent = 2; ssr.thickness = 0.6; ssr.maxDistance = 240; ssr.roughnessFactor = 0.15; ssr.enableAutomaticThicknessComputation = false; ssr.selfCollisionNumSkip = 2;
     let lastQ = -1; const setQ = () => { const q = Math.max(0.1, Math.min(1, (S.gfx as any).ssrQ ?? 0.5)); if (Math.abs(q - lastQ) < 0.01) return; lastQ = q;
       ssr.step = Math.round(4 - 3 * q); ssr.maxSteps = Math.round(80 + 420 * q); ssr.ssrDownsample = q < 0.4 ? 2 : q < 0.75 ? 1 : 0; ssr.strength = 0.5 + 0.5 * q; ssr.blurDispersionStrength = 0.06 - 0.04 * q; };
     setQ(); let t = 0; steps.push(dt => { t += dt; if (t > 0.5) { t = 0; setQ(); } }); });

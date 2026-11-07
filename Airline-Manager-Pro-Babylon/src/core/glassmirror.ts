@@ -36,22 +36,25 @@ export function glassMirrors(sc: Scene, cam: Camera, glass: PBRMaterial, sky: Ab
       const g2 = glass.clone(glass.name + '/live' + planes.length) as PBRMaterial; (g2 as any)._inside = undefined; look(g2);
       const side: Side = { mats: [g2], mirror: null, plane: new Plane(-out.x, -out.y, -out.z, dd), meshes: mine }; (side as any).out = out; (side as any).dd = dd;
       planes.push(side); } }
-  let probe: ReflectionProbe | null = null, active: Side | null = null, on = false, q = -1;
+  let probe: ReflectionProbe | null = null, active: Side | null = null, on = false, q = -1, jetOn = false;
   const list = (qq: number) => { const L: AbstractMesh[] = [...sky]; for (const m of sc.meshes) if (m.isEnabled() && m.isVisible && kindUp(m, /aircraft|^jetway$|^J-\d/i)) L.push(m); if (qq >= 0.5) L.push(...extra()); return L; };
   const size = (qq: number) => qq < 0.3 ? 128 : qq < 0.55 ? 256 : qq < 0.8 ? 512 : 1024;
   const every = (qq: number) => qq < 0.35 ? 3 : qq < 0.7 ? 2 : 1;
   const stop = () => { for (const p of planes) { if (p.mirror) { p.mirror.dispose(); p.mirror = null; } for (const m of p.meshes) m.material = glass; }
     if (probe) { probe.dispose(); probe = null; } for (const m of jetGlass) m.material = glass; jetMat && jetMat.dispose(); jetMat = null; active = null; };
   let jetMat: PBRMaterial | null = null;
+  const makeJet = (L: AbstractMesh[]) => { if (!jetGlass.length) return; probe = new ReflectionProbe('glass-jet-probe', q < 0.55 ? 64 : 128, sc); probe.refreshRate = every(q) * 2; for (const m of L) if (!jetGlass.includes(m)) probe.renderList!.push(m);
+    jetMat = glass.clone(glass.name + '/jet') as PBRMaterial; (jetMat as any)._inside = undefined; look(jetMat); jetMat.reflectionTexture = probe.cubeTexture; };
   /** Called a few times a second: on or off, the quality, which side you are on (or inside). */
-  const tick = (want: boolean, quality: number, inside: boolean) => {
+  const tick = (want: boolean, quality: number, inside: boolean, jet = true) => {
     if (!want) { if (on) { stop(); on = false; } return; }
-    if (!on || Math.abs(quality - q) > 0.04) { stop(); on = true; q = quality;
+    // the jetways' all-round reflection is its own switch: turning it on or off leaves the terminal's glass as it is
+    if (on && jet !== jetOn) { if (probe) { probe.dispose(); probe = null; } for (const m of jetGlass) m.material = glass; if (jetMat) { jetMat.dispose(); jetMat = null; } jetOn = jet; if (jet) makeJet(list(q)); }
+    if (!on || Math.abs(quality - q) > 0.04) { stop(); on = true; q = quality; jetOn = jet;
       const L = list(q);
       for (const p of planes) { const mt = new MirrorTexture('glass-mirror', size(q), sc, true); mt.mirrorPlane = p.plane; mt.renderList = L; mt.refreshRate = every(q); mt.level = 1;
         p.mirror = mt; p.mats[0].reflectionTexture = mt; (p.mats[0] as any).realTimeFiltering = false; }
-      if (jetGlass.length) { probe = new ReflectionProbe('glass-jet-probe', q < 0.55 ? 64 : 128, sc); probe.refreshRate = every(q) * 2; for (const m of L) if (!jetGlass.includes(m)) probe.renderList!.push(m);
-        jetMat = glass.clone(glass.name + '/jet') as PBRMaterial; (jetMat as any)._inside = undefined; look(jetMat); jetMat.reflectionTexture = probe.cubeTexture; }
+      if (jet) makeJet(L);
     }
     // the side you are on: its mirror drawn and its panes mirroring; the other side as before (and nothing while inside)
     const p0 = cam.globalPosition; let best: Side | null = null;
