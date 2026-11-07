@@ -400,3 +400,10 @@ body.photo-on .cab-says { display: none; }
 @media (min-width: 1000px) { .ds-card { width: min(820px, 80vw); padding: 24px 26px; font-size: 15px; } .ds-head b { font-size: 20px; }
   .ds-body { grid-template-columns: 300px 1fr; gap: 20px; } .ds-facts { grid-template-columns: 1fr; align-content: start; } .ds-foot { justify-content: flex-end; } .ds-foot button { flex: 0 0 190px; } }
 @media (max-height: 480px) and (orientation: landscape) { .ds-card { max-height: 96vh; padding-top: 10px; } .ds-body { grid-template-columns: 1fr 1fr; } .ds-facts { grid-template-columns: 1fr 1fr; } .ds-foot button { height: 40px; } }
+
+/* the problem report at the start screen (uses the device scan's card) */
+.ir-note { margin: 0 0 6px; opacity: .8; }
+.ir-list { display: grid; gap: 6px; max-height: 46vh; overflow-y: auto; }
+.ir-list div { display: grid; gap: 2px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, .05); }
+.ir-list small { opacity: .6; font-size: 11px; } .ir-list span { opacity: .85; font-size: 13px; }
+@media (min-width: 1000px) { .ir-wrap .ds-body { grid-template-columns: 1fr; } }

@@ -41,6 +41,11 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 function serve() {
   return new Promise(res => {
     const srv = http.createServer((req, rsp) => {
+      if ((req.url || '').split('?')[0] === '/api/log' && req.method === 'POST') {   // a problem for Documents\\Airport Dynasty Pro\\Logs\\problems.log
+        let b = ''; req.on('data', c => { b += c; if (b.length > 1e5) req.destroy(); });
+        req.on('end', () => { try { const j = JSON.parse(b || '{}'), dir = path.join(app.getPath('documents'), 'Airport Dynasty Pro', 'Logs'); fs.mkdirSync(dir, { recursive: true });
+          const line = `${new Date(j.at || Date.now()).toISOString()}  ${j.place || ''}: ${j.what || ''}\r\n    ${j.why || ''}${j.detail ? '\r\n    ' + String(j.detail).replace(/\n/g, '\r\n    ') : ''}\r\n\r\n`;
+          fs.appendFileSync(path.join(dir, 'problems.log'), line); } catch (e) { /* not written */ } rsp.writeHead(204); rsp.end(); }); return; }
       if ((req.url || '').split('?')[0] === '/api/update') {
         if (req.method === 'POST') { let b = ''; req.on('data', c => { b += c; if (b.length > 1e5) req.destroy(); }); req.on('end', () => { let j = {}; try { j = JSON.parse(b || '{}'); } catch (e) { /* empty */ } startUpdate(j.url, j.version); rsp.writeHead(200, { 'Content-Type': 'application/json' }); rsp.end(JSON.stringify(UPD)); }); return; }
         rsp.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); rsp.end(JSON.stringify(UPD)); return;

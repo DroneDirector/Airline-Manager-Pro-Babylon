@@ -1,6 +1,7 @@
 // The start screen of the Babylon.js edition: the same film as the main game's (the stand, the pushback, the flight
 // deck, above the clouds at sunset and the operations desk), cut to the music, the same logo and look; no menus yet,
 // only the way into the lounge. The film is drawn on its own canvas over the 3D view.
+import { pendingIssues, issuesText } from '../core/errlog';
 import { S, saveSettings } from '../core/settings';
 import { APP } from '../core/app';
 import { icon, esc } from './icons';
@@ -63,6 +64,7 @@ export function splashOpen(enter: (id: string) => void) {
   T.clock0 = performance.now(); T.lastShot = -1;
   const loop = () => { if (!T.on) return; T.raf = requestAnimationFrame(loop); if (!document.hidden) titleFrame(); };
   T.raf = requestAnimationFrame(loop);
+  setTimeout(issueReport, 900);   // problems since last time, like a crash screen
 }
 export function splashIsOpen(): boolean { return !!TitleScreen.on; }
 /** Up and down (keys, D-pad) move between the start screen's choices. */
@@ -264,4 +266,20 @@ function titleCaption(sh: TsShot) {
   el.classList.remove('on'); void el.offsetWidth;
   (el.querySelector('small') as HTMLElement).textContent = sh.cap[0]; (el.querySelector('b') as HTMLElement).textContent = sh.cap[1];
   el.classList.add('on');
+}
+
+/** The report of what could not be combined (instancing, texture arrays) since last time: Copy, Share, OK. */
+function issueReport() {
+  const list = pendingIssues(); if (!list.length || document.querySelector('.ir-wrap')) return;
+  const w = document.createElement('div'); w.className = 'ds-wrap ir-wrap';
+  w.innerHTML = `<div class="ds-card" role="dialog" aria-label="Problem report"><div class="ds-head"><b>Something was not right last time</b><span class="ds-q low">${list.length}</span></div>
+    <div class="ds-body"><p class="ir-note">These parts were drawn the usual way instead (nothing is missing). Copy or share the report to send it.</p>
+    <div class="ir-list">${list.slice(-30).reverse().map(i => `<div><small>${esc(new Date(i.at).toLocaleString())} · ${esc(i.place)}</small><b>${esc(i.what)}</b><span>${esc(i.why)}</span></div>`).join('')}</div></div>
+    <div class="ds-foot"><button class="ds-no" data-ir="copy">Copy</button><button class="ds-no" data-ir="share">Share</button><button class="ds-yes" data-ir="ok">OK</button></div></div>`;
+  document.body.appendChild(w); requestAnimationFrame(() => w.classList.add('in'));
+  const text = 'Airport Dynasty Pro ' + APP.version + ' · problem report\n\n' + issuesText(list);
+  w.addEventListener('click', async e => { const b = (e.target as HTMLElement).closest('[data-ir]') as HTMLElement; if (!b) return; const a = b.getAttribute('data-ir');
+    if (a === 'copy') { try { await navigator.clipboard.writeText(text); b.textContent = 'Copied'; } catch (er) { b.textContent = 'Could not copy'; } return; }
+    if (a === 'share') { try { if ((navigator as any).share) await (navigator as any).share({ title: 'Problem report', text }); else { await navigator.clipboard.writeText(text); b.textContent = 'Copied'; } } catch (er) { /* closed */ } return; }
+    pendingIssues(true); w.classList.remove('in'); setTimeout(() => w.remove(), 200); });
 }

@@ -4,6 +4,7 @@
 // everything that moves it stay, so the animation drives the new model the same way) and checked against the
 // slot's rules: its size, where its origin sits, which way it slides. What was replaced, and any problem, is
 // written to the game's log (Settings → Updates and errors) and told on screen, each time.
+import { logIssue } from './errlog';
 import { Scene, TransformNode, Vector3, AbstractMesh, LoadAssetContainerAsync, Texture, VideoTexture } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { gameSend } from '../ui/game-frame';
@@ -74,7 +75,12 @@ export async function applyReplacements(sc: Scene) {
         if (rule.origin !== 'any' && o.length() > Math.max(...want) * 0.25) probs.push(`its origin is ${o.length().toFixed(2)} m off its ${rule.origin === 'base' ? 'underside' : 'middle'}`);
         if (rule.slides === 'y' && sz.y < Math.max(sz.x, sz.z)) probs.push('it should be longest upright (it slides up and down)');
         if (rule.slides === 'z' && sz.z < Math.max(sz.x, sz.y)) probs.push('it should be longest along its length (it slides along it)'); }
-      for (const n of nodes) { const inst = box.instantiateModelsToScene(nm => `${id}:${nm}`, false, { doNotInstantiate: true });
+      // the same model in several slots: instances of one model (drawn together); a model with bones or shape animation
+      // is copied in full for each (those can't be shared). If instancing fails, full copies, and the problem is logged.
+      const share = nodes.length > 1 && !box.skeletons.length && !box.morphTargetManagers.length && !box.animationGroups.length;
+      const place = (n: TransformNode, inst: boolean) => box.instantiateModelsToScene(nm => `${id}:${nm}`, false, { doNotInstantiate: !inst });
+      for (const n of nodes) { let inst: any;
+        try { inst = place(n, share); } catch (e: any) { logIssue('Your models', `${file}: drawn as full copies`, String((e && e.message) || e), `slot ${id}`); inst = place(n, false); }
         for (const ch of n.getChildren()) (ch as any).setEnabled && (ch as any).setEnabled(false);
         for (const r of inst.rootNodes) { r.parent = n; (r as TransformNode).position && (r as TransformNode).position.setAll(0); for (const m of r.getChildMeshes(false) as AbstractMesh[]) { m.metadata = n.metadata; m.receiveShadows = true; } } }
       tell('info', `${rule.title} replaced`, `${file} is used on ${nodes.length} part${nodes.length > 1 ? 's' : ''}`);

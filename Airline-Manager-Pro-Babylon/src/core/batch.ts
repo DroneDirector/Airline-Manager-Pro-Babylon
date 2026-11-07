@@ -87,3 +87,43 @@ export function prewarmHidden(sc: Scene): void {
     mat.forceCompilationAsync(m, { useInstances: !!(m as Mesh).hasInstances }).catch(() => { /* compiled when shown */ }).then(() => setTimeout(next, 16)); };
   setTimeout(next, 500);
 }
+
+/** The places built without the airport's kit (the lounge, the offices, operations, the hangar, the court, the joined
+ *  building, the terminal on its own): what is fixed is found by watching, then combined like at the airport.
+ *  A second and a half after the place has settled, everything that has not moved, is not animated and is not a door,
+ *  a lift, a screen, a person, an animal, a vehicle, an aircraft or the like counts as fixed: it is fixed in place and
+ *  gets the texture arrays, merging, thin instances (with boxes to walk against) and the octree. Anything that fails is
+ *  logged (shown at the start screen next time) and simply drawn as it was. */
+const MOVES = /door|lift|elev|hatch|drawer|fan|wheel|prop|rotor|screen|monitor|\btv\b|npc|person|people|staff|pilot|crew|avatar|pet|dog|cat|bird|animal|aircraft|airliner|plane|\bcar\b|vehicle|bus|truck|cart|player|camera|sky|cloud|water|fire|flag|curtain|blind|clock|board|fids|ball|net|hose|jetway|look-|holo|wx|rain|snow/i;
+export function optimizePlace(sc: Scene, place: string, log: (what: string, why: string) => void) {
+  const moving = (m: Node | null) => { for (let q: any = m; q; q = q.parent) { if (MOVES.test(q.name || '')) return true; const md = q.metadata; if (md && (md.door || md.lift || md.slot || md.live || MOVES.test(String(md.kind || '')))) return true; } return false; };
+  setTimeout(() => {
+    if (sc.isDisposed) return; const W0 = new Map<AbstractMesh, Float32Array>();
+    for (const m of sc.meshes) W0.set(m, new Float32Array(m.computeWorldMatrix(true).m));
+    setTimeout(() => {
+      if (sc.isDisposed) return;
+      const animated = new Set<any>(); for (const g of sc.animationGroups) for (const ta of g.targetedAnimations) animated.add(ta.target); for (const a of (sc as any)._activeAnimatables || []) animated.add(a.target);
+      const isAnim = (m: Node) => { for (let q: any = m; q; q = q.parent) if (animated.has(q)) return true; return false; };
+      const fixed = new Set<AbstractMesh>();
+      for (const m of sc.meshes) { const w0 = W0.get(m); if (!w0 || m.skeleton || m.isWorldMatrixFrozen && !(m as any).isAnInstance && false) continue;
+        const w1 = m.computeWorldMatrix(true).m; let same = true; for (let i = 0; i < 16; i++) if (Math.abs(w1[i] - w0[i]) > 1e-5) { same = false; break; }
+        if (same && !moving(m) && !isAnim(m)) fixed.add(m); }
+      for (const m of fixed) { if (!m.isWorldMatrixFrozen) m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true; }
+      const ok = (m: AbstractMesh) => fixed.has(m), gens: any[] = [];
+      for (const l of sc.lights) { const g: any = (l as any).getShadowGenerator && (l as any).getShadowGenerator(); if (g && g.getShadowMap()) gens.push(g); }
+      const casters: AbstractMesh[] = []; for (const g of gens) for (const m of g.getShadowMap().renderList || []) if (!casters.includes(m)) casters.push(m);
+      const step = (what: string, f: () => void) => { try { f(); } catch (e) { log(what + ' could not be done', String((e as any)?.message || e)); } };
+      step('Texture arrays', () => shareMaterialsLazy(sc, ok));
+      step('Merging fixed objects', () => mergeStatic(sc, ok, casters));
+      step('Thin instances', () => thinLazy(sc, ok, casters, !!sc.collisionsEnabled));
+      for (const g of gens) { const sm = g.getShadowMap(); if (sm && sm.renderList) sm.renderList = casters.filter(m => !m.isDisposed()); }
+      step('Freezing materials', () => freezeStatic(sc));
+      if (!(sc as any)._selectionOctree) step('The octree', () => { const stop = octreeStatic(sc); sc.onDisposeObservable.addOnce(stop); });
+      step('Shader pre-warming', () => prewarmHidden(sc));
+    }, 1500);
+  }, 2500);
+}
+// (loaded on use: texarray and thin import this file's neighbours)
+let shareMaterialsLazy: (sc: Scene, ok: (m: AbstractMesh) => boolean) => any = () => 0;
+let thinLazy: (sc: Scene, ok: (m: AbstractMesh) => boolean, c: AbstractMesh[], walk: boolean) => any = () => 0;
+export function setCombiners(share: typeof shareMaterialsLazy, thin: typeof thinLazy) { shareMaterialsLazy = share; thinLazy = thin; }

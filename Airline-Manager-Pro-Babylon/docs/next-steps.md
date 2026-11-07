@@ -6,3 +6,7 @@
 - Draw calls per pass (main view, shadows, glow): measure, to see where the rest of the draw calls go.
 - Thin instances: if draw calls matter more than processor time on a device, try larger areas than 150 m.
 - Before 1.0: remove the "Animate jetways (test)" button; permissions from VATSIM, IVAO, SimBrief and Hoppie.
+
+- Airport layouts (OpenStreetMap): build them with instancing from the start (runway and taxiway lights, stand markings, signs and repeated buildings as thin instances).
+- Next worthwhile instancing: the jetways' stair steps, posts, rails and wheels (about 400 pieces), grouped per jetway so they still move with it and the stairs stay walkable.
+- Animated people and animals in groups: baked-animation instancing (each walks its own path); one taken out of the group for a special moment (a chase, an arrest, a bird strike).

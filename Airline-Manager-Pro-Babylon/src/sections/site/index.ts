@@ -9,6 +9,7 @@
 // on the airport boundary. Inside the boundary the ground is levelled (blending into the real ground only within its
 // outer 100 m); outside it the real ground and its mountains are untouched. Ready-made views (from a gate, the apron,
 // the runway, the holding point, the air) and a free drone camera, the time of day and the weather, the photo button.
+import { logIssue } from '../../core/errlog';
 import { glassMirrors } from '../../core/glassmirror';
 import { glassLook } from '../terminal/kit';
 import { thinStatic } from '../../core/thin';
@@ -243,8 +244,8 @@ const Site$: Section = {
     { const doorParts = new Set<any>(); for (const d of doors) for (const m of d.node.getChildMeshes()) doorParts.add(m);
       const okM = (m: AbstractMesh) => !before.has(m) && !liftParts.has(m) && !hidden.has(m) && !doorParts.has(m);
       // materials alike but for colour and picture become one (texture arrays), so far more can be merged below
-      try { shareMaterials(sc, okM); } catch (e) { /* each keeps its own */ }
-      try { mergeStatic(sc, okM, casters); } catch (e) { /* as built */ } }
+      try { shareMaterials(sc, okM); } catch (e) { logIssue('Airport', 'Texture arrays could not be made', String((e as any)?.message || e)); }
+      try { mergeStatic(sc, okM, casters); } catch (e) { logIssue('Airport', 'Fixed objects could not be merged', String((e as any)?.message || e)); } }
     // airport mode (from the game's Airport): on foot, with gravity, against the terminal's floors, walls and glass,
     // the levelled ground and the aircraft; the stairs are walked up as ramps; the doors open as you come to them
     const walkMode = !!(ctx.opts && ctx.opts.walk); O.walkMode = walkMode;
@@ -276,7 +277,7 @@ const Site$: Section = {
     }
     // the fixed copies (furniture, fittings) as thin instances: nothing per copy left for the processor each frame
     try { const moving = new Set<any>(); for (const d of doors) for (const m of d.node.getChildMeshes()) moving.add(m);
-      thinStatic(sc, m => !before.has(m) && !liftParts.has(m) && !hidden.has(m) && !moving.has(m), casters, walkMode); } catch (e) { /* the copies stay */ }
+      thinStatic(sc, m => !before.has(m) && !liftParts.has(m) && !hidden.has(m) && !moving.has(m), casters, walkMode); } catch (e) { logIssue('Airport', 'Thin instances could not be made', String((e as any)?.message || e)); }
     O.doors = doors;
     progress(92, 'Setting up the views…');
     // lights, camera, the sky and its weather
@@ -404,8 +405,8 @@ const Site$: Section = {
     progress(100, 'Ready');
     // then, with your own models in place, the materials that never change are frozen (the ground's, the landscape's,
     // lamps, signs, screens and the weather's stay live)
-    const freezeLater = () => { try { const keep = new Set<any>(); for (const m of sc.meshes) if (/ground|GROUND|ROAD|APRON|GRASS/.test(m.name) && m.material) keep.add(m.material); freezeStatic(sc, keep); } catch (e) { /* all live */ }
-      try { const stop = octreeStatic(sc); sc.onDisposeObservable.addOnce(stop); } catch (e) { /* every object tested on its own */ }
+    const freezeLater = () => { try { const keep = new Set<any>(); for (const m of sc.meshes) if (/ground|GROUND|ROAD|APRON|GRASS/.test(m.name) && m.material) keep.add(m.material); freezeStatic(sc, keep); } catch (e) { logIssue('Airport', 'Materials could not be frozen', String((e as any)?.message || e)); }
+      try { const stop = octreeStatic(sc); sc.onDisposeObservable.addOnce(stop); } catch (e) { logIssue('Airport', 'The octree could not be built', String((e as any)?.message || e)); }
       try { prewarmHidden(sc); } catch (e) { /* compiled when shown */ }
       };
     applyReplacements(sc).then(freezeLater, freezeLater);
