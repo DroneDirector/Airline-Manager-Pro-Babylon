@@ -122,23 +122,38 @@ export function buildJetway(K: Kit, n: number, gateX: number, stand: { x: number
   /** The hoses' simulation (in the jetway's frame), one step: the wind, the spring back to the hanging shape, gravity, their length kept, the colliders, both ends on their pipes. */
   const hoses: any[] = [], colliders: { nd: TransformNode; c: Vector3; h: Vector3 }[] = [], HR = 0.17;
   const collide = (nd: TransformNode, c: Vector3, h: Vector3) => colliders.push({ nd, c, h });
-  const stepHoses = (dt: number, iters = 1) => { const W = V(0.75, 0, 0.66);
-    const cm = colliders.map(cl => { const m = cl.nd.computeWorldMatrix(true).multiply(oInv), inv = m.clone().invert(); return { m, inv, c: cl.c, h: cl.h }; });
-    for (const H of hoses) { const rw = H.rest.map((r: Vector3) => toO(H.par, r)); if (!H.x.length) { H.x = rw.map((v: Vector3) => v.clone()); H.p = rw.map((v: Vector3) => v.clone()); }
+  // the hoses' cloth: worked out in place (no new objects every frame), the tube rebuilt only when a hose has really
+  // moved (half a centimetre) and at most 30 times a second, and nothing at all while you are more than 90 m away
+  const HW = V(0.75, 0, 0.66), HG = V(0, -1.5, 0), hv = V(0, 0, 0), ha = V(0, 0, 0), hdv = V(0, 0, 0), hl = V(0, 0, 0), hm = new Matrix();
+  let hoseT = 0;
+  const stepHoses = (dt: number, iters = 1) => {
+    const cam = sc.activeCamera; if (cam && Vector3.Distance(cam.globalPosition, o.getAbsolutePosition()) > 90) return;
+    for (const cl of colliders as any[]) { if (!cl.m) { cl.m = new Matrix(); cl.inv = new Matrix(); } cl.nd.computeWorldMatrix(true).multiplyToRef(oInv, cl.m); cl.m.invertToRef(cl.inv); }
+    const now = performance.now(), mayBuild = now >= hoseT; if (mayBuild) hoseT = now + 33;
+    for (const H of hoses) {
+      if (!H.rw) H.rw = H.rest.map(() => V(0, 0, 0));
+      for (let k = 0; k < H.rest.length; k++) { H.par.computeWorldMatrix(true).multiplyToRef(oInv, hm); Vector3.TransformCoordinatesToRef(H.rest[k], hm, H.rw[k]); }
+      const rw: Vector3[] = H.rw;
+      if (!H.x.length) { H.x = rw.map((v: Vector3) => v.clone()); H.p = rw.map((v: Vector3) => v.clone()); }
       for (let it = 0; it < iters; it++) { const t = clock + it * dt, gust = 0.5 + 0.35 * Math.sin(t * 0.8 + H.ph) + 0.15 * Math.sin(t * 2.3 + H.ph * 2);
-        for (let k = 1; k < H.x.length - 1; k++) { const x = H.x[k], v = x.subtract(H.p[k]).scale(0.94), sag = Math.sin(Math.PI * k / (H.x.length - 1));
-          const a = rw[k].subtract(x).scale(22).add(V(0, -1.5, 0)).add(W.scale(0.9 * gust * sag)); H.p[k] = x.clone(); H.x[k] = x.add(v).add(a.scale(dt * dt)); }
+        for (let k = 1; k < H.x.length - 1; k++) { const x: Vector3 = H.x[k], sag = Math.sin(Math.PI * k / (H.x.length - 1));
+          x.subtractToRef(H.p[k], hv).scaleInPlace(0.94);
+          rw[k].subtractToRef(x, ha).scaleInPlace(22).addInPlace(HG); ha.addInPlaceFromFloats(HW.x * 0.9 * gust * sag, 0, HW.z * 0.9 * gust * sag);
+          H.p[k].copyFrom(x); x.addInPlace(hv).addInPlaceFromFloats(ha.x * dt * dt, ha.y * dt * dt, ha.z * dt * dt); }
         for (let pass = 0; pass < 4; pass++) {
-          for (let k = 0; k < H.x.length - 1; k++) { const d = H.x[k + 1].subtract(H.x[k]), L0 = d.length() || 1e-6, e = (L0 - H.len[k]) / L0 * 0.5; const w0 = k === 0 ? 0 : 1, w1 = k + 1 === H.x.length - 1 ? 0 : 1, sw = w0 + w1 || 1;
-            H.x[k].addInPlace(d.scale(e * 2 * w0 / sw)); H.x[k + 1].subtractInPlace(d.scale(e * 2 * w1 / sw)); }
-          for (let k = 1; k < H.x.length - 1; k++) for (const C of cm) { const l = Vector3.TransformCoordinates(H.x[k], C.inv).subtract(C.c), ex = C.h.x + HR - Math.abs(l.x), ey = C.h.y + HR - Math.abs(l.y), ez = C.h.z + HR - Math.abs(l.z);
-            if (ex > 0 && ey > 0 && ez > 0) { if (ex < ey && ex < ez) l.x += Math.sign(l.x || 1) * ex; else if (ey < ez) l.y += Math.sign(l.y || 1) * ey; else l.z += Math.sign(l.z || 1) * ez; H.x[k] = Vector3.TransformCoordinates(l.add(C.c), C.m); } }
+          for (let k = 0; k < H.x.length - 1; k++) { H.x[k + 1].subtractToRef(H.x[k], hdv); const L0 = hdv.length() || 1e-6, e = (L0 - H.len[k]) / L0 * 0.5; const w0 = k === 0 ? 0 : 1, w1 = k + 1 === H.x.length - 1 ? 0 : 1, sw = w0 + w1 || 1;
+            const f0 = e * 2 * w0 / sw, f1 = e * 2 * w1 / sw; H.x[k].addInPlaceFromFloats(hdv.x * f0, hdv.y * f0, hdv.z * f0); H.x[k + 1].addInPlaceFromFloats(-hdv.x * f1, -hdv.y * f1, -hdv.z * f1); }
+          for (let k = 1; k < H.x.length - 1; k++) for (const C of colliders as any[]) { Vector3.TransformCoordinatesToRef(H.x[k], C.inv, hl); hl.subtractInPlace(C.c); const ex = C.h.x + HR - Math.abs(hl.x), ey = C.h.y + HR - Math.abs(hl.y), ez = C.h.z + HR - Math.abs(hl.z);
+            if (ex > 0 && ey > 0 && ez > 0) { if (ex < ey && ex < ez) hl.x += Math.sign(hl.x || 1) * ex; else if (ey < ez) hl.y += Math.sign(hl.y || 1) * ey; else hl.z += Math.sign(hl.z || 1) * ez; hl.addInPlace(C.c); Vector3.TransformCoordinatesToRef(hl, C.m, H.x[k]); } }
           H.x[0].copyFrom(rw[0]); H.x[H.x.length - 1].copyFrom(rw[rw.length - 1]); } }
-      // the tube again only when it has moved: a smooth curve through the points, ribbed
-      const moved = !H.last || H.x.some((v: Vector3, k: number) => Vector3.DistanceSquared(v, H.last[k]) > 4e-6); if (!moved) continue; H.last = H.x.map((v: Vector3) => v.clone());
-      const path: Vector3[] = []; for (let m = 0; m < H.M; m++) { const f = m / (H.M - 1) * (H.x.length - 1), k = Math.min(H.x.length - 2, Math.floor(f)), u = f - k;
-        path.push(Vector3.CatmullRom(H.x[Math.max(0, k - 1)], H.x[k], H.x[k + 1], H.x[Math.min(H.x.length - 1, k + 2)], u)); }
-      const rf = (_i: number, dist: number) => 0.15 * (0.95 + 0.06 * Math.pow(0.5 + 0.5 * Math.cos(dist * Math.PI * 2 / 0.075), 2));
+      // the tube again only when it has moved
+      if (!mayBuild) continue;
+      const moved = !H.last || H.x.some((v: Vector3, k: number) => Vector3.DistanceSquared(v, H.last[k]) > 2.5e-5); if (!moved) continue;
+      if (!H.last) H.last = H.x.map((v: Vector3) => v.clone()); else for (let k = 0; k < H.x.length; k++) H.last[k].copyFrom(H.x[k]);
+      if (!H.path) H.path = Array.from({ length: H.M }, () => V(0, 0, 0));
+      const path: Vector3[] = H.path; for (let m = 0; m < H.M; m++) { const f = m / (H.M - 1) * (H.x.length - 1), k = Math.min(H.x.length - 2, Math.floor(f)), u = f - k;
+        path[m].copyFrom(Vector3.CatmullRom(H.x[Math.max(0, k - 1)], H.x[k], H.x[k + 1], H.x[Math.min(H.x.length - 1, k + 2)], u)); }
+      const rf = H.rf || (H.rf = (_i: number, dist: number) => 0.15 * (0.95 + 0.06 * Math.pow(0.5 + 0.5 * Math.cos(dist * Math.PI * 2 / 0.075), 2)));
       if (!H.mesh) { H.mesh = MeshBuilder.CreateTube(`J-${n}/PCA-HOSE`, { path, tessellation: 16, cap: Mesh.CAP_ALL, radiusFunction: rf, updatable: true } as any, sc); H.mesh.material = X.JY; H.mesh.parent = o; H.mesh.metadata = meta; H.mesh.receiveShadows = true; K.casters.push(H.mesh); made.push(H.mesh); }
       else MeshBuilder.CreateTube('', { path, radiusFunction: rf, instance: H.mesh } as any); } };
   const angD = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));

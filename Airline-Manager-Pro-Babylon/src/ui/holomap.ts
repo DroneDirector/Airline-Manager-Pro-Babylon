@@ -204,10 +204,12 @@ export function holoMap(host: HTMLElement, get: () => HoloState | null, root?: T
   // ---------- drawing one view of the map ----------
   interface View { cx: number; cz: number; yaw: number; k: number; f: number; full: boolean }
   const t0 = performance.now();
+  const PP: [number, number][] = Array.from({ length: 32 }, () => [0, 0] as [number, number]); let pi = 0;
   const render = (c0: CanvasRenderingContext2D, W: number, H: number, dpr: number, V: View, st: HoloState) => {
     const c: CanvasRenderingContext2D = LIGHT ? new Proxy(c0, { set(t: any, k, v) { if (k !== 'shadowBlur') t[k] = v; return true; }, get(t: any, k) { const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; } }) : c0;
     const now = performance.now(), sy = Math.sin(V.yaw), cy = Math.cos(V.yaw), k = V.k, X0 = W / 2, Y0 = H / 2;
-    const P = (x: number, z: number): [number, number] => { const dx = x - V.cx, dz = z - V.cz; return [X0 + (dx * cy - dz * sy) * k, Y0 - (dx * sy + dz * cy) * k]; };
+    // a point on the map: written into one of a small ring of reused pairs (no new objects for every point drawn)
+    const P = (x: number, z: number): [number, number] => { const dx = x - V.cx, dz = z - V.cz, r = PP[pi = (pi + 1) & 31]; r[0] = X0 + (dx * cy - dz * sy) * k; r[1] = Y0 - (dx * sy + dz * cy) * k; return r; };
     const reach = Math.max(W, H) / k * 0.75, inView = (x: number, z: number) => Math.abs(x - V.cx) < reach && Math.abs(z - V.cz) < reach;
     c.clearRect(0, 0, W, H);
     const bg = c.createRadialGradient(X0, Y0, Math.min(W, H) * 0.05, X0, Y0, Math.max(W, H) * 0.75); bg.addColorStop(0, 'rgba(10,40,70,.78)'); bg.addColorStop(1, 'rgba(3,12,26,.86)');

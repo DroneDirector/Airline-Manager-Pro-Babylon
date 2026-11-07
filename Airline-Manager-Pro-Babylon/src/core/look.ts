@@ -159,7 +159,7 @@ export function applyLook(P: LookParts): (dt: number) => void {
   // the sun's disc for the rays and the flares: kept far out along the sun's direction, hidden below the horizon
   let sunDisc: Mesh | null = null;
   if (g.volLight || g.flares) { sunDisc = MeshBuilder.CreateSphere('look-sun', { diameter: 40, segments: 12 }, sc); const sm = new StandardMaterial('look-sun', sc); sm.emissiveColor = new Color3(1, 0.86, 0.62); sm.disableLighting = true; sunDisc.material = sm; sunDisc.isPickable = false; sunDisc.applyFog = false;
-    steps.push(() => { const d = P.sun.direction; sunDisc!.position.copyFrom(cam.globalPosition.subtract(d.scale(780))); const up = -d.y; sunDisc!.setEnabled(up > -0.03); sm.emissiveColor.set(1, 0.72 + 0.2 * Math.min(1, up * 4), 0.45 + 0.3 * Math.min(1, up * 4)); }); }
+    steps.push(() => { const d = P.sun.direction; sunDisc!.position.set(cam.globalPosition.x - d.x * 780, cam.globalPosition.y - d.y * 780, cam.globalPosition.z - d.z * 780); const up = -d.y; sunDisc!.setEnabled(up > -0.03); sm.emissiveColor.set(1, 0.72 + 0.2 * Math.min(1, up * 4), 0.45 + 0.3 * Math.min(1, up * 4)); }); }
   // volumetric light: rays from the sun past the buildings, the jetways and through the glass
   if (g.volLight && sunDisc) tryIt(() => { const vls = new VolumetricLightScatteringPostProcess('look-rays', IS_PC ? 0.75 : 0.5, cam, sunDisc!, IS_PC ? 90 : 40, Texture.BILINEAR_SAMPLINGMODE, E, false); vls.exposure = 0.18; vls.decay = 0.965; vls.weight = 0.55; vls.density = 0.92;
     vls.excludedMeshes = sc.meshes.filter(m => m !== sunDisc && !isBig(m));   // only big things block the sun's rays (small ones never show in them)
@@ -169,7 +169,8 @@ export function applyLook(P: LookParts): (dt: number) => void {
     new LensFlare(0.32, 0, new Color3(1, 0.95, 0.85), null as any, fs).texture = tx(0.9, 'rgba(255,240,220,A)'); for (const [s, p, c] of [[0.06, 0.25, 'rgba(255,200,140,A)'], [0.1, 0.5, 'rgba(180,220,255,A)'], [0.05, 0.75, 'rgba(255,180,120,A)'], [0.14, 1.1, 'rgba(160,200,255,A)']] as [number, number, string][]) new LensFlare(s, p, new Color3(1, 1, 1), null as any, fs).texture = tx(0.35, c); });
 
   // height fog: a low haze over the ground that thins with height (the distance gets depth)
-  if (g.heightFog) tryIt(() => { const dr = sc.enableDepthRenderer(cam, false, true, Texture.NEAREST_SAMPLINGMODE, true); const pp = new PostProcess('look-fog', 'heightFog', ['invView', 'camPos', 'fogColor', 'tanHalf', 'aspect', 'density', 'falloff', 'base'], ['depthSampler'], 1, cam);
+  if (g.heightFog) tryIt(() => { const dr = sc.enableDepthRenderer(cam, false, true, Texture.NEAREST_SAMPLINGMODE, true);
+ const pp = new PostProcess('look-fog', 'heightFog', ['invView', 'camPos', 'fogColor', 'tanHalf', 'aspect', 'density', 'falloff', 'base'], ['depthSampler'], 1, cam);
     pp.onApply = ef => { ef.setTexture('depthSampler', dr.getDepthMap()); const inv = cam.getViewMatrix().clone().invert(); ef.setMatrix('invView', inv); ef.setVector3('camPos', cam.globalPosition);
       const fc = sc.fogColor || new Color3(0.7, 0.75, 0.82), day = Math.max(0.15, Math.min(1, (WX.sunAlt + 6) / 20)); ef.setColor3('fogColor', new Color3(fc.r * day, fc.g * day, fc.b * day)); ef.setFloat('tanHalf', Math.tan((cam as any).fov / 2)); ef.setFloat('aspect', E.getAspectRatio(cam));
       ef.setFloat('density', 0.0016 + 0.004 * WX.rain); ef.setFloat('falloff', 0.035); ef.setFloat('base', P.base); }; });
@@ -197,9 +198,9 @@ export function applyLook(P: LookParts): (dt: number) => void {
       const on = wet > 0.03; if (WET.mirror && on !== was) { WET.mirror.refreshRate = on ? (IS_PC ? 1 : 2) : 100000; was = on; } }); }
   // the sun glinting on the tarmac, the concrete and the markings: from the sun's side only, and only when the sun
   // gets through the clouds (sunshine through a gap in them glints too)
-  steps.push(() => { const d = P.sun.direction, L = Math.hypot(d.x, d.y, d.z) || 1; WET.sun = [-d.x / L, -d.y / L, -d.z / L];
+  steps.push(() => { const d = P.sun.direction, L = Math.hypot(d.x, d.y, d.z) || 1; WET.sun[0] = -d.x / L; WET.sun[1] = -d.y / L; WET.sun[2] = -d.z / L;
     const sl: any = P.sun, k = g.glint === false ? 0 : (sl.intensity || 0) * SUN.vis * 0.55 * Math.max(0, Math.min(1, (SUN.alt + 1) / 6)), c = sl.diffuse || { r: 1, g: 1, b: 1 };
-    WET.sunCol = [c.r * k, c.g * k, c.b * k]; });
+    WET.sunCol[0] = c.r * k; WET.sunCol[1] = c.g * k; WET.sunCol[2] = c.b * k; });
 
   void Color4; void Light;
   return (dt: number) => { for (const s of steps) s(dt); };
