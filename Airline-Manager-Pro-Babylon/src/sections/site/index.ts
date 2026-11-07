@@ -44,6 +44,12 @@ const D2R = Math.PI / 180, R = 6371000, HEIGHT_URL = 'https://s3.amazonaws.com/e
 /** The site (Iceland only): the frame's reference point (the terminal's plan origin is 1,482 m from it, south of the runway), the
  *  runway's true heading (the gates face 90° to the left of it, towards the mountains), its designators (west end
  *  first), the snow line, the colours of the low ground. Mýrdalssandur is your airport, BIAP / VTX. */
+/** The quick viewpoints in airport mode (plan metres: x along the pier, z out to the apron), the first is where you start:
+ *  1 out on the apron beside gate 4's jetway and its stair, the aircraft on your right; 2 on the apron looking along the terminal to the jetways. */
+const WALK_VIEWS: { name: string; at: [number, number]; look: [number, number]; pitch: number }[] = [
+  { name: 'Gate 4 jetway', at: [150, 100], look: [200, 104], pitch: 0 },
+  { name: 'Along the terminal', at: [238, 94], look: [100, 86], pitch: 0 },
+];
 export const SITES = [
   { id: 'myrdalssandur', name: 'Mýrdalssandur Airport, Iceland', icao: 'BIAP', iata: 'VTX', lat: 63.465, lon: -18.72, hdg: 68, rwy: ['08', '26'], gates: 338, snow: 950, low: 'sand' },
 ];
@@ -197,7 +203,7 @@ const Site$: Section = {
     progress(86, 'Building your terminal…'); await new Promise(r => setTimeout(r, 0));
     const before = new Set(sc.transformNodes.concat(sc.meshes as any[]));
     const K = makeKit(sc); buildShell(K, () => { /* its own steps */ }); const doors = buildDoors(K) as DoorObj[]; furnish(K, () => { /* */ }); K.clearWalls();
-    const FX: any = buildFixtures(K, '#1C3A8A', '#3FD3E6', 'Airline Manager Pro', () => { /* */ }); O.lifts = (FX && FX.lifts) || []; buildRental(K);
+    const FX: any = buildFixtures(K, '#1C3A8A', '#3FD3E6', 'Airport Dynasty Pro', () => { /* */ }); O.lifts = (FX && FX.lifts) || []; buildRental(K);
     // the rental car centre's cars as the game has them: only the companies signed at your airport, and a car that is out is not in its bay
     try { const RC = ctx.opts && ctx.opts.data && ctx.opts.data.rental; if (RC) { const seen: { [k: string]: number } = {};
       for (const c of rentalCars(K)) { const k = c.company + '/' + c.type, n = seen[k] = (seen[k] || 0) + 1, on = RC.signed.indexOf(c.company) >= 0 && n > ((RC.out[c.company] || {})[c.type] || 0);
@@ -293,7 +299,7 @@ const Site$: Section = {
     hud.insertAdjacentHTML('beforeend', `<div class="site-lift" hidden></div>`);
     // the jetways' test button: animates all of them (docks parked ones, undocks docked ones). REMOVE BEFORE 1.0
     hud.insertAdjacentHTML('beforeend', `<button class="wx-b site-jwtest" data-jwtest style="position:absolute;left:12px;bottom:${walkMode ? 168 : 112}px">Animate jetways (test)</button>`);
-    if (walkMode) hud.insertAdjacentHTML('beforeend', `<div class="site-moves">${[['jump', 'Jump'], ['crouch', 'Crouch'], ['prone', 'Prone'], ['sprint', 'Sprint']].map(([k, l]) => `<button class="wx-b" data-mv="${k}">${l}</button>`).join('')}</div>`);
+    if (walkMode) hud.insertAdjacentHTML('beforeend', `<div class="site-moves">${[['jump', 'Jump'], ['crouch', 'Crouch'], ['prone', 'Prone'], ['sprint', 'Sprint']].map(([k, l]) => `<button class="wx-b" data-mv="${k}">${l}</button>`).join('')}${WALK_VIEWS.map((v, i) => `<button class="wx-b" data-wv="${i}" title="${v.name}">View ${i + 1}</button>`).join('')}</div>`);
     if (walkMode) { hud.classList.add('site-walk'); (hud.querySelector('.site-dock') as HTMLElement).style.display = 'none'; (hud.querySelector('.site-ud') as HTMLElement).style.display = 'none'; }
     // the body you walk in: feet at its position, 1.8 m tall, 0.6 m across
     const body = MeshBuilder.CreateBox('player', { size: 0.5 }, sc); body.isVisible = false; body.isPickable = false; body.checkCollisions = false; body.ellipsoid = new Vector3(0.3, 0.9, 0.3); body.ellipsoidOffset = new Vector3(0, 0.9, 0);
@@ -316,11 +322,16 @@ const Site$: Section = {
     if (walkMode) holoMap(hud, () => { const inv = apInv, l = Vector3.TransformCoordinates(body.position, inv);
       const d = Vector3.TransformNormal(new Vector3(Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw)), inv);
       return { x: l.x - AIRFIELD.airport.planU, z: l.z - AIRFIELD.airport.planV, f: l.y > F2Y - 1.5 ? 2 : 1, yaw: Math.atan2(d.x, d.z) }; }, O.K && O.K.root);
-    if (walkMode) { const p = toWorld(75, 0.3, -21.5); body.position.copyFrom(p); const f = toWorld(75, 0.3, 20).subtract(p).normalize(); CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = 0; }
+    /** Puts you on one of the quick viewpoints (plan metres), standing, facing its look point. */
+    const goView = (i: number) => { const v = WALK_VIEWS[i] || WALK_VIEWS[0], p = toWorld(v.at[0], 0.3, v.at[1]); body.position.copyFrom(p); W.vy = 0;
+      const f = toWorld(v.look[0], 0.3, v.look[1]).subtract(p).normalize(); CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = v.pitch; if (W.stance !== 'stand') setStance('stand'); };
+    O.goView = goView;
+    if (walkMode) goView(0);
     const place = (id: string) => { const v = VIEWS.find(q => q.id === id) || VIEWS[0], at = Vector3.TransformCoordinates(new Vector3(v.at[0], v.at[1], v.at[2]), ap.computeWorldMatrix(true)), lk = Vector3.TransformCoordinates(new Vector3(v.look[0], v.look[1], v.look[2]), ap.getWorldMatrix());
       const d = lk.subtract(at).normalize(); CAM.x = at.x; CAM.y = at.y; CAM.z = at.z; CAM.yaw = Math.atan2(d.x, d.z); CAM.pitch = Math.asin(d.y); CAM.speed = id === 'air' || id === 'flyby' ? 220 : id === 'gate' ? 8 : 40;
       hud.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.getAttribute('data-view') === id)); hud.querySelectorAll('[data-sp2]').forEach(b => b.classList.toggle('on', Number(b.getAttribute('data-sp2')) === CAM.speed)); };
     hud.addEventListener('click', e => { const b = (e.target as HTMLElement).closest('button') as HTMLElement | null; if (!b) return;
+      if (b.hasAttribute('data-wv')) { O.goView(+(b.getAttribute('data-wv') || 0)); return; }
       if (b.hasAttribute('data-mv')) { const k = b.getAttribute('data-mv'); if (k === 'jump') O.W.jump = true; else if (k === 'sprint') { O.W.sprint = !O.W.sprint; b.classList.toggle('on', O.W.sprint); } else O.setStance(k); }
       if (b.hasAttribute('data-services') && ctx.toGame) { ctx.toGame('rental'); return; }
       if (b.hasAttribute('data-jwtest')) { const js: any[] = O.jetways || []; for (const j of js) j.test(); const st = js[0] && js[0].state; toast(st === 'docking' ? 'Jetways docking (about 2 minutes)' : st === 'undocking' ? 'Jetways undocking (about 1½ minutes)' : 'Jetways are still moving'); return; }

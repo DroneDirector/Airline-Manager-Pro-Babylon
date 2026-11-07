@@ -1,7 +1,7 @@
 {
   "name": "airline-manager-pro-babylon-game",
   "private": true,
-  "description": "The airline game's interface inside Airline Manager Pro Babylon",
+  "description": "The airline game's interface inside Airport Dynasty Pro",
   "scripts": {
     "build": "node scripts/build.mjs"
   },

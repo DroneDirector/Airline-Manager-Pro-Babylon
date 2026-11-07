@@ -23,7 +23,7 @@ if (rc && process.platform === 'win32') {
 }
 const res = join(pkg, 'resources', 'app'); mkdirSync(res, { recursive: true });
 copyFileSync(join(here, 'main.js'), join(res, 'main.js'));
-writeFileSync(join(res, 'package.json'), JSON.stringify({ name: 'airline-manager-pro-babylon', productName: cfg.appName, version: cfg.version, main: 'main.js', private: true }, null, 2));
+writeFileSync(join(res, 'package.json'), JSON.stringify({ name: 'airline-manager-pro-babylon', productName: 'Airline Manager Pro Babylon' /* the settings folder's name, kept so settings and saves stay after the rename */, version: cfg.version, main: 'main.js', private: true }, null, 2));
 copyFileSync(join(here, 'app.ico'), join(pkg, 'app.ico'));
 const web = join(top, 'www');
 if (!existsSync(join(web, 'app.js'))) throw new Error('Build the app first (npm run build)');

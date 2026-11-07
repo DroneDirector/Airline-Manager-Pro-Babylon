@@ -38,7 +38,7 @@ export function splashOpen(enter: (id: string) => void) {
   const r = document.createElement('div'); r.className = 'ts'; r.setAttribute('aria-label', 'Start screen');
   r.innerHTML = `<canvas class="ts-cv" aria-hidden="true"></canvas><div class="ts-fx" aria-hidden="true"></div>
     <div class="ts-left">
-      <div class="ts-logo" aria-label="${esc(APP.name)}"><span class="ts-l1">Airline</span><span class="ts-l2">Manager</span><span class="ts-l3">Pro</span></div>
+      <div class="ts-logo" aria-label="${esc(APP.name)}"><span class="ts-l1">Airport</span><span class="ts-l2">Dynasty</span><span class="ts-l3">Pro</span></div>
       <div class="ts-engine">Babylon.js edition · a first look</div>
       <nav class="ts-nav">${[
         ['game:continue', 'play', 'Continue game', 'Back to your airline, at the Overview'],

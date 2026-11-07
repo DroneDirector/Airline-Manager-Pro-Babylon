@@ -54,7 +54,7 @@ const Terminal$: Section = {
   id: 'terminal', title: 'The terminal',
   async open(ctx: SectionCtx) {
     const { engine, ui, progress } = ctx; O.ctx = ctx;
-    const D: any = Object.assign({ airline: 'Airline Manager Pro', color: '#1C3A8A', color2: '#3FD3E6' }, (ctx.opts && ctx.opts.data) || {});
+    const D: any = Object.assign({ airline: 'Airport Dynasty Pro', color: '#1C3A8A', color2: '#3FD3E6' }, (ctx.opts && ctx.opts.data) || {});
     progress(6, 'Drawing up the terminal…'); await new Promise(r => setTimeout(r, 30));
     engine.useReverseDepthBuffer = true; O.engine = engine; const sc = new Scene(engine); O.scene = sc; sc.clearColor = new Color4(0.66, 0.78, 0.9, 1); sc.skipPointerMovePicking = true;
     const hemi = new HemisphericLight('hemi', new Vector3(0.2, 1, -0.3), sc); hemi.diffuse = Color3.FromHexString('#EEF3FA'); hemi.groundColor = Color3.FromHexString('#6E665C'); hemi.intensity = 0.95;

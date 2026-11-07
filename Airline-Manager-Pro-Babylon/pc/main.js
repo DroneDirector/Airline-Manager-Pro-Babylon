@@ -57,9 +57,9 @@ function serve() {
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
   const port = await serve();
-  const win = new BrowserWindow({ width: 1600, height: 900, backgroundColor: '#05030c', fullscreen: true, autoHideMenuBar: true, title: 'Airline Manager Pro Babylon', icon: path.join(path.dirname(process.execPath), 'app.ico'), webPreferences: { backgroundThrottling: false } });
-  // photos taken in the game go straight into Pictures\Airline Manager Pro, without asking
-  win.webContents.session.on('will-download', (e, item) => { const n = item.getFilename(); if (!/^AMP-photo/.test(n)) return; const dir = path.join(app.getPath('pictures'), 'Airline Manager Pro'); try { fs.mkdirSync(dir, { recursive: true }); } catch (er) { /* there */ } item.setSavePath(path.join(dir, n)); });
+  const win = new BrowserWindow({ width: 1600, height: 900, backgroundColor: '#05030c', fullscreen: true, autoHideMenuBar: true, title: 'Airport Dynasty Pro', icon: path.join(path.dirname(process.execPath), 'app.ico'), webPreferences: { backgroundThrottling: false } });
+  // photos taken in the game go straight into Pictures\Airport Dynasty Pro, without asking
+  win.webContents.session.on('will-download', (e, item) => { const n = item.getFilename(); if (!/^AMP-photo/.test(n)) return; const dir = path.join(app.getPath('pictures'), 'Airport Dynasty Pro'); try { fs.mkdirSync(dir, { recursive: true }); } catch (er) { /* there */ } item.setSavePath(path.join(dir, n)); });
   win.loadURL(`http://127.0.0.1:${port}/`);
   win.webContents.on('before-input-event', (e, input) => { if (input.type === 'keyDown' && input.key === 'F11') { win.setFullScreen(!win.isFullScreen()); e.preventDefault(); } });
   globalShortcut.register('Alt+F4', () => app.quit());

@@ -1,6 +1,6 @@
-# Airline Manager Pro – Babylon.js edition
+# Airport Dynasty Pro – Babylon.js edition
 
-A separate edition of Airline Manager Pro on the Babylon.js engine, for Android and the PC. It installs beside the
+A separate edition of Airport Dynasty Pro on the Babylon.js engine, for Android and the PC. It installs beside the
 main game and doesn't touch it.
 
 The title screen opens the game's whole interface (Continue game, New game, Load game, Save game, UI: the

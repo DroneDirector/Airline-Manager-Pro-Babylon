@@ -1,4 +1,4 @@
-// Link to the Airline Manager Pro PC app over the local network: the same Wi-Fi, or the PC joined
+// Link to the Airport Dynasty Pro PC app over the local network: the same Wi-Fi, or the PC joined
 // to this phone's hotspot (the PC then uses the phone's mobile data).
 // Finds the PC (UDP discovery through the native LanLink plugin), pairs with the 6-digit code
 // shown on the PC, remembers it, and reconnects automatically.

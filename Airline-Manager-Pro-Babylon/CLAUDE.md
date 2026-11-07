@@ -1,4 +1,4 @@
-# Airline Manager Pro – Babylon.js edition: project rules
+# Airport Dynasty Pro – Babylon.js edition: project rules
 
 - A separate edition of the game on Babylon.js, in its own repository. It never changes the main game
   (DroneDirector/Microsoft-Flight-Simulator-Projects).

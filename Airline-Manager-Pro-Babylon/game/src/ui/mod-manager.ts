@@ -91,7 +91,7 @@ function mmRender() {
         <button class="mm-tb" data-act="mm-undo" ${S.undo.length ? '' : 'disabled'}>${icon('back')}Undo</button>
         <label class="mm-alloff"><span>All mods off</span><button class="tg ${S.allOff ? 'on' : ''}" role="switch" aria-checked="${S.allOff}" data-act="mm-alloff"><i></i></button></label>
         <button class="mm-tb hot" data-act="mm-import">${icon('download')}${DESKTOP ? 'Install a .zip' : 'Open a .zip'}</button>
-        ${DESKTOP ? `<button class="mm-tb" data-act="mm-folder" title="Documents\\Airline Manager Pro\\Mods">${icon('store')}Mods folder</button>` : ''}
+        ${DESKTOP ? `<button class="mm-tb" data-act="mm-folder" title="Documents\\Airport Dynasty Pro\\Mods">${icon('store')}Mods folder</button>` : ''}
         <button class="ts-x" data-act="mm-close" aria-label="Close">${icon('close')}</button>
       </div></div>
     <div class="mm-tabs">${tabs.map(t => `<button class="mm-tab ${MM.tab === t[0] ? 'on' : ''}" data-act="mm-tab" data-t="${t[0]}">${t[1]}${t[2] !== '' ? `<em>${t[2]}</em>` : ''}${t[0] === 'installed' && ups ? `<span class="mm-badge">${ups} update${ups === 1 ? '' : 's'}</span>` : ''}${t[0] === 'installed' && conf.length ? `<span class="mm-badge warn">${conf.length} conflict${conf.length === 1 ? '' : 's'}</span>` : ''}</button>`).join('')}</div>
@@ -178,7 +178,7 @@ ACTIONS['mm-undo'] = () => { if (modsUndo()) { Sound.tick(); toast('Undone', 'in
 ACTIONS['mm-health'] = () => { Sound.tick(); modHealth().then(h => { MM.health = h; mmRender(); }); };
 ACTIONS['mm-health-close'] = () => { MM.health = null; mmRender(); };
 ACTIONS['mm-profile-save'] = () => { const S = modsState(); modProfileSave(S.profile || 'Default'); Sound.tick(); toast(`Profile "${S.profile}" saved`, 'ok'); mmRender(); };
-ACTIONS['mm-folder'] = () => { Sound.tick(); fetch('/api/mods/open', { method: 'POST' }).catch(() => { /* none */ }); toast('Put mod .zip files in Documents\\Airline Manager Pro\\Mods; they are installed when the Mod Manager opens', 'info'); };
+ACTIONS['mm-folder'] = () => { Sound.tick(); fetch('/api/mods/open', { method: 'POST' }).catch(() => { /* none */ }); toast('Put mod .zip files in Documents\\Airport Dynasty Pro\\Mods; they are installed when the Mod Manager opens', 'info'); };
 ACTIONS['mm-import'] = () => {
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.zip,application/zip'; inp.multiple = true;
   inp.onchange = async () => {

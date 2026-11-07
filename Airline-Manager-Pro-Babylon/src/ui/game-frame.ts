@@ -37,7 +37,7 @@ export function gameHidden(): boolean { return !!frame && frame.classList.contai
 
 export function gameOpen(act: 'new' | 'continue' | 'load' | 'save' | 'ui', on: { title: () => void; exit: () => void; viewer: (id: string) => void }) {
   gameClose(); handlers = on;
-  const f = document.createElement('iframe'); f.className = 'game-frame'; f.setAttribute('title', 'Airline Manager Pro');
+  const f = document.createElement('iframe'); f.className = 'game-frame'; f.setAttribute('title', 'Airport Dynasty Pro');
   f.setAttribute('allow', 'autoplay; fullscreen; gamepad; clipboard-write');
   f.src = `game/index.html?embed=${act}&n=${Date.now().toString(36)}`;
   document.body.appendChild(f); document.body.classList.add('game-on'); frame = f;

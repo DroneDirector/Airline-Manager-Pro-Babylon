@@ -232,7 +232,7 @@ export function furnish(K: Kit, progress: (p: number, s: string) => void) {
   /** The Academy as drawn: the board on the north wall, the teacher's desk facing the class, 4 rows of 5 student desks. */
   function academy(r: Room) {
     const b = K.obj(r.id, 'WHITEBOARD', 146, 0, 19.8, Math.PI, 'F1-ACADEMY/BOARD'); K.box(b, 8, 1.4, 0.05, M.whiteGloss, 0, 1.7, 0); K.box(b, 8.1, 0.06, 0.12, M.steel, 0, 0.98, 0.05);
-    const sc2 = K.obj(r.id, 'PROJECTION', 146, 0, 19.75, Math.PI, 'F1-ACADEMY/SCREEN'); const p = MeshBuilder.CreatePlane(K.nm('ac'), { width: 3.2, height: 1.8 }, sc); p.material = K.picture(signC('Airline Manager Pro · Academy', '#1C2D52', '#F2F4F7', 1024, 576, '700 64px Arial, sans-serif'), 1); p.parent = sc2; p.position.set(0, 3.4, -0.05); p.rotation.y = Math.PI; p.metadata = sc2.metadata;
+    const sc2 = K.obj(r.id, 'PROJECTION', 146, 0, 19.75, Math.PI, 'F1-ACADEMY/SCREEN'); const p = MeshBuilder.CreatePlane(K.nm('ac'), { width: 3.2, height: 1.8 }, sc); p.material = K.picture(signC('Airport Dynasty Pro · Academy', '#1C2D52', '#F2F4F7', 1024, 576, '700 64px Arial, sans-serif'), 1); p.parent = sc2; p.position.set(0, 3.4, -0.05); p.rotation.y = Math.PI; p.metadata = sc2.metadata;
     desk(r, 144.9, 17.3, 0, 1.8, 0.8, M.oak, 1); officeChair(r, 144.9, 18.4, Math.PI);
     let n = 0;
     for (const z of [14.2, 10.6, 7.1, 3.5]) for (const x of [138.7, 142.3, 145.9, 149.5, 153.1]) { n++;

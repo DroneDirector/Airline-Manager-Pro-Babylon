@@ -1,4 +1,4 @@
-// Airline Manager Pro, Babylon.js edition. It starts with the start screen (the film), then one place: the lounge.
+// Airport Dynasty Pro, Babylon.js edition. It starts with the start screen (the film), then one place: the lounge.
 // The gear in the corner is always there: graphics and controls settings. More parts of the game are added as
 // sections (core/sections.ts) and opened from here.
 import { logProblem } from './core/errlog';

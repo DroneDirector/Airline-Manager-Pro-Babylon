@@ -4,12 +4,12 @@
 #define MyVer GetEnv('AMPB_VERSION')
 [Setup]
 AppId={{8C2E5B4A-3F71-4D2B-9A6E-B4B1C0A7E513}
-AppName=Airline Manager Pro Babylon
+AppName=Airport Dynasty Pro
 AppVersion={#MyVer}
-AppVerName=Airline Manager Pro Babylon {#MyVer}
+AppVerName=Airport Dynasty Pro {#MyVer}
 AppPublisher=DroneDirector
-DefaultDirName={autopf}\Airline Manager Pro Babylon
-DefaultGroupName=Airline Manager Pro Babylon
+DefaultDirName={autopf}\Airport Dynasty Pro
+DefaultGroupName=Airport Dynasty Pro
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -17,7 +17,7 @@ OutputDir=build
 OutputBaseFilename=AirlineManagerProBabylon-PC-Setup-{#MyVer}
 SetupIconFile=app.ico
 UninstallDisplayIcon={app}\AirlineManagerProBabylon.exe
-UninstallDisplayName=Airline Manager Pro Babylon
+UninstallDisplayName=Airport Dynasty Pro
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -31,9 +31,14 @@ Name: "desktopicon"; Description: "Make a shortcut on the desktop"; GroupDescrip
 [Files]
 Source: "build\Airline Manager Pro Babylon PC\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[InstallDelete]
+; the shortcuts under the game's earlier name
+Type: files; Name: "{autoprograms}\Airline Manager Pro Babylon.lnk"
+Type: files; Name: "{autodesktop}\Airline Manager Pro Babylon.lnk"
+
 [Icons]
-Name: "{autoprograms}\Airline Manager Pro Babylon"; Filename: "{app}\AirlineManagerProBabylon.exe"; IconFilename: "{app}\app.ico"
-Name: "{autodesktop}\Airline Manager Pro Babylon"; Filename: "{app}\AirlineManagerProBabylon.exe"; IconFilename: "{app}\app.ico"; Tasks: desktopicon
+Name: "{autoprograms}\Airport Dynasty Pro"; Filename: "{app}\AirlineManagerProBabylon.exe"; IconFilename: "{app}\app.ico"
+Name: "{autodesktop}\Airport Dynasty Pro"; Filename: "{app}\AirlineManagerProBabylon.exe"; IconFilename: "{app}\app.ico"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\AirlineManagerProBabylon.exe"; Description: "Start Airline Manager Pro Babylon"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\AirlineManagerProBabylon.exe"; Description: "Start Airport Dynasty Pro"; Flags: nowait postinstall skipifsilent

@@ -15,7 +15,7 @@ const Backup = {
   tools(): any { return Store.native(); },
 
   init() {
-    if (DESKTOP) { this.folder = { set: true, name: 'Documents\\Airline Manager Pro', lastWrite: 0 }; return; }
+    if (DESKTOP) { this.folder = { set: true, name: 'Documents\\Airport Dynasty Pro', lastWrite: 0 }; return; }
     const T = this.tools();
     if (T && T.backupFolderInfo) T.backupFolderInfo().then((r: any) => { this.folder = r; }).catch(() => { /* older app */ });
   },
@@ -56,7 +56,7 @@ const Backup = {
 
   /** Replace everything with a backup and start again from it. */
   restore(text: string) {
-    const d = this.parse(text); if (!d) { toast('That file isn\'t an Airline Manager Pro backup', 'warn'); return; }
+    const d = this.parse(text); if (!d) { toast('That file isn\'t an Airport Dynasty Pro backup', 'warn'); return; }
     try { localStorage.setItem(STORE_KEY, text); } catch (e) { toast('The backup couldn\'t be stored on this phone', 'warn'); return; }
     try { localStorage.removeItem('amp-nogame'); } catch (e) { /* ignore */ }
     // nothing may save over it now, before the app starts again from it
@@ -91,7 +91,7 @@ const Backup = {
    *  side (when each was saved, by which version, the airlines, balance, fleet and flights), with a clear
    *  warning when the backup is older than what it would replace. */
   confirmRestore(text: string, from: string) {
-    const d = this.parse(text); if (!d) { toast('No Airline Manager Pro backup was found there', 'warn'); return; }
+    const d = this.parse(text); if (!d) { toast('No Airport Dynasty Pro backup was found there', 'warn'); return; }
     const here = DESKTOP ? 'this PC' : 'this phone';
     let cur: any = null; try { cur = JSON.parse(localStorage.getItem(Mode.key()) || 'null'); } catch (e) { /* nothing */ }
     if (cur && !cur.state) cur = null;
@@ -120,7 +120,7 @@ const Backup = {
   offerRestoreOnFirstStart() {
     if (Store.nogame()) return;   // every save was deleted: the start screen offers a new game or a backup
     if (DESKTOP && Store.wasEmpty && !Mode.coop()) {
-      fetch('/api/backup').then(r => r.json()).then(r => { if (r && r.data) setTimeout(() => this.confirmRestore(r.data, 'Found in Documents\\Airline Manager Pro on this PC'), 1500); else setTimeout(() => firstStartWelcome(false), SPLASH_MS + 600); }).catch(() => setTimeout(() => firstStartWelcome(false), SPLASH_MS + 600));
+      fetch('/api/backup').then(r => r.json()).then(r => { if (r && r.data) setTimeout(() => this.confirmRestore(r.data, 'Found in Documents\\Airport Dynasty Pro on this PC'), 1500); else setTimeout(() => firstStartWelcome(false), SPLASH_MS + 600); }).catch(() => setTimeout(() => firstStartWelcome(false), SPLASH_MS + 600));
       return;
     }
     if (Mode.coop()) { if (Store.wasEmpty) setTimeout(() => coopWorldWelcome(), SPLASH_MS + 600); return; }
@@ -154,7 +154,7 @@ ACTIONS['backup-restore-go'] = () => { const t = (window as any).__restoreText; 
 // The main save is written after every change (Store.save). Besides it, the device keeps five backup saves:
 // each new one replaces the oldest, at most one a minute while you play and one straight away when you leave
 // the app, so there are always five recent moments to go back to. On the phone they are files in the app's own
-// storage; on the PC, in Documents\Airline Manager Pro\backups; in a browser, in its own storage.
+// storage; on the PC, in Documents\Airport Dynasty Pro\backups; in a browser, in its own storage.
 const SaveSlots = {
   N: 5, _last: 0, _json: '', _timer: 0 as any,
   meta(): { next: number; at: number[] } { try { const m = JSON.parse(localStorage.getItem('amp.saveSlots') || 'null'); if (m && Array.isArray(m.at)) return m; } catch (e) { /* none */ } return { next: 0, at: [0, 0, 0, 0, 0] }; },

@@ -87,7 +87,7 @@ function titleHtml(): string {
   return `<canvas class="ts-cv" aria-hidden="true"></canvas>
     <div class="ts-fx" aria-hidden="true"></div>
     <div class="ts-left">
-      <div class="ts-logo" aria-label="${esc(APP.name)}"><span class="ts-l1">Airline</span><span class="ts-l2">Manager</span><span class="ts-l3">Pro</span></div>
+      <div class="ts-logo" aria-label="${esc(APP.name)}"><span class="ts-l1">Airport</span><span class="ts-l2">Dynasty</span><span class="ts-l3">Pro</span></div>
       <nav class="ts-nav">
         ${Store.nogame() ? '' : item('ts-continue', 'play', 'Continue', co ? esc(co.name) : 'Back into the game')}
         ${item('ts-new', 'plus', 'New game', 'Create your pilot and airline')}
@@ -493,7 +493,7 @@ function titleDeleteAll(withBackups: boolean) {
 
 /* ---------- twenty saves ---------- */
 // Each save is the whole airline as it was at that moment. On the phone, files in the app's own storage; on the PC,
-// Documents\Airline Manager Pro\saves\game-1 … game-20.json; in a browser, its own database. A list of what is in
+// Documents\Airport Dynasty Pro\saves\game-1 … game-20.json; in a browser, its own database. A list of what is in
 // each slot is kept besides, so the menu shows them at once.
 const GameSaves = {
   N: 20,
@@ -526,7 +526,7 @@ const GameSaves = {
    *  or on the ground, and nothing has happened while the save sat in its slot. Then into the office. */
   restoreText(text: string) {
     let d: any = null; try { d = JSON.parse(text); } catch (e) { /* not a save */ }
-    if (!d || !d.state) { toast('That isn\'t an Airline Manager Pro save', 'warn'); return; }
+    if (!d || !d.state) { toast('That isn\'t an Airport Dynasty Pro save', 'warn'); return; }
     const at = +d.savedAt || 0, now = Date.now(), dt = at ? now - at : 0;
     if (dt > 0) {
       const lo = at - 20 * 365 * 864e5, hi = at + 3 * 365 * 864e5;

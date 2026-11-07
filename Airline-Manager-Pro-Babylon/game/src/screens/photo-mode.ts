@@ -54,14 +54,14 @@ ACTIONS['photo-shoot'] = () => {
       .then(([inGame, where]) => { if (!inGame && !where) { toast('The photo could not be saved', 'warn'); return; } toast(`Photo saved ${inGame ? 'with your screenshots' : ''}${inGame && where ? ' and ' : ''}${where}`, 'ok', { label: 'To the papers', act: 'photo-news' }); });
   } catch (e) { toast('The photo could not be taken', 'warn'); }
 };
-/** A photo also onto the device: the phone's gallery (Pictures/Airline Manager Pro, where the Photos app shows it)
- *  or, on the PC, the Pictures folder (Pictures\\Airline Manager Pro). Says where it went. */
+/** A photo also onto the device: the phone's gallery (Pictures/Airport Dynasty Pro, where the Photos app shows it)
+ *  or, on the PC, the Pictures folder (Pictures\\Airport Dynasty Pro). Says where it went. */
 function photoToDevice(data: string, cap: string) {
   const d = new Date(), stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}.${String(d.getSeconds()).padStart(2, '0')}`;
-  const name = `Airline Manager Pro ${stamp}`;
+  const name = `Airport Dynasty Pro ${stamp}`;
   const c: any = (window as any).Capacitor, T = c && c.isNativePlatform && c.isNativePlatform() && c.Plugins && c.Plugins.AppTools;
-  if (T && T.savePhoto) return T.savePhoto({ data, name: name + '.jpg' }).then(() => 'in your phone\'s gallery (Pictures, Airline Manager Pro)', () => '');
-  if (DESKTOP) return fetch('/api/photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data, name, cap }) }).then(r => r.json()).then(r => r && r.ok ? 'in your Pictures folder (Airline Manager Pro)' : '', () => '');
+  if (T && T.savePhoto) return T.savePhoto({ data, name: name + '.jpg' }).then(() => 'in your phone\'s gallery (Pictures, Airport Dynasty Pro)', () => '');
+  if (DESKTOP) return fetch('/api/photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data, name, cap }) }).then(r => r.json()).then(r => r && r.ok ? 'in your Pictures folder (Airport Dynasty Pro)' : '', () => '');
   return Promise.resolve('');   // in a browser: kept in the game only
 }
 /** The last photo as the papers' photo of the day (one a day). */

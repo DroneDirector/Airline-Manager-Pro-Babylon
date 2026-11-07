@@ -1,4 +1,4 @@
-name: Airline Manager Pro Babylon – build
+name: Airport Dynasty Pro – build
 
 on:
   push:
@@ -107,7 +107,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: airline-manager-pro-babylon-v${{ steps.apk.outputs.version }}
-          name: Airline Manager Pro Babylon ${{ steps.apk.outputs.version }}
+          name: Airport Dynasty Pro ${{ steps.apk.outputs.version }}
           prerelease: true
           body_path: Airline-Manager-Pro-Babylon/release-notes/${{ steps.apk.outputs.version }}.md
           files: |

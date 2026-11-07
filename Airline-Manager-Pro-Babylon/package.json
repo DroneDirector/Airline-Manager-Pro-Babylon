@@ -1,7 +1,7 @@
 {
   "name": "airline-manager-pro-babylon",
   "private": true,
-  "description": "Airline Manager Pro on the Babylon.js engine: the lounge, as a demonstration",
+  "description": "Airport Dynasty Pro on the Babylon.js engine: the lounge, as a demonstration",
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"

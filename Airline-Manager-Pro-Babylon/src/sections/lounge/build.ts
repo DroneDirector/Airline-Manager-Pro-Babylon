@@ -116,7 +116,7 @@ export function buildLounge(scene: Scene, progress: (p: number, s: string) => vo
     const mx = X0 + 0.62, mz = Z1 - 0.5; box(0.7, 1.0, 0.3, walnut, mx, 0.5, mz); for (let r = 0; r < 3; r++) for (let i = 0; i < 2; i++) box(0.26, 0.3, 0.01, pbr({ col: [0xC0392B, 0x2E5C8A, 0xF2B544, 0x2F6B4A, 0x8E44AD, 0xE67E22][(r * 2 + i) % 6], rough: 0.7 }), mx - 0.16 + i * 0.32, 0.3 + r * 0.3, mz - 0.16, 0, false);
     block(mx - 0.45, mz - 0.3, mx + 0.45, Z1);
     const dx = DOOR_X - 2.6; box(2.2, 1.05, 0.6, walnut, dx, 0.525, Z1 - 1.6); box(2.3, 0.05, 0.75, stone, dx, 1.07, Z1 - 1.6);
-    plane(1.6, 0.4, picMat(P.sign('Airline Manager Pro', '#2C8CFF', '#FFFFFF'), 0), dx, 0.6, Z1 - 1.91, 0, -1); block(dx - 1.2, Z1 - 2.0, dx + 1.2, Z1 - 1.2); }
+    plane(1.6, 0.4, picMat(P.sign('Airport Dynasty Pro', '#2C8CFF', '#FFFFFF'), 0), dx, 0.6, Z1 - 1.91, 0, -1); block(dx - 1.2, Z1 - 2.0, dx + 1.2, Z1 - 1.2); }
 
   progress(62, 'Polishing the brass at the bar…');
   // ---- the bar: L-shaped, black lacquer and brass, returning to the back wall at its right end ----

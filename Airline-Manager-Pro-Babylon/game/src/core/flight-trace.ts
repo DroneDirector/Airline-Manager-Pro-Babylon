@@ -124,7 +124,7 @@ const FlightTrace = {
   },
 
   text(): string {
-    return `Airline Manager Pro ${APP.version} · flight trace · ${this.stamp(Date.now())}\n` +
+    return `Airport Dynasty Pro ${APP.version} · flight trace · ${this.stamp(Date.now())}\n` +
       'Each line: time, callsign, registration, route, then phase · altitude · planned speed · speed over the ground · heading · position · runway.\n' +
       'Problems are marked between "!": JUMP, FAST, OFF RUNWAY, RUNWAY, NO TOUCHDOWN.\n\n' + this.lines.join('\n');
   },

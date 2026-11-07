@@ -1,7 +1,7 @@
 {
   "name": "airline-manager-pro-babylon-pc",
   "private": true,
-  "description": "Airline Manager Pro Babylon for Windows: the app in its own window (Electron)",
+  "description": "Airport Dynasty Pro for Windows: the app in its own window (Electron)",
   "devDependencies": {
     "electron": "44.9.0",
     "esbuild": "0.24.2",

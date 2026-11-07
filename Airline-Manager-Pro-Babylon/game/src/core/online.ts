@@ -156,7 +156,7 @@ ${wp(to, 'Airport', B.pos[1], B.pos[0], elevB, to)}
 `;
   return { name: `${from}${to}.pln`, text };
 }
-/** Send a flight plan to the simulator PC (saved in Documents\Airline Manager Pro\Flight plans), or save the file. */
+/** Send a flight plan to the simulator PC (saved in Documents\Airport Dynasty Pro\Flight plans), or save the file. */
 function sendPlnToPc(from: string, to: string): Promise<string> {
   const p = buildPln(from, to); if (!p) return Promise.reject(new Error('Unknown airport'));
   if (DESKTOP) return fetch('/api/flightplan', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }).then(r => r.json()).then(r => { if (!r.ok) throw new Error(r.error || 'Not saved'); return r.path; });
