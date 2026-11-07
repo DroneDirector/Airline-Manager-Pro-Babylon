@@ -49,7 +49,7 @@ jobs:
         run: |
           $v = (Get-Content ../app.config.json | ConvertFrom-Json).version
           $f = "AirlineManagerProBabylon-PC-$v.zip"
-          Compress-Archive -Path "build/Airline Manager Pro Babylon PC" -DestinationPath $f
+          Compress-Archive -Path "build/Airport Dynasty Pro PC" -DestinationPath $f
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
           $env:AMPB_VERSION = $v

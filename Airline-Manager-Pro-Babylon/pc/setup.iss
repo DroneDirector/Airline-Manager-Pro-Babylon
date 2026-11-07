@@ -29,7 +29,7 @@ CloseApplications=yes
 Name: "desktopicon"; Description: "Make a shortcut on the desktop"; GroupDescription: "Shortcuts:"
 
 [Files]
-Source: "build\Airline Manager Pro Babylon PC\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "build\Airport Dynasty Pro PC\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [InstallDelete]
 ; the shortcuts under the game's earlier name

@@ -1,6 +1,8 @@
 // The PC app: the app's own files served from this folder on this PC only, shown in its own window (full screen,
 // F11 switches it). Game controllers work through the window's Gamepad API.
 const { app, BrowserWindow, Menu, globalShortcut } = require('electron');
+// settings and saves stay in the same folder they have always been in (AppData), whatever the game is called
+try { app.setPath('userData', require('node:path').join(app.getPath('appData'), 'Airline Manager Pro Babylon')); } catch (e) { /* the default folder */ }
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
