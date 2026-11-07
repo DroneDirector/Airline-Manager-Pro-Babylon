@@ -9,6 +9,7 @@
 // on the airport boundary. Inside the boundary the ground is levelled (blending into the real ground only within its
 // outer 100 m); outside it the real ground and its mountains are untouched. Ready-made views (from a gate, the apron,
 // the runway, the holding point, the air) and a free drone camera, the time of day and the weather, the photo button.
+import { glassLook } from '../terminal/kit';
 import { thinStatic } from '../../core/thin';
 import { shareMaterials } from '../../core/texarray';
 import { CascadedShadowGenerator, SSAO2RenderingPipeline, ReflectionProbe } from '@babylonjs/core';
@@ -29,7 +30,7 @@ import { cachedUrl, releaseUrl } from '../../core/tilecache';
 import { makeKit } from '../terminal/kit';
 import { buildShell } from '../terminal/shell';
 import { buildDoors, stepDoors, DoorObj } from '../terminal/doors';
-import { STAIRS, F2Y } from '../terminal/plan';
+import { STAIRS, F2Y, ROOMS, inRoom } from '../terminal/plan';
 import { holoMap } from '../../ui/holomap';
 import { Matrix } from '@babylonjs/core';
 import { stepLifts, LiftCtl } from '../terminal/lifts';
@@ -448,6 +449,12 @@ const Site$: Section = {
         if (ride) { const m1 = ride.computeWorldMatrix(true), p = Vector3.TransformCoordinates(Vector3.TransformCoordinates(body.position, m0.clone().invert()), m1); body.position.copyFrom(p); }
         if (js.some(j => j.moving && Vector3.Distance(cam.position, j.node.getAbsolutePosition()) < 45)) { if (now - (O.beepT || 0) > 1.1) { O.beepT = now; jwBeep(); } } } catch (e) { /* still */ }
       try { insides(cam.globalPosition); } catch (e) { /* all drawn */ }
+      // the outer glazing: strong reflections seen from outside, a clear view out from inside (changed only on going in or out)
+      if ((O.glT = (O.glT || 0) - dt) <= 0) { O.glT = 0.3; try { const gm = K.M.glassOuter; if (gm) {
+        const lq = Vector3.TransformCoordinates(cam.globalPosition, SV.rootInv || (SV.rootInv = K.root.getWorldMatrix().clone().invert())), fl = lq.y > F2Y - 0.5 ? 2 : 1;
+        let inside = ROOMS.some(r => r.f === fl && inRoom(r, lq.x, lq.z));
+        if (!inside) { const up = sc.pickWithRay(new Ray(cam.globalPosition, Vector3.Up(), 4), (m: any) => !!(m.metadata && /^J-\d/.test(m.metadata.id || '')), true); inside = !!(up && up.hit); }
+        glassLook(gm, inside); } } catch (e) { /* stays as it is */ } }
       lap('jetways'); wx.frame(dt, now); lap('weather');
       sc.render(); lap('drawing'); perfEnd();
     });

@@ -88,7 +88,7 @@ function mats(K: Kit) {
 
 export function buildJetway(K: Kit, n: number, gateX: number, stand: { x: number; nz: number }) {
   const { M, sc } = K, o = K.obj('APRON', 'JETWAY', gateX, F2Y, PN, 0, `J-${n}`); o.metadata.kind = 'jetway';
-  const X = mats(K), { JS, JT, JW, JB, JF, JC, JH, JR, JRed, JD, JG, JGa, JBr, JK, JKD, JSh, JTy, JRim, JCap, JCarp, JSlat, JTread, JSide, JClMid, JClTop, JClBot, JClEnd, JRoof, JUnder } = X, JWa = X.JL, GL = M.glass;
+  const X = mats(K), { JS, JT, JW, JB, JF, JC, JH, JR, JRed, JD, JG, JGa, JBr, JK, JKD, JSh, JTy, JRim, JCap, JCarp, JSlat, JTread, JSide, JClMid, JClTop, JClBot, JClEnd, JRoof, JUnder } = X, JWa = X.JL, GL = M.glassOuter || M.glass;
   const MARK = K.glow('#FF8A00', 0.6); MARK.name = `J-${n}/MARKERS`;
   const LED = K.glow('#FFFFFF', 1.1); LED.name = `J-${n}/LED`;   // its own lights (brighter when docked)
   const meta = o.metadata, V = (x: number, y: number, z: number) => new Vector3(x, y, z);

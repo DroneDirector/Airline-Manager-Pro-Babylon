@@ -6,6 +6,8 @@
 //  - Objects of the same kind share one source mesh per part (instances): many chairs cost little to draw.
 import { Scene, Vector3, Color3, MeshBuilder, Mesh, PBRMaterial, StandardMaterial, DynamicTexture, Texture, TransformNode, AbstractMesh, InstancedMesh } from '@babylonjs/core';
 import * as P from '../lounge/pictures';
+import { fileTex } from '../../core/filetex';
+import { IS_PC } from '../../core/app';
 import { ROOMS, inRoom } from './plan';
 
 export interface Obj { id: string; kind: string; room: string; node: TransformNode }
@@ -74,6 +76,16 @@ export function makeKit(sc: Scene): Kit {
     copper: pbr({ key: 'copper', col: '#B86F3E', metal: 0.9, rough: 0.3, emis: '#3A1A08', emisK: 0.35 }), tealUI: pbr({ key: 'tealUI', col: '#3FD3E6', rough: 0.4 }),
     light: glow('#FFF6E6', 1.6), lightCool: glow('#EAF4FF', 1.5), lightWarm: glow('#FFD9A0', 1.8), sky: glow('#BFE3FA', 1.1), green: glow('#3BD16F', 1.4), redLed: glow('#FF3B30', 1.4),
   };
+  // the outer glazing (the facades, the gates' and the pier's windows, the jetways): low-iron laminated glass with
+  // float-glass waviness, a film of dust, dried water spots and rain runs (our own tileable pictures, 3 m a repeat). It
+  // reflects strongly seen from outside and hardly at all from inside (glassLook switches the two as you go in and out)
+  { const q = IS_PC ? '' : '-512', g = new PBRMaterial('glassOuter', sc); g.maxSimultaneousLights = 4;
+    const c = fileTex('glass-colour' + q, sc), n = fileTex('glass-normal' + q, sc), r = fileTex('glass-refl' + q, sc); c.hasAlpha = true;
+    g.albedoColor = Color3.White(); g.albedoTexture = c; g.useAlphaFromAlbedoTexture = true; g.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND; g.backFaceCulling = false;
+    // a reflective coating (specular workflow): its strength set by glassLook, its gloss from the picture (smudges a touch duller)
+    g.bumpTexture = n; (g.bumpTexture as any).level = 0.35; g.reflectivityTexture = r; g.useMicroSurfaceFromReflectivityMapAlpha = true; g.microSurface = 0.98;
+    g.useRadianceOverAlpha = true; g.useSpecularOverAlpha = true; g.indexOfRefraction = 1.52;
+    M.glassOuter = g; glassLook(g, false); }
   for (const k of ['plaster', 'concrete', 'terrazzo', 'timber', 'herring', 'carpetBlue', 'carpetGrey', 'tile', 'tileDark', 'rubber', 'grass', 'asphalt', 'apron', 'kerb', 'white', 'offwhite']) { (M[k] as PBRMaterial).backFaceCulling = false; }
   // ---- objects ----
   const counts: { [k: string]: number } = {};
@@ -127,3 +139,21 @@ export function tiles(a: string, b: string, n: number): HTMLCanvasElement {
 /** A sign: white letters on a colour, for over doors and desks. */
 export function signC(text: string, bg = '#14202E', fg = '#F2F4F7', w = 1024, h = 200, font = '700 96px Arial, sans-serif') { return P.sign(text, bg, fg, w, h, font); }
 export { P, Vector3 };
+
+/** The outer glazing seen from outside (strong reflections, the inside hard to make out) or from inside (a clear view out,
+ *  the room barely mirrored). Changed only when you go in or out, never every frame. */
+export function glassLook(g: PBRMaterial, inside: boolean) {
+  if ((g as any)._inside === inside) return; (g as any)._inside = inside;
+  // outside: the coating mirrors the sky and the apron and the tinted glass has body; inside: the coating's mirror and
+  // most of the tint drop away (the bright day outside is what you see)
+  g.reflectivityColor.set(inside ? 0.02 : 0.55, inside ? 0.02 : 0.6, inside ? 0.02 : 0.64); g.environmentIntensity = inside ? 0.3 : 2.6; g.alpha = inside ? 0.32 : 1; g.specularIntensity = inside ? 0.2 : 1; g.directIntensity = inside ? 0.5 : 1;
+}
+/** Texture co-ordinates for a glass pane laid flat on its own plane, 3 m a repeat (so the pattern is the same size on every pane). */
+export function glassUV(m: Mesh, world: boolean, tile = 3) {
+  const pos = m.getVerticesData('position'), nor = m.getVerticesData('normal'); if (!pos || !nor) return;
+  const W = world ? m.computeWorldMatrix(true) : null, uv = new Float32Array(pos.length / 3 * 2), v = new Vector3();
+  for (let i = 0, j = 0; i < pos.length; i += 3, j += 2) { v.set(pos[i], pos[i + 1], pos[i + 2]); if (W) Vector3.TransformCoordinatesToRef(v, W, v);
+    const ax = Math.abs(nor[i]), ay = Math.abs(nor[i + 1]), az = Math.abs(nor[i + 2]);
+    if (ay >= ax && ay >= az) { uv[j] = v.x / tile; uv[j + 1] = v.z / tile; } else if (ax >= az) { uv[j] = v.z / tile; uv[j + 1] = v.y / tile; } else { uv[j] = v.x / tile; uv[j + 1] = v.y / tile; } }
+  m.setVerticesData('uv', uv, false, 2);
+}

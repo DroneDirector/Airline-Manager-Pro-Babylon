@@ -3,6 +3,7 @@
 // where a wall faces the open air; the wave roof over the Grand Hall and the kerb (white on top, warm timber under it,
 // three lens skylights along its crests, downlights) on its eight tree columns; the pier's roof with its solar panels;
 // and the site: the kerb, the access road, the car park, the trees, the apron with its stands and taxi lane.
+import { glassUV } from './kit';
 import { liftHoles } from './lifts';
 import { MeshBuilder, Mesh, Vector3, Vector4, VertexData, TransformNode } from '@babylonjs/core';
 import { Kit, signC } from './kit';
@@ -36,9 +37,10 @@ export function buildShell(K: Kit, progress: (p: number, s: string) => void) {
     if (ax === 'x') m.position.set((a + b) / 2, (y0 + y1) / 2, line + off); else m.position.set(line + off, (y0 + y1) / 2, (a + b) / 2);
     put(roomId, m, mat); };
   // glass stays its own mesh in its room (merged glass sorts badly and flickers); everything else is merged per room
-  const put = (roomId: string, m: Mesh, mat: any) => { if (mat === M.glass) { m.material = mat; m.parent = K.rooms[roomId]; m.isPickable = false; m.alphaIndex = 10; m.metadata = { id: roomId + '/GLASS', kind: 'glass', room: roomId }; m.freezeWorldMatrix(); } else K.struct(roomId, m, mat); };
+  const put = (roomId: string, m: Mesh, mat: any) => { if (mat === M.glass || mat === M.glassOuter) { m.material = mat; m.parent = K.rooms[roomId]; m.isPickable = false; m.alphaIndex = 10; m.metadata = { id: roomId + '/GLASS', kind: 'glass', room: roomId, outer: mat === M.glassOuter }; m.freezeWorldMatrix(); if (mat === M.glassOuter) glassUV(m, true); } else K.struct(roomId, m, mat); };
   /** A run of wall along a side: solid (or glass) between the doors, a lintel over each door. */
-  const sideRun = (r: Room, side: string, y0: number, y1: (u: number) => number, mat: any, glass: boolean, off: number, th = 0.12, rid = r.id) => {
+  const sideRun = (r: Room, side: string, y0: number, y1: (u: number) => number, mat: any, glass: boolean, off: number, th = 0.12, rid = r.id, outer = false) => {
+    const GM = outer ? M.glassOuter : M.glass;   // the outer glazing (onto the open air) or glass inside the building
     const ax: 'x' | 'z' = side === 'n' || side === 's' ? 'x' : 'z', line = side === 'n' ? r.z1 : side === 's' ? r.z0 : side === 'e' ? r.x1 : r.x0;
     const a0 = ax === 'x' ? r.x0 : r.z0, a1 = ax === 'x' ? r.x1 : r.z1;
     const ds = DOORS.filter(dr => dr.f === r.f && dr.along === ax && Math.abs((ax === 'x' ? dr.z : dr.x) - line) < 0.3 && (ax === 'x' ? dr.x : dr.z) > a0 && (ax === 'x' ? dr.x : dr.z) < a1 && y0 < base(r.f) + 0.5)
@@ -48,7 +50,7 @@ export function buildShell(K: Kit, progress: (p: number, s: string) => void) {
     for (const [pa, pb, py] of pieces) {
       // tall walls under a sloping top (the wave roof) are cut into short pieces, each up to the roof above it
       const flat = y1(pa) === y1(pb) && y1((pa + pb) / 2) === y1(pa), step = flat ? pb - pa : 1;
-      for (let s = pa; s < pb - 0.001; s += step) { const e = Math.min(pb, s + step), m = glass && py === y0 ? M.glass : mat;
+      for (let s = pa; s < pb - 0.001; s += step) { const e = Math.min(pb, s + step), m = glass && py === y0 ? GM : mat;
         if (flat) { wallBox(rid, m, ax, line, s, e, py, y1(s), off, glass && py === y0 ? 0.03 : th); continue; }
         // a sloping top: one flat panel from the bottom up to the roof at each end, so it meets the roof all along
         const P = (u: number, yy: number) => ax === 'x' ? new Vector3(u, yy, line + off) : new Vector3(line + off, yy, u);
@@ -79,13 +81,13 @@ export function buildShell(K: Kit, progress: (p: number, s: string) => void) {
       if (isHall) {
         // the Grand Hall: its walls go up to the wave roof; on its north side, between 6 and 12 m, the glass of the Floor 2 rooms over the hall takes their place
         const roofAt = (u: number) => ax === 'x' ? waveH(u, line) - 0.05 : waveH(line, u) - 0.05;
-        sideRun(r, side, 0, u => Math.min(F2Y, roofAt(u)), wm, glass, 0, 0.2);
+        sideRun(r, side, 0, u => Math.min(F2Y, roofAt(u)), wm, glass, 0, 0.2, r.id, glass);
         const a0 = ax === 'x' ? r.x0 : r.z0, a1 = ax === 'x' ? r.x1 : r.z1; let s0 = a0;
         const covered = (u: number) => { const px = ax === 'x' ? u : line - inward * 0.5, pz = ax === 'x' ? line - inward * 0.5 : u; return F2R.some(q => inRoom(q, px, pz)); };
-        const band = (p0: number, p1: number) => { if (p1 - p0 < 0.05) return; const sub = { ...r, x0: ax === 'x' ? p0 : r.x0, x1: ax === 'x' ? p1 : r.x1, z0: ax === 'z' ? p0 : r.z0, z1: ax === 'z' ? p1 : r.z1 } as Room; sideRun(sub, side, F2Y, u2 => Math.min(ROOF, roofAt(u2)), wm, glass, 0, 0.2); };
+        const band = (p0: number, p1: number) => { if (p1 - p0 < 0.05) return; const sub = { ...r, x0: ax === 'x' ? p0 : r.x0, x1: ax === 'x' ? p1 : r.x1, z0: ax === 'z' ? p0 : r.z0, z1: ax === 'z' ? p1 : r.z1 } as Room; sideRun(sub, side, F2Y, u2 => Math.min(ROOF, roofAt(u2)), wm, glass, 0, 0.2, r.id, glass); };
         for (let u = a0; u < a1; u += 1) { if (covered(Math.min(a1 - 0.01, u + 0.5))) { band(s0, u); s0 = u + 1; } }
         band(Math.min(s0, a1), a1);
-        sideRun(r, side, ROOF, roofAt, wm, glass, 0, 0.2);
+        sideRun(r, side, ROOF, roofAt, wm, glass, 0, 0.2, r.id, glass);
         continue;
       }
       // one wall per shared edge: sample the side every half metre and look at what is beyond it. Where another room
@@ -94,7 +96,7 @@ export function buildShell(K: Kit, progress: (p: number, s: string) => void) {
       const a0 = ax === 'x' ? r.x0 : r.z0, a1 = ax === 'x' ? r.x1 : r.z1, me = ROOMS.indexOf(r);
       const beyond = (u: number) => { const px = ax === 'x' ? u : line - inward * 0.3, pz = ax === 'x' ? line - inward * 0.3 : u; return ROOMS.find(q => q !== r && q.f === r.f && q.kind !== 'museum' && inRoom(q, px, pz)); };
       // a glass side: built by this room, unless the Grand Hall's own glass is already on that line (the entrances)
-      if (glass) { if (beyond(((ax === 'x' ? r.x0 + r.x1 : r.z0 + r.z1) / 2))?.kind !== 'hall') sideRun(r, side, base(r.f), () => top(r), wm, glass, inward * 0.09); continue; }
+      if (glass) { const bq = beyond(((ax === 'x' ? r.x0 + r.x1 : r.z0 + r.z1) / 2)); if (bq?.kind !== 'hall') sideRun(r, side, base(r.f), () => top(r), wm, glass, inward * 0.09, 0.12, r.id, !bq); continue; }   // nothing beyond: the outer glazing
       const cls = (u: number): string => { const q = beyond(u); if (!q) return 'air'; if (q.kind === 'hall' || ROOMS.indexOf(q) < me) return 'skip'; return 'own:' + Math.max(top(r), top(q)).toFixed(2); };
       const runOf = (p0: number, p1: number, c: string) => { if (p1 - p0 < 0.02 || c === 'skip') return; const sub = { ...r, x0: ax === 'x' ? p0 : r.x0, x1: ax === 'x' ? p1 : r.x1, z0: ax === 'z' ? p0 : r.z0, z1: ax === 'z' ? p1 : r.z1 } as Room;
         if (c === 'air') { sideRun(sub, side, base(r.f), () => top(r), wm, false, inward * 0.09); sideRun(sub, side, base(r.f), () => base(r.f) + 6, M.white, false, -inward * 0.04, 0.08); }
