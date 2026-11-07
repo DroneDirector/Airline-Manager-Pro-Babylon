@@ -23,7 +23,16 @@ export function perfShow() { if (!el) return; const g = S.gfx; el.hidden = !(g.s
 /** Where the processor's time goes, part by part (ms per frame, averaged): shown under CPU. */
 const parts: { [k: string]: number } = {}, partsShown: { [k: string]: number } = {};
 export function perfPart(name: string, ms: number) { parts[name] = (parts[name] || 0) + ms; }
-export function perfBegin() { const now = performance.now(); if (last) interval += ((now - last) - interval) * 0.1; last = now; t0 = now; }
+export function perfBegin() { const now = performance.now(); if (last) { const d = now - last; interval += (d - interval) * 0.1; if (d < 1000) playTrack(d, now); } last = now; t0 = now; }
+/** How fast the 3D places really ran while playing (pauses left out), with the settings they ran at: kept on the
+ *  device, for the device scan. */
+let pSum = 0, pN = 0, pSaved = 0;
+function playTrack(d: number, now: number) { pSum += d; pN++; if (now - pSaved < 5000 || pN < 60) return; pSaved = now;
+  const fps = 1000 / (pSum / pN); pSum = 0; pN = 0; let r: any = null; try { r = JSON.parse(localStorage.getItem('ampb.playfps') || 'null'); } catch (e) { /* none */ }
+  const g: any = S.gfx, same = r && r.preset === g.preset && Math.abs(r.scale - g.scale) < 0.01;
+  const avg = same ? r.fps + (fps - r.fps) * 0.2 : fps;
+  try { localStorage.setItem('ampb.playfps', JSON.stringify({ fps: avg, preset: g.preset, scale: g.scale, shadows: g.shadows, at: Date.now() })); } catch (e) { /* not kept */ } }
+export function recentPlay(): { fps: number; preset: string; scale: number; at: number } | null { try { return JSON.parse(localStorage.getItem('ampb.playfps') || 'null'); } catch (e) { return null; } }
 let cpuAvg = 0;
 export function perfEnd() { const w = performance.now() - t0; work += w; cpuAvg += (w - cpuAvg) * 0.1; frames++; if (performance.now() > nextShow) draw(); }
 /** The processor's time per frame and the time between frames (smoothed), for the automatic resolution. */

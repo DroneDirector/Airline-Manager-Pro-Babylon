@@ -5,7 +5,7 @@
 import { S, saveSettings, PRESETS } from '../core/settings';
 import { IS_PC } from '../core/app';
 import { gpuInfo } from '../core/engine';
-import { perfLoad } from '../core/perf-meter';
+import { recentPlay } from '../core/perf-meter';
 import { esc } from './icons';
 
 type Rec = { preset: 'low' | 'medium' | 'high' | 'ultra'; set: { [k: string]: any }; facts: [string, string][]; why: string[]; score: number };
@@ -33,24 +33,38 @@ export function scanDevice(): Rec {
   const cores = navigator.hardwareConcurrency || 4, mem = (navigator as any).deviceMemory || 0, ops = cpuTest();
   const gpu = gpuInfo() || (gl ? String(gl.getParameter(gl.RENDERER)) : 'unknown'), gc = gpuClass(gpu);
   const px = Math.round(screen.width * (window.devicePixelRatio || 1)) + ' × ' + Math.round(screen.height * (window.devicePixelRatio || 1));
-  const load = perfLoad(), fpsNow = load.frame > 0 ? Math.round(1000 / load.frame) : 0;
-  // the score: graphics chip counts most, then the processor, the memory and, if a 3D view is open, how it runs now
+  // how it really ran in the 3D places (the last few minutes of playing, with the settings it ran at) counts most
+  const play = recentPlay(), fpsNow = play && Date.now() - play.at < 14 * 864e5 ? Math.round(play.fps) : 0;
+  const ORDER: Rec['preset'][] = ['low', 'medium', 'high', 'ultra'];
   const cpuS = Math.max(0, Math.min(3, (ops - 4000) / 6000)) + (cores >= 8 ? 0.5 : 0);
   let score = gc * 1.6 + cpuS + (mem >= 8 ? 1 : mem >= 4 ? 0.5 : mem ? 0 : 0.5) + (IS_PC ? 1 : 0);
-  if (fpsNow) score += fpsNow >= 55 ? 0.8 : fpsNow >= 40 ? 0 : fpsNow >= 25 ? -1 : -2;
-  const preset: Rec['preset'] = score >= 9 ? 'ultra' : score >= 6.5 ? 'high' : score >= 3.5 ? 'medium' : 'low';
-  const set: { [k: string]: any } = Object.assign({}, PRESETS[preset]);
+  let level = score >= 9 ? 3 : score >= 6.5 ? 2 : score >= 3.5 ? 1 : 0;
   const why: string[] = [];
-  set.autoRes = !IS_PC || score < 6.5; if (set.autoRes) why.push('Automatic resolution on, so the frame rate holds when it gets busy');
-  if (!IS_PC) { set.heightFog = false; set.fps = score >= 6.5 ? 60 : 30; why.push(`Frame rate limit ${set.fps}, to keep the device cool and the battery lasting`); }
-  else set.fps = 0;
+  // phones and tablets: Medium at most (the airport is a very big place for a phone's chip), Low on weaker chips
+  if (!IS_PC) level = Math.min(level, gc >= 3 ? 1 : gc >= 2 ? 1 : 0);
+  if (fpsNow) { const ran = Math.max(0, ORDER.indexOf((play!.preset as any) === 'custom' ? 'medium' : play!.preset as any));
+    if (fpsNow < 20) level = Math.max(0, Math.min(level, ran - 1));
+    else if (fpsNow < 35) level = Math.min(level, ran);
+    else if (fpsNow >= 55 && IS_PC) level = Math.max(level, Math.min(3, ran + 1));
+    why.push(`It ran at about ${fpsNow} frames a second in the 3D places with ${play!.preset} quality at ${Math.round(play!.scale * 100)}% resolution`); }
+  const preset = ORDER[level];
+  const set: { [k: string]: any } = Object.assign({}, PRESETS[preset]);
+  set.autoRes = !IS_PC || level < 2; if (set.autoRes) why.push('Automatic resolution on, so the frame rate holds when it gets busy');
+  if (!IS_PC) {
+    set.heightFog = false; set.fps = fpsNow && fpsNow < 45 ? 30 : 60; why.push(`Frame rate limit ${set.fps}, steady and easier on the battery`);
+    // the screen's pixels: about 1.3 million drawn at most on a phone or tablet (more makes it slower, not visibly sharper)
+    const pix = screen.width * screen.height * (window.devicePixelRatio || 1) ** 2, cap = Math.sqrt(1.3e6 / Math.max(1, pix));
+    let sc = Math.min(set.scale, cap, level === 0 ? 0.6 : 0.75); if (fpsNow && fpsNow < 20) sc = Math.min(sc, 0.5);
+    set.scale = Math.max(0.4, Math.round(sc * 20) / 20); why.push(`Resolution ${Math.round(set.scale * 100)}%: the screen is sharp and the chip works per pixel`);
+    if (level === 0) { set.shadows = 'off'; set.mirror = 'off'; }
+  } else set.fps = 0;
   if (msaa < 4 && set.aa === 'msaa') { set.aa = 'fxaa'; why.push('FXAA smoothing, as this graphics chip has no 4× MSAA'); }
+  if (!IS_PC && set.aa === 'msaa') set.aa = 'fxaa';
   if (maxTex && maxTex < 8192 && set.shadows === 'high') { set.shadows = 'low'; why.push('Lighter shadows, for this chip\'s picture size limit'); }
-  if (!IS_PC && preset !== 'low' && gc <= 1) { set.scale = Math.min(set.scale, 0.75); why.push('Resolution 75%: the screen is sharp and the chip works per pixel'); }
-  if (fpsNow && fpsNow < 25) why.push(`It runs at ${fpsNow} frames a second now, so the recommendation is lighter`);
+  if (fpsNow && fpsNow < 20) why.push('That is too slow to play well, so the recommendation is lighter');
   why.unshift(`${preset[0].toUpperCase() + preset.slice(1)} quality suits this ${IS_PC ? 'PC' : 'device'} best`);
   const facts: [string, string][] = [['Graphics chip', gpu], ['Processor', `${cores} cores · speed ${Math.round(ops / 100) / 10}k`], ['Memory', mem ? `${mem} GB or more` : 'not told'],
-    ['Screen', `${px} pixels`], ['Biggest picture', maxTex ? `${maxTex} px` : 'unknown'], ['Running now', fpsNow ? `${fpsNow} frames a second` : 'no 3D view open']];
+    ['Screen', `${px} pixels`], ['Biggest picture', maxTex ? `${maxTex} px` : 'unknown'], ['Measured', fpsNow ? `${fpsNow} frames a second while playing` : 'not yet (play a little first)']];
   return { preset, set, facts, why, score };
 }
 
