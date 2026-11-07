@@ -317,15 +317,10 @@ body.game-on .gear, body.game-on .exit, body.game-on .to-title, body.game-on .pl
 .site-top b { display: block; font: 700 15px 'Inter', sans-serif; }
 .site-top small { font: 600 11.5px 'Inter', sans-serif; color: #C9D4EA; line-height: 1.45; }
 .site-dock { position: absolute; left: max(12px, env(safe-area-inset-left)); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 30px); display: flex; flex-direction: column; gap: 8px; max-width: 64vw; pointer-events: auto; }
-.site-views { display: flex; flex-wrap: wrap; gap: 6px; }
-.site-speed { display: flex; align-items: center; gap: 6px; color: #DDE6F7; font: 600 11px 'Inter', sans-serif; }
-.site-speed small { margin-right: 4px; }
-.site-ud { bottom: 30%; }
-.site-moves { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 34px); display: grid; grid-template-columns: repeat(2, auto); gap: 8px; pointer-events: auto; }
-.site-moves .wx-b { min-width: 86px; justify-content: center; padding: 10px 12px; }
-.site-views { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
-.site-views span { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; opacity: .75; margin-right: 2px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
-.site-moves .site-views .wx-b { min-width: 0; flex: 1; padding: 9px 0; }
+.site-views { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; align-items: center; }
+.site-views span { grid-column: 1 / -1; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; opacity: .75; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.6); margin-bottom: -2px; }
+.site-moves .site-views .wx-b { min-width: 0; padding: 8px 4px; font-size: 13px; white-space: nowrap; justify-content: center; }
+@media (max-width: 700px), (max-height: 500px) { .site-moves .site-views .wx-b { font-size: 12px; padding: 7px 2px; } }
 /* photo mode in the 3D viewer: everything but the strip goes away */
 body.photo-on .v3d-top, body.photo-on .v3d-views, body.photo-on .v3d-time, body.photo-on .v3d-perf, body.photo-on .v3d-credit, body.photo-on .gear, body.photo-on .exit, body.photo-on .to-title, body.photo-on .perf { opacity: 0 !important; pointer-events: none !important; transition: opacity .25s; }
 .ph-wrap { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 20; max-width: calc(100vw - 20px); pointer-events: auto; }

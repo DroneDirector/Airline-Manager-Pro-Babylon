@@ -45,14 +45,18 @@ import { AIRFIELD, designate } from './airfield/plan';
 const D2R = Math.PI / 180, R = 6371000, HEIGHT_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/';
 /** The quick viewpoints in airport mode (plan metres: x along the pier, z out to the apron), the first is where you start:
  *  each is placed on a clear spot (never inside a wall, seat, rail or roof). */
-const WALK_VIEWS: { name: string; at: [number, number]; look: [number, number]; y: number; pitch: number }[] = [
-  { name: 'Apron by gate 4\'s jetway', at: [150, 100], look: [200, 104], y: 0, pitch: 0 },
-  { name: 'Apron, along the terminal', at: [238, 94], look: [100, 86], y: 0, pitch: 0 },
-  { name: 'Kerb, the main entrance', at: [22, -30], look: [75, -4], y: 0, pitch: 0 },
-  { name: 'Kerb, the shuttle bus and the trees', at: [66, -27.5], look: [0, -19], y: 0, pitch: 0 },
-  { name: 'Gate 4\'s jetway corridor', at: [191.05, 83.3], look: [191.05, 96], y: F2Y, pitch: 0 },
-  { name: 'Gate 4, looking out at the apron', at: [180, 72.5], look: [180, 110], y: F2Y, pitch: 0 },
+const WALK_VIEWS: { name: string; label: string; at: [number, number]; look: [number, number]; y: number; pitch: number }[] = [
+  { label: 'Entrance', name: 'Outside the main entrance doors', at: [75, -19], look: [75, 12], y: 0, pitch: 0 },
+  { label: 'Main hall', name: 'Inside the main hall, facing check-in', at: [76, -0.5], look: [76, 40], y: 0, pitch: 0 },
+  { label: 'Gate 4', name: 'Gate 4, looking out at the apron', at: [180, 72.5], look: [180, 110], y: F2Y, pitch: 0 },
+  { label: 'Jetway', name: 'Gate 4\'s jetway corridor', at: [191.05, 83.3], look: [191.05, 96], y: F2Y, pitch: 0 },
+  { label: 'Apron', name: 'On the apron by gate 4\'s jetway', at: [150, 100], look: [200, 104], y: 0, pitch: 0 },
+  { label: 'Pier', name: 'On the apron, looking along the terminal', at: [238, 94], look: [100, 86], y: 0, pitch: 0 },
+  { label: 'Kerb', name: 'At the kerb, looking at the main entrance', at: [22, -30], look: [75, -4], y: 0, pitch: 0 },
+  { label: 'Bus stop', name: 'At the kerb, the shuttle bus and the trees', at: [66, -27.5], look: [0, -19], y: 0, pitch: 0 },
 ];
+/** Where airport mode starts: on the apron. */
+const WALK_START = 4;
 /** The site (Iceland only): the frame's reference point (the terminal's plan origin is 1,482 m from it, south of the runway), the
  *  runway's true heading (the gates face 90° to the left of it, towards the mountains), its designators (west end
  *  first), the snow line, the colours of the low ground. Mýrdalssandur is your airport, BIAP / VTX. */
@@ -314,7 +318,7 @@ const Site$: Section = {
     hud.insertAdjacentHTML('beforeend', `<div class="site-lift" hidden></div>`);
     // the jetways' test button: animates all of them (docks parked ones, undocks docked ones). REMOVE BEFORE 1.0
     hud.insertAdjacentHTML('beforeend', `<button class="wx-b site-jwtest" data-jwtest style="position:absolute;left:12px;bottom:${walkMode ? 168 : 112}px">Animate jetways (test)</button>`);
-    if (walkMode) hud.insertAdjacentHTML('beforeend', `<div class="site-moves">${[['jump', 'Jump'], ['crouch', 'Crouch'], ['prone', 'Prone'], ['sprint', 'Sprint']].map(([k, l]) => `<button class="wx-b" data-mv="${k}">${l}</button>`).join('')}<div class="site-views"><span>Views</span>${WALK_VIEWS.map((v, i) => `<button class="wx-b" data-wv="${i}" title="${v.name}" aria-label="View ${i + 1}: ${v.name}">${i + 1}</button>`).join('')}</div></div>`);
+    if (walkMode) hud.insertAdjacentHTML('beforeend', `<div class="site-moves">${[['jump', 'Jump'], ['crouch', 'Crouch'], ['prone', 'Prone'], ['sprint', 'Sprint']].map(([k, l]) => `<button class="wx-b" data-mv="${k}">${l}</button>`).join('')}<div class="site-views"><span>Go to</span>${WALK_VIEWS.map((v, i) => `<button class="wx-b" data-wv="${i}" title="${v.name}" aria-label="${v.name}">${v.label}</button>`).join('')}</div></div>`);
     if (walkMode) { hud.classList.add('site-walk'); (hud.querySelector('.site-dock') as HTMLElement).style.display = 'none'; (hud.querySelector('.site-ud') as HTMLElement).style.display = 'none'; }
     // the body you walk in: feet at its position, 1.8 m tall, 0.6 m across
     const body = MeshBuilder.CreateBox('player', { size: 0.5 }, sc); body.isVisible = false; body.isPickable = false; body.checkCollisions = false; body.ellipsoid = new Vector3(0.3, 0.9, 0.3); body.ellipsoidOffset = new Vector3(0, 0.9, 0);
@@ -350,12 +354,12 @@ const Site$: Section = {
         for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, q = new Vector3(p.x + Math.cos(a) * rr, p.y, p.z + Math.sin(a) * rr); if (ok(q)) return q; } }
       return p; };
     /** Puts you on one of the quick viewpoints (plan metres), standing, facing its look point, never inside anything. */
-    const goView = (i: number) => { const v = WALK_VIEWS[i] || WALK_VIEWS[0], p = toWorld(v.at[0], v.y + 0.3, v.at[1]); if (W.stance !== 'stand') setStance('stand');
+    const goView = (i: number) => { const v = WALK_VIEWS[i] || WALK_VIEWS[WALK_START], p = toWorld(v.at[0], v.y + 0.3, v.at[1]); if (W.stance !== 'stand') setStance('stand');
       body.position.copyFrom(clearSpot(p)); W.vy = 0;
       const f = toWorld(v.look[0], v.y + 0.3, v.look[1]).subtract(p).normalize(); CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = v.pitch;
       hud.querySelectorAll('[data-wv]').forEach(b => b.classList.toggle('on', b.getAttribute('data-wv') === String(i))); };
     O.goView = goView;
-    if (walkMode) goView(0);
+    if (walkMode) goView(WALK_START);
     const place = (id: string) => { const v = VIEWS.find(q => q.id === id) || VIEWS[0], at = Vector3.TransformCoordinates(new Vector3(v.at[0], v.at[1], v.at[2]), ap.computeWorldMatrix(true)), lk = Vector3.TransformCoordinates(new Vector3(v.look[0], v.look[1], v.look[2]), ap.getWorldMatrix());
       const d = lk.subtract(at).normalize(); CAM.x = at.x; CAM.y = at.y; CAM.z = at.z; CAM.yaw = Math.atan2(d.x, d.z); CAM.pitch = Math.asin(d.y); CAM.speed = id === 'air' || id === 'flyby' ? 220 : id === 'gate' ? 8 : 40;
       hud.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.getAttribute('data-view') === id)); hud.querySelectorAll('[data-sp2]').forEach(b => b.classList.toggle('on', Number(b.getAttribute('data-sp2')) === CAM.speed)); };
