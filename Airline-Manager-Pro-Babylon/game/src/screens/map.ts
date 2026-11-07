@@ -252,4 +252,6 @@ function trafficCardHtml(f: any, in3d?: boolean): string {
     ${in3d ? '' : `<div class="btn-row"><button class="btn ghost sm" data-act="tfc-3d" data-id="${esc(f.id)}"><b>3D</b>Follow in 3D</button></div>`}
   </div>`;
 }
+/** Your own aircraft, in the air or taxiing: straight into the 3D view of it. */
+ACTIONS['fc-3d'] = el => { const id = el.getAttribute('data-id'), m = _curMap(); if (!id || !m) return; try { if (v3dSupported()) v3dOpen(id, m); } catch (e) { /* the map shows it */ } };
 ACTIONS['tfc-3d'] = el => { const id = el.getAttribute('data-id'), m = _curMap(); if (!id || !m) return; ACTIONS['map-unmark'](el, null); v3dOpen(id, m); };

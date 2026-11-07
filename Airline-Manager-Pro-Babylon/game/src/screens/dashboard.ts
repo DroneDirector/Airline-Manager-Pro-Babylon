@@ -74,7 +74,7 @@ function flightCard(f: LiveFlight): string {
       ${coPilotChip()}
     </div>` : `<div class="fc-sync"><div class="sync-item">${icon('user')}<span><small>Flown by</small><b>${esc(pilot(f.pilotId).name)}</b></span></div>
       ${onBoardHtml(onBoardFlight(f))}</div>`}
-    <div class="fc-docs"><button class="btn ghost sm" data-act="pax-list" data-id="${esc(f.id)}">${icon('pax')}Passenger list</button><button class="btn ghost sm" data-act="loadsheet" data-id="${esc(f.id)}">${icon('fuel')}Loadsheet</button></div>
+    <div class="fc-docs">${typeof V3d !== 'undefined' && V3d.open ? '' : `<button class="btn ghost sm" data-act="fc-3d" data-id="${esc(f.id)}"><b>3D</b>Follow in 3D</button>`}<button class="btn ghost sm" data-act="pax-list" data-id="${esc(f.id)}">${icon('pax')}Passenger list</button><button class="btn ghost sm" data-act="loadsheet" data-id="${esc(f.id)}">${icon('fuel')}Loadsheet</button></div>
   </div>`;
 }
 

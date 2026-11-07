@@ -34,7 +34,8 @@ interface View { id: string; label: string; orbit?: [number, number, number]; ey
 const SW = seatAt(CABIN_VIEW_ROW, 0), SA = seatAt(CABIN_AISLE_ROW, 2), EYE = CFLOOR + 1.17;
 const VIEWS: View[] = [
   { id: 'chase', label: 'Behind', orbit: [0, 0.14, 64] },
-  { id: 'side', label: 'Side', orbit: [Math.PI / 2, 0.04, 60] },
+  { id: 'side', label: 'Right side', orbit: [Math.PI / 2, 0.04, 60] },
+  { id: 'sideL', label: 'Left side', orbit: [-Math.PI / 2, 0.04, 60] },
   { id: 'front', label: 'Front', orbit: [Math.PI * 0.9, 0.07, 54] },
   { id: 'top', label: 'Above', orbit: [0.5, 1.2, 72] },
   { id: 'below', label: 'Below', orbit: [0.7, -0.42, 48] },
