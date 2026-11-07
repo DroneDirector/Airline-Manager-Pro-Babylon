@@ -184,7 +184,10 @@ export function applyLook(P: LookParts): (dt: number) => void {
   // eye adaptation: brighter indoors (under a roof), back down outside, eased like an eye
   if (g.eyeAdapt) { let target = 1, cur = 1, t = 0; const ip = dp.imageProcessing, baseExp = ip.exposure;
     steps.push(dt => { t += dt; if (t > 0.3) { t = 0; const hit = sc.pickWithRay(new Ray(cam.globalPosition, Vector3.Up(), 25), m => m.isPickable && m.isVisible && !(m as any).isAnInstance && isBig(m) && !/sky|look-|COLLIDE|ground|GROUND|sea|ROAD|APRON|GRASS/i.test(m.name), true); target = hit && hit.hit ? 1.32 : 1; }
-      cur += (target - cur) * Math.min(1, dt * (target > cur ? 0.6 : 1.4)); ip.exposure = baseExp * cur; }); }
+      cur += (target - cur) * Math.min(1, dt * (target > cur ? 0.6 : 1.4)); const e = baseExp * cur, cfg: any = ip.imageProcessingConfiguration;
+      // set straight on the screen pass's settings: through ip.exposure Babylon would tell every material in the place
+      // to re-check itself, every frame (hundreds of milliseconds a frame on a phone, indoors and in the jetways)
+      if (Math.abs(cfg._exposure - e) > 0.002) cfg._exposure = e; }); }
 
   // rain and snow on the ground, and the sun glinting on it: wet, darker and glossier while it rains, puddles spreading
   // as it goes on, drying slowly after; snow settling while it snows, melting (and wetting) after; all in the shaders
