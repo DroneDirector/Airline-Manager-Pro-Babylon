@@ -7,7 +7,7 @@ export interface Gfx {
   mirror: 'off' | 'low' | 'high'; probe: boolean; glow: boolean; bloom: boolean; ssao: boolean; aces: boolean; exposure: number;
   sharpen: boolean; fov: number; clouds: 'low' | 'medium' | 'high' | 'ultra'; terrain: boolean; showFps: boolean; showCpu: boolean; showGpu: boolean; showMem: boolean; particles: 'low' | 'high';
   iblShadows: boolean; manyLights: boolean; volLight: boolean; heightFog: boolean; ssr: boolean; pcss: boolean; taa: boolean;
-  eyeAdapt: boolean; flares: boolean; dof: boolean; mblur: boolean; parallax: boolean; wetRain: boolean; glint: boolean; renderer: 'webgl' | 'webgpu';
+  eyeAdapt: boolean; flares: boolean; dof: boolean; mblur: boolean; parallax: boolean; wetRain: boolean; glint: boolean; renderer: 'webgl' | 'webgpu'; autoRes: boolean;
 }
 export interface Controls {
   padLook: number; padDead: number; padInvert: boolean; padSwap: boolean; padVibrate: boolean;
@@ -22,7 +22,7 @@ export const PRESETS: { [k: string]: Partial<Gfx> } = {
   ultra: { scale: IS_PC ? 1.25 : 1, aa: 'msaa', shadows: 'high', mirror: 'high', probe: true, glow: true, bloom: true, ssao: true, sharpen: true, particles: 'high', clouds: 'ultra', iblShadows: IS_PC, manyLights: true, volLight: true, heightFog: true, ssr: IS_PC, pcss: true, taa: true, eyeAdapt: true, flares: true, dof: false, mblur: false, parallax: true, wetRain: true, glint: true },
 };
 const DEF: Settings = {
-  gfx: Object.assign({ renderer: 'webgl', preset: (IS_PC ? 'high' : 'medium') as Preset, fps: IS_PC ? 0 : 60, terrain: true, aces: true, exposure: 1, fov: 70, showFps: false, showCpu: false, showGpu: false, showMem: false } as any, PRESETS[IS_PC ? 'high' : 'medium']),
+  gfx: Object.assign({ renderer: 'webgl', autoRes: !IS_PC, preset: (IS_PC ? 'high' : 'medium') as Preset, fps: IS_PC ? 0 : 60, terrain: true, aces: true, exposure: 1, fov: 70, showFps: false, showCpu: false, showGpu: false, showMem: false } as any, PRESETS[IS_PC ? 'high' : 'medium']),
   ctl: { padLook: 1, padDead: 0.15, padInvert: false, padSwap: false, padVibrate: true, touchLook: 1, touchStick: 1, mouseLook: 1, mouseInvert: false },
   music: true,
 };

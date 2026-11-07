@@ -22,6 +22,8 @@ import { buildAirliner, setGear } from '../viewer3d/airliner';
 import { makeWeather, Weather } from '../terminal/weather';
 import { applyLook, slimGlow } from '../../core/look';
 import { mergeStatic, freezeStatic } from '../../core/batch';
+import { jetwayInteriors } from '../../core/hide';
+import { cachedUrl, releaseUrl } from '../../core/tilecache';
 import { makeKit } from '../terminal/kit';
 import { buildShell } from '../terminal/shell';
 import { buildDoors, stepDoors, DoorObj } from '../terminal/doors';
@@ -62,7 +64,7 @@ function loadTile(z: number, x: number, y: number): Promise<Float32Array | null>
   return new Promise(ok => { const im = new Image(); im.crossOrigin = 'anonymous';
     im.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D; g.drawImage(im, 0, 0);
       const d = g.getImageData(0, 0, 256, 256).data, H = new Float32Array(65536); for (let i = 0; i < 65536; i++) H[i] = d[i * 4] * 256 + d[i * 4 + 1] + d[i * 4 + 2] / 256 - 32768; tiles[k] = H; ok(H); };
-    im.onerror = () => { tiles[k] = null; ok(null); }; im.src = `${HEIGHT_URL}${z}/${x}/${y}.png`; });
+    im.onerror = () => { tiles[k] = null; ok(null); }; cachedUrl(`${HEIGHT_URL}${z}/${x}/${y}.png`).then(u => { const done = () => releaseUrl(u); im.addEventListener('load', done); im.addEventListener('error', done); im.src = u; }); });
 }
 /** The height (m) at a place from the tiles of zoom z (bilinear), or null. */
 function hAt(z: number, lat: number, lon: number): number | null {
@@ -331,6 +333,7 @@ const Site$: Section = {
     perfAttach(engine, sc, hud); perfShow();
     if (walkMode) toast(IS_TOUCH ? 'Your airport · left thumb: walk · right: look' : 'Your airport · W A S D walk · mouse look · Shift run · Space jump · C crouch · Z prone · E lift · P photo · a controller: A jump, B crouch, Y prone, X lift, R3 sprint'); else toast(IS_TOUCH ? 'Pick a view · left thumb: fly · right: look · ▲ ▼ up and down' : 'Pick a view · W A S D fly · mouse look · Space / R up · C / F down · Shift faster · P photo');
     // the shaders compiled while still loading (no stutter the first time something comes into view), at most 25 s
+    const insides = jetwayInteriors(sc);   // the jetways' insides only drawn from close by
     progress(97, 'Preparing the graphics…');
     try { await Promise.race([sc.whenReadyAsync(), new Promise(r => setTimeout(r, 25000))]); } catch (e) { /* compiled as they come into view */ }
     progress(100, 'Ready');
@@ -377,6 +380,7 @@ const Site$: Section = {
         for (const j of js) j.update(dt);
         if (ride) { const m1 = ride.computeWorldMatrix(true), p = Vector3.TransformCoordinates(Vector3.TransformCoordinates(body.position, m0.clone().invert()), m1); body.position.copyFrom(p); }
         if (js.some(j => j.moving && Vector3.Distance(cam.position, j.node.getAbsolutePosition()) < 45)) { if (now - (O.beepT || 0) > 1.1) { O.beepT = now; jwBeep(); } } } catch (e) { /* still */ }
+      try { insides(cam.globalPosition); } catch (e) { /* all drawn */ }
       lap('jetways'); wx.frame(dt, now); lap('weather');
       sc.render(); lap('drawing'); perfEnd();
     });

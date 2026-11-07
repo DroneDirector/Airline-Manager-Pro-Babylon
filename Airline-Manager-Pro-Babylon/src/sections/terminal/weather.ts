@@ -9,7 +9,7 @@
 //    C / F down, Shift faster; on a touch screen the ▲ ▼ buttons);
 //  - Photo: every piece of the interface is taken off the screen, the picture is taken, saved (Pictures / Airline
 //    Manager Pro on Android and on the PC), and the interface comes back.
-import { Scene, Vector3, Color3, Color4, ParticleSystem, DynamicTexture, Texture, MeshBuilder, Mesh, StandardMaterial, DirectionalLight, HemisphericLight, UniversalCamera, AbstractEngine, Tools, GlowLayer } from '@babylonjs/core';
+import { Scene, Vector3, Color3, Color4, ParticleSystem, GPUParticleSystem, DynamicTexture, Texture, MeshBuilder, Mesh, StandardMaterial, DirectionalLight, HemisphericLight, UniversalCamera, AbstractEngine, Tools, GlowLayer } from '@babylonjs/core';
 import { makeSky, skyFrame, Sky } from '../viewer3d/sky';
 import { sunAt, moonAt, dirOf, lst } from '../viewer3d/astro';
 import { S } from '../../core/settings';
@@ -74,11 +74,13 @@ export function makeWeather(h: WxHooks) {
   // ---- rain and snow, falling round the camera ----
   const dropTex = (() => { const t = new DynamicTexture('wx-drop', { width: 16, height: 64 }, sc, false); const x = t.getContext() as CanvasRenderingContext2D; const g = x.createLinearGradient(0, 0, 0, 64); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.6, 'rgba(220,230,245,.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(6, 0, 4, 64); t.hasAlpha = true; t.update(); return t; })();
   const flakeTex = (() => { const t = new DynamicTexture('wx-flake', { width: 32, height: 32 }, sc, false); const x = t.getContext() as CanvasRenderingContext2D; const g = x.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.5, 'rgba(255,255,255,.7)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 32, 32); t.hasAlpha = true; t.update(); return t; })();
-  const rain = new ParticleSystem('wx-rain', IS_PC ? 9000 : 3500, sc); rain.particleTexture = dropTex; rain.emitter = new Vector3(0, 14, 0); rain.minEmitBox = new Vector3(-22, 0, -22); rain.maxEmitBox = new Vector3(22, 2, 22);
+  // the rain and the snow are worked out by the graphics chip where it can (not by the processor); the same look
+  const PS = (name: string, cap: number): ParticleSystem => (GPUParticleSystem.IsSupported ? new GPUParticleSystem(name, { capacity: cap }, sc) : new ParticleSystem(name, cap, sc)) as any;
+  const rain = PS('wx-rain', IS_PC ? 9000 : 3500); rain.particleTexture = dropTex; rain.emitter = new Vector3(0, 14, 0); rain.minEmitBox = new Vector3(-22, 0, -22); rain.maxEmitBox = new Vector3(22, 2, 22);
   rain.direction1 = new Vector3(-0.08, -1, -0.04); rain.direction2 = new Vector3(0.08, -1, 0.04); rain.minEmitPower = 15; rain.maxEmitPower = 19; rain.minLifeTime = 0.9; rain.maxLifeTime = 1.05; rain.updateSpeed = 1 / 60;
   rain.minSize = 0.028; rain.maxSize = 0.04; rain.minScaleY = 14; rain.maxScaleY = 22; rain.billboardMode = ParticleSystem.BILLBOARDMODE_STRETCHED; rain.blendMode = ParticleSystem.BLENDMODE_STANDARD;
   rain.color1 = new Color4(0.78, 0.83, 0.9, 0.42); rain.color2 = new Color4(0.7, 0.76, 0.85, 0.32); rain.colorDead = new Color4(0.7, 0.76, 0.85, 0); rain.emitRate = 0; rain.start();
-  const snow = new ParticleSystem('wx-snow', IS_PC ? 8000 : 3000, sc); snow.particleTexture = flakeTex; snow.emitter = new Vector3(0, 16, 0); snow.minEmitBox = new Vector3(-26, 0, -26); snow.maxEmitBox = new Vector3(26, 3, 26);
+  const snow = PS('wx-snow', IS_PC ? 8000 : 3000); snow.particleTexture = flakeTex; snow.emitter = new Vector3(0, 16, 0); snow.minEmitBox = new Vector3(-26, 0, -26); snow.maxEmitBox = new Vector3(26, 3, 26);
   snow.direction1 = new Vector3(-0.35, -1, -0.25); snow.direction2 = new Vector3(0.35, -1, 0.25); snow.minEmitPower = 0.9; snow.maxEmitPower = 1.5; snow.minLifeTime = 9; snow.maxLifeTime = 13; snow.minSize = 0.03; snow.maxSize = 0.075;
   snow.minAngularSpeed = -1; snow.maxAngularSpeed = 1; snow.blendMode = ParticleSystem.BLENDMODE_STANDARD; snow.color1 = new Color4(1, 1, 1, 0.95); snow.color2 = new Color4(0.92, 0.95, 1, 0.85); snow.colorDead = new Color4(1, 1, 1, 0); snow.emitRate = 0; snow.start();
 

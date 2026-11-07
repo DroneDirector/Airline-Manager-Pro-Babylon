@@ -24,7 +24,10 @@ export function perfShow() { if (!el) return; const g = S.gfx; el.hidden = !(g.s
 const parts: { [k: string]: number } = {}, partsShown: { [k: string]: number } = {};
 export function perfPart(name: string, ms: number) { parts[name] = (parts[name] || 0) + ms; }
 export function perfBegin() { const now = performance.now(); if (last) interval += ((now - last) - interval) * 0.1; last = now; t0 = now; }
-export function perfEnd() { work += performance.now() - t0; frames++; if (performance.now() > nextShow) draw(); }
+let cpuAvg = 0;
+export function perfEnd() { const w = performance.now() - t0; work += w; cpuAvg += (w - cpuAvg) * 0.1; frames++; if (performance.now() > nextShow) draw(); }
+/** The processor's time per frame and the time between frames (smoothed), for the automatic resolution. */
+export function perfLoad() { return { cpu: cpuAvg, frame: interval }; }
 const bar = (k: number, warn = 0.7, bad = 0.9) => { const p = Math.max(0, Math.min(1, k)); return `<i class="pb"><i style="width:${(p * 100).toFixed(0)}%;background:${p > bad ? '#FF5A6E' : p > warn ? '#FFC24A' : '#4CFFA0'}"></i></i>`; };
 function draw() {
   if (!el || el.hidden || !eng) { work = 0; frames = 0; return; }

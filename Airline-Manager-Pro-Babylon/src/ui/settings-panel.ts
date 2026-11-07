@@ -19,6 +19,7 @@ type Row = { k: 'seg'; key: string; label: string; sub?: string; opts: [any, str
 const pct = (v: number) => Math.round(v * 100) + '%';
 const GFX: Row[] = [
   { k: 'seg', key: 'gfx.preset', label: 'Quality', sub: 'Sets everything below at once', opts: [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra'], ['custom', 'Custom']] },
+  { k: 'tog', key: 'gfx.autoRes', label: 'Automatic resolution', sub: 'Draws a little smaller when the graphics chip can\'t keep up, and sharp again when it can (never below 60%)' },
   { k: 'range', key: 'gfx.scale', label: 'Resolution', sub: 'Lower is faster, higher is sharper', min: 0.4, max: IS_PC ? 1.5 : 1, step: 0.05, fmt: pct },
   ...(IS_PC ? [{ k: 'seg', key: 'gfx.renderer', label: 'Graphics engine', sub: 'WebGPU takes far less of the processor per thing drawn (new; WebGL if it can\'t start). Applies after restarting the game', opts: [['webgl', 'WebGL'], ['webgpu', 'WebGPU']] } as Row] : []),
   { k: 'seg', key: 'gfx.fps', label: 'Frame rate limit', opts: [[30, '30'], [60, '60'], [0, 'No limit']] },

@@ -3,6 +3,7 @@
 // (CC BY 4.0), so the sea, the coast, the fjords, the mountains and the towns are where they really are. A square of
 // 5 × 5 tiles round the aircraft (about 45 km across at 60° north), on the curve of the Earth, laid out again when
 // the aircraft has flown on. Loaded over the internet as needed; without it the plain land and sea stay.
+import { cachedUrl, releaseUrl } from '../../core/tilecache';
 import { Scene, Mesh, MeshBuilder, TransformNode, PBRMaterial, Texture, VertexBuffer, Color3 } from '@babylonjs/core';
 import { IS_PC } from '../../core/app';
 import { flatHeight } from '../../core/flatten';
@@ -19,7 +20,7 @@ export interface Terrain { root: TransformNode; lat: number; lon: number; cx: nu
 const heights: { [k: string]: Float32Array | null } = {};
 
 function loadImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((ok, no) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = () => no(new Error('no tile')); im.src = url; });
+  return cachedUrl(url).then(u => new Promise((ok, no) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => { releaseUrl(u); ok(im); }; im.onerror = () => { releaseUrl(u); no(new Error('no tile')); }; im.src = u; }));
 }
 /** A tile's heights in metres (256 × 256), from its colours: (red × 256 + green + blue / 256) − 32768. */
 async function tileHeights(x: number, y: number): Promise<Float32Array | null> {
@@ -59,8 +60,9 @@ export function buildTerrain(sc: Scene, lat: number, lon: number, onReady?: () =
       }
       m.updateVerticesData(VertexBuffer.PositionKind, p); m.refreshBoundingInfo(); m.createNormals(true); m.setEnabled(true);
       // the picture from the satellites (EOX's tiles count rows from the top, as the heights do)
-      const t = new Texture(`${SAT_URL}${Z}/${y}/${x}.jpg`, sc, false, false, Texture.TRILINEAR_SAMPLINGMODE, () => { mat.albedoColor = Color3.White(); }, () => { /* the plain colour stays */ });
-      t.wrapU = t.wrapV = Texture.CLAMP_ADDRESSMODE; t.anisotropicFilteringLevel = 8; mat.albedoTexture = t;
+      cachedUrl(`${SAT_URL}${Z}/${y}/${x}.jpg`).then(u => { if (sc.isDisposed) { releaseUrl(u); return; }
+        const t = new Texture(u, sc, false, false, Texture.TRILINEAR_SAMPLINGMODE, () => { releaseUrl(u); mat.albedoColor = Color3.White(); }, () => { releaseUrl(u); /* the plain colour stays */ }, null, false, undefined, undefined, undefined, undefined, '.jpg');
+        t.wrapU = t.wrapV = Texture.CLAMP_ADDRESSMODE; t.anisotropicFilteringLevel = 8; mat.albedoTexture = t; });
       T.ready++; if (T.ready === N * N && onReady) onReady();
     });
   }
