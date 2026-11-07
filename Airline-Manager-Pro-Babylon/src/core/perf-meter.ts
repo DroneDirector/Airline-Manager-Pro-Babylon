@@ -81,6 +81,17 @@ function draw() {
   const n = head.length;
   el.innerHTML = `<div class="pf-g" style="grid-template-columns:repeat(${n},auto)">${head.map(h => `<b>${h}</b>`).join('')}${val.map(v => `<div>${v}</div>`).join('')}</div>`
     + `<div class="pf-m ${warn.length ? 'bad' : ''}">${warn.length ? '⚠ ' + warn.join(' · ') : 'Running smoothly'}</div>`;
+  clear(el);
+}
+/** Keep the overlay clear of every button and panel on screen: when it would cover one, it moves up above it. */
+function clear(e: HTMLElement) {
+  const others = Array.from(document.querySelectorAll<HTMLElement>('button, .site-moves, .wx-b, .v3d-b, .holomap, .place-ver, .gear, .exit, .to-title'))
+    .filter(o => !e.contains(o) && o.offsetParent !== null && getComputedStyle(o).visibility !== 'hidden' && getComputedStyle(o).opacity !== '0').map(o => o.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0);
+  if (!e.classList.contains('moved')) e.style.bottom = '';
+  const hit = (a: DOMRect, b: DOMRect) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
+  for (let i = 0; i < 6; i++) { const r = e.getBoundingClientRect(), o = others.find(b => hit(r, b)); if (!o) return;
+    const y = Math.max(0, o.top - r.height - 6);
+    if (e.classList.contains('moved')) e.style.top = y + 'px'; else e.style.bottom = (innerHeight - o.top + 6) + 'px'; }
 }
 /** What the pictures (with their smaller copies) and the models take on the graphics chip, roughly. */
 function estimateGpu(): number {
