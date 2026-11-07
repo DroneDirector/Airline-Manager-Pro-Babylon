@@ -23,12 +23,16 @@ const box = r => { const lat = r[4], lon = r[5], k = Math.max(0.05, Math.cos(lat
 const tiles = new Map(); for (const r of AP) { const key = Math.floor(r[4] / T) + ',' + Math.floor(r[5] / T); (tiles.get(key) || tiles.set(key, []).get(key)).push(r); }
 const mine = Array.from(tiles.keys()).sort().filter((k, i) => i % shards === shard);
 let res = {}; try { res = JSON.parse(fs.readFileSync(out)); } catch (e) { /* fresh */ }
+// the airports the last build already answered (layout-data's answered.json): their tiles are skipped, so a run
+// continues where the last one stopped; once every airport is answered, a run starts a fresh round (refresh)
+const DONE = new Set(); try { for (const k of JSON.parse(fs.readFileSync(process.argv[5] || 'answered.json'))) DONE.add(k); } catch (e) { /* nothing yet */ }
+const allDone = AP.every(r => DONE.has(r[0]));
 
 async function query(bb, first) {
-  const q = `[out:json][timeout:180][maxsize:1073741824][bbox:${bb.map(v => v.toFixed(4)).join(',')}];(way["aeroway"~"^(runway|taxiway|taxilane|apron|parking_position|terminal)$"];node["aeroway"~"^(parking_position|gate)$"];);out body geom qt;`;
+  const q = `[out:json][timeout:90][bbox:${bb.map(v => v.toFixed(4)).join(',')}];(way["aeroway"~"^(runway|taxiway|taxilane|apron|parking_position|terminal)$"];node["aeroway"~"^(parking_position|gate)$"];);out body geom qt;`;
   for (let k = 0; k < SERVERS.length * 2; k++) { const url = SERVERS[(first + k) % SERVERS.length];
-    try { const r = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'AirlineManagerPro-layout-build/2 (occasional build of bundled airport layouts)' }, signal: AbortSignal.timeout(240000) });
-      if (r.status === 429 || r.status === 504) { await sleep(30000); continue; } if (!r.ok) { await sleep(5000); continue; }
+    try { const r = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'AirlineManagerPro-layout-build/2 (occasional build of bundled airport layouts)' }, signal: AbortSignal.timeout(150000) });
+      if (r.status === 429 || r.status === 504) { await sleep(15000); continue; } if (!r.ok) { await sleep(5000); continue; }
       const d = await r.json(); if (d.remark && /timed out|runtime error|out of memory/i.test(d.remark)) return 'big'; return d.elements || []; }
     catch (e) { await sleep(5000); } }
   return null; }
@@ -36,7 +40,7 @@ async function query(bb, first) {
 async function fetchTile(bb, depth) {
   const els = await query(bb, shard); await sleep(2000);
   if (Array.isArray(els)) return els;
-  if (depth >= 3) return els === 'big' ? [] : null;
+  if (depth >= 2) return els === 'big' ? [] : null;
   const [s, w, n, e] = bb, ms = (s + n) / 2, me = (w + e) / 2, all = [];
   for (const q of [[s, w, ms, me], [s, me, ms, e], [ms, w, n, me], [ms, me, n, e]]) { const part = await fetchTile(q, depth + 1); if (part == null) return null; all.push(...part); }
   return all; }
@@ -50,9 +54,10 @@ function compact(lat0, lon0, els) {
   }
   return w.length || n.length ? { c, w, n } : null; }
 
-let done = 0; const t0 = Date.now();
+let done = 0; const t0 = Date.now(), STOP = Number(process.env.STOP_MIN || 300) * 60000;
 for (const key of mine) {
-  const list = tiles.get(key); if (list.every(r => r[0] in res)) { done++; continue; }
+  if (Date.now() - t0 > STOP) { console.log('time is up for this run: the rest next run'); break; }
+  const list = tiles.get(key); if (list.every(r => r[0] in res || (!allDone && DONE.has(r[0])))) { done++; continue; }
   const [ty, tx] = key.split(',').map(Number), M = 0.12;           // a margin, so boxes reaching over the edge are whole
   const els = await fetchTile([ty * T - M, tx * T - M, ty * T + T + M, tx * T + T + M], 0);
   if (els == null) { console.log('tile', key, 'not answered; next run'); done++; continue; }

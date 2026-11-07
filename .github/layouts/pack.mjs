@@ -8,5 +8,8 @@ if (oldDir && fs.existsSync(oldDir)) for (const f of fs.readdirSync(oldDir).filt
 fs.rmSync(outDir, { recursive: true, force: true }); fs.mkdirSync(outDir, { recursive: true }); const packs = {};
 for (const [icao, v] of Object.entries(all)) { if (!v) continue; const p = icao.slice(0, 2); (packs[p] = packs[p] || {})[icao] = v; }
 let bytes = 0; for (const [p, v] of Object.entries(packs)) { const s = JSON.stringify(v); bytes += s.length; fs.writeFileSync(`${outDir}/${p}.json`, s); }
+// every airport answered so far (with or without a layout), so the next run can continue where this one stopped
+let answered = []; try { answered = JSON.parse(fs.readFileSync(oldDir + '/answered.json')); } catch (e) { /* first */ }
+fs.writeFileSync(`${outDir}/answered.json`, JSON.stringify(Array.from(new Set([...answered, ...Object.keys(all)])).sort()));
 fs.writeFileSync(`${outDir}/README.md`, '# Airport layouts\n\nRunways, taxiways, aprons, terminals and stands of the airports, from OpenStreetMap: © OpenStreetMap contributors, available under the Open Database License (ODbL 1.0, https://opendatacommons.org/licenses/odbl/). This database is made available under the ODbL.\n');
 console.log(Object.keys(all).length, 'airports answered,', Object.values(all).filter(Boolean).length, 'with a layout,', kept, 'kept from the last build;', Object.keys(packs).length, 'packs,', (bytes / 1e6).toFixed(1), 'MB');

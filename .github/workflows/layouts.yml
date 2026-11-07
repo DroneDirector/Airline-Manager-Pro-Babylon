@@ -35,7 +35,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --max-old-space-size=6144 .github/layouts/fetch.mjs ${{ matrix.shard }} 6 shard-${{ matrix.shard }}.json
+      - name: What the last build already has
+        run: |
+          echo '[]' > answered.json
+          if git fetch --depth 1 origin layout-data; then
+            mkdir -p last && git archive FETCH_HEAD Airline-Manager-Pro-Babylon/game/www/layouts | tar -x -C last
+            node -e "const fs=require('fs'),d='last/Airline-Manager-Pro-Babylon/game/www/layouts';let a=[];try{a=JSON.parse(fs.readFileSync(d+'/answered.json'))}catch(e){for(const f of fs.readdirSync(d))if(/^[A-Z0-9-]{1,2}\.json$/.test(f))a.push(...Object.keys(JSON.parse(fs.readFileSync(d+'/'+f))))}fs.writeFileSync('answered.json',JSON.stringify(a));console.log(a.length,'airports already done')"
+          fi
+      - run: node --max-old-space-size=6144 .github/layouts/fetch.mjs ${{ matrix.shard }} 6 shard-${{ matrix.shard }}.json answered.json
+        timeout-minutes: 330
+        env:
+          STOP_MIN: 315
       - uses: actions/upload-artifact@v4
         if: always()
         with:
