@@ -9,6 +9,7 @@
 // on the airport boundary. Inside the boundary the ground is levelled (blending into the real ground only within its
 // outer 100 m); outside it the real ground and its mountains are untouched. Ready-made views (from a gate, the apron,
 // the runway, the holding point, the air) and a free drone camera, the time of day and the weather, the photo button.
+import { thinStatic } from '../../core/thin';
 import { shareMaterials } from '../../core/texarray';
 import { CascadedShadowGenerator, SSAO2RenderingPipeline, ReflectionProbe } from '@babylonjs/core';
 import { Ray, Scene, Vector3, Color3, Color4, UniversalCamera, HemisphericLight, DirectionalLight, ShadowGenerator, GlowLayer, DefaultRenderingPipeline, ImageProcessingConfiguration, MeshBuilder, Mesh, VertexData, TransformNode, PBRMaterial, StandardMaterial, DynamicTexture, Texture, AbstractMesh } from '@babylonjs/core';
@@ -267,6 +268,9 @@ const Site$: Section = {
         const m = new Mesh('ramp-' + st.id, sc), vd = new VertexData(); vd.positions = p.flatMap(v => [v.x, v.y + 0.02, v.z]); vd.indices = [0, 1, 2, 0, 2, 3, 0, 2, 1, 0, 3, 2]; vd.applyToMesh(m);
         m.parent = K.root; m.isVisible = false; m.checkCollisions = true; m.isPickable = false; }
     }
+    // the fixed copies (furniture, fittings) as thin instances: nothing per copy left for the processor each frame
+    try { const moving = new Set<any>(); for (const d of doors) for (const m of d.node.getChildMeshes()) moving.add(m);
+      thinStatic(sc, m => !before.has(m) && !liftParts.has(m) && !hidden.has(m) && !moving.has(m), casters, walkMode); } catch (e) { /* the copies stay */ }
     O.doors = doors;
     progress(92, 'Setting up the views…');
     // lights, camera, the sky and its weather
