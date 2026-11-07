@@ -41,15 +41,19 @@ import { buildAirfield, AIRFIELD_VIEWS } from './airfield/build';
 import { AIRFIELD, designate } from './airfield/plan';
 
 const D2R = Math.PI / 180, R = 6371000, HEIGHT_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/';
+/** The quick viewpoints in airport mode (plan metres: x along the pier, z out to the apron), the first is where you start:
+ *  each is placed on a clear spot (never inside a wall, seat, rail or roof). */
+const WALK_VIEWS: { name: string; at: [number, number]; look: [number, number]; y: number; pitch: number }[] = [
+  { name: 'Apron by gate 4\'s jetway', at: [150, 100], look: [200, 104], y: 0, pitch: 0 },
+  { name: 'Apron, along the terminal', at: [238, 94], look: [100, 86], y: 0, pitch: 0 },
+  { name: 'Kerb, the main entrance', at: [22, -30], look: [75, -4], y: 0, pitch: 0 },
+  { name: 'Kerb, the shuttle bus and the trees', at: [66, -27.5], look: [0, -19], y: 0, pitch: 0 },
+  { name: 'Gate 4\'s jetway corridor', at: [191.05, 83.3], look: [191.05, 96], y: F2Y, pitch: 0 },
+  { name: 'Gate 4, looking out at the apron', at: [180, 72.5], look: [180, 110], y: F2Y, pitch: 0 },
+];
 /** The site (Iceland only): the frame's reference point (the terminal's plan origin is 1,482 m from it, south of the runway), the
  *  runway's true heading (the gates face 90° to the left of it, towards the mountains), its designators (west end
  *  first), the snow line, the colours of the low ground. Mýrdalssandur is your airport, BIAP / VTX. */
-/** The quick viewpoints in airport mode (plan metres: x along the pier, z out to the apron), the first is where you start:
- *  1 out on the apron beside gate 4's jetway and its stair, the aircraft on your right; 2 on the apron looking along the terminal to the jetways. */
-const WALK_VIEWS: { name: string; at: [number, number]; look: [number, number]; pitch: number }[] = [
-  { name: 'Gate 4 jetway', at: [150, 100], look: [200, 104], pitch: 0 },
-  { name: 'Along the terminal', at: [238, 94], look: [100, 86], pitch: 0 },
-];
 export const SITES = [
   { id: 'myrdalssandur', name: 'Mýrdalssandur Airport, Iceland', icao: 'BIAP', iata: 'VTX', lat: 63.465, lon: -18.72, hdg: 68, rwy: ['08', '26'], gates: 338, snow: 950, low: 'sand' },
 ];
@@ -225,6 +229,7 @@ const Site$: Section = {
         ac.root.parent = holder; for (const m of ac.casters) casters.push(m); } catch (e) { /* the stand stays empty */ } }
     for (const m of K.casters) casters.push(m);
     const liftParts = new Set<any>(); for (const l of O.lifts as LiftCtl[]) for (const m of l.moving_parts) liftParts.add(m); for (const j of (FX && FX.jetways) || []) for (const m of j.meshes()) liftParts.add(m); O.jetways = (FX && FX.jetways) || [];
+    for (const d of doors) for (const m of d.node.getChildMeshes()) liftParts.add(m);   // the doors slide and swing: never fixed in place
     for (const m of sc.meshes) { if (!before.has(m)) { m.renderingGroupId = 1; m.computeWorldMatrix(true); if (!liftParts.has(m)) { m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true; } } }
     // the terminal's static things merged by material and 60 m square: far fewer draw calls, the same picture
     { const doorParts = new Set<any>(); for (const d of doors) for (const m of d.node.getChildMeshes()) doorParts.add(m);
@@ -237,7 +242,8 @@ const Site$: Section = {
       const skip = new Set<any>(); for (const d of doors) for (const m of d.node.getChildMeshes()) skip.add(m);
       for (const m of K.groups.STAIRS.getChildMeshes()) skip.add(m); for (const m of K.groups.SCREENS.getChildMeshes()) skip.add(m);
       for (const m of sc.meshes) if (!before.has(m) && !skip.has(m) && m.getTotalVertices() > 0) m.checkCollisions = true;
-      for (const m of ap.getChildMeshes()) { if (m.getTotalVertices() <= 0 || hidden.has(m)) continue; const kind = m.metadata && m.metadata.kind;
+      // (the doors are left out: they open as you come to them, so they are never in the way)
+      for (const m of ap.getChildMeshes()) { if (m.getTotalVertices() <= 0 || hidden.has(m) || skip.has(m)) continue; const kind = m.metadata && m.metadata.kind;
         if (/^AIRFIELD\//.test(m.name) ? kind === 'ground' || kind === 'building' || kind === 'signs' : kind !== 'road') m.checkCollisions = true; }
       O.AFB.ground.subdivide(64);
       inner.m.checkCollisions = true; inner.m.subdivide(64);
@@ -300,7 +306,7 @@ const Site$: Section = {
     hud.insertAdjacentHTML('beforeend', `<div class="site-lift" hidden></div>`);
     // the jetways' test button: animates all of them (docks parked ones, undocks docked ones). REMOVE BEFORE 1.0
     hud.insertAdjacentHTML('beforeend', `<button class="wx-b site-jwtest" data-jwtest style="position:absolute;left:12px;bottom:${walkMode ? 168 : 112}px">Animate jetways (test)</button>`);
-    if (walkMode) hud.insertAdjacentHTML('beforeend', `<div class="site-moves">${[['jump', 'Jump'], ['crouch', 'Crouch'], ['prone', 'Prone'], ['sprint', 'Sprint']].map(([k, l]) => `<button class="wx-b" data-mv="${k}">${l}</button>`).join('')}${WALK_VIEWS.map((v, i) => `<button class="wx-b" data-wv="${i}" title="${v.name}">View ${i + 1}</button>`).join('')}</div>`);
+    if (walkMode) hud.insertAdjacentHTML('beforeend', `<div class="site-moves">${[['jump', 'Jump'], ['crouch', 'Crouch'], ['prone', 'Prone'], ['sprint', 'Sprint']].map(([k, l]) => `<button class="wx-b" data-mv="${k}">${l}</button>`).join('')}<div class="site-views"><span>Views</span>${WALK_VIEWS.map((v, i) => `<button class="wx-b" data-wv="${i}" title="${v.name}" aria-label="View ${i + 1}: ${v.name}">${i + 1}</button>`).join('')}</div></div>`);
     if (walkMode) { hud.classList.add('site-walk'); (hud.querySelector('.site-dock') as HTMLElement).style.display = 'none'; (hud.querySelector('.site-ud') as HTMLElement).style.display = 'none'; }
     // the body you walk in: feet at its position, 1.8 m tall, 0.6 m across
     const body = MeshBuilder.CreateBox('player', { size: 0.5 }, sc); body.isVisible = false; body.isPickable = false; body.checkCollisions = false; body.ellipsoid = new Vector3(0.3, 0.9, 0.3); body.ellipsoidOffset = new Vector3(0, 0.9, 0);
@@ -324,8 +330,22 @@ const Site$: Section = {
       const d = Vector3.TransformNormal(new Vector3(Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw)), inv);
       return { x: l.x - AIRFIELD.airport.planU, z: l.z - AIRFIELD.airport.planV, f: l.y > F2Y - 1.5 ? 2 : 1, yaw: Math.atan2(d.x, d.z) }; }, O.K && O.K.root);
     /** Puts you on one of the quick viewpoints (plan metres), standing, facing its look point. */
-    const goView = (i: number) => { const v = WALK_VIEWS[i] || WALK_VIEWS[0], p = toWorld(v.at[0], 0.3, v.at[1]); body.position.copyFrom(p); W.vy = 0;
-      const f = toWorld(v.look[0], 0.3, v.look[1]).subtract(p).normalize(); CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = v.pitch; if (W.stance !== 'stand') setStance('stand'); };
+    /** A spot clear of walls, seats, rails and roofs near p (world): the body's width round it at foot, knee, chest and
+     *  head height, and its full height above; tried in rings out to 3 m. Returns p if no clear spot is found. */
+    const solid = (m: any) => !!m.checkCollisions && m !== body && m.isEnabled();
+    const clearSpot = (p: Vector3) => { const dirs: Vector3[] = []; for (let a = 0; a < 8; a++) dirs.push(new Vector3(Math.cos(a * Math.PI / 4), 0, Math.sin(a * Math.PI / 4)));
+      const ok = (q: Vector3) => { const dn = sc.pickWithRay(new Ray(q.add(new Vector3(0, 1.0, 0)), Vector3.Down(), 3), solid); if (!dn || !dn.hit || !dn.pickedPoint) return false;
+        const f = dn.pickedPoint.y; const up = sc.pickWithRay(new Ray(new Vector3(q.x, f + 0.05, q.z), Vector3.Up(), 1.95), solid); if (up && up.hit) return false;
+        for (const h of [0.35, 0.9, 1.5]) for (const d of dirs) { const r = sc.pickWithRay(new Ray(new Vector3(q.x, f + h, q.z), d, 0.45), solid); if (r && r.hit) return false; }
+        q.y = f + 0.05; return true; };
+      for (let ring = 0; ring <= 12; ring++) { const rr = ring * 0.25, n = ring ? 8 + ring * 2 : 1;
+        for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, q = new Vector3(p.x + Math.cos(a) * rr, p.y, p.z + Math.sin(a) * rr); if (ok(q)) return q; } }
+      return p; };
+    /** Puts you on one of the quick viewpoints (plan metres), standing, facing its look point, never inside anything. */
+    const goView = (i: number) => { const v = WALK_VIEWS[i] || WALK_VIEWS[0], p = toWorld(v.at[0], v.y + 0.3, v.at[1]); if (W.stance !== 'stand') setStance('stand');
+      body.position.copyFrom(clearSpot(p)); W.vy = 0;
+      const f = toWorld(v.look[0], v.y + 0.3, v.look[1]).subtract(p).normalize(); CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = v.pitch;
+      hud.querySelectorAll('[data-wv]').forEach(b => b.classList.toggle('on', b.getAttribute('data-wv') === String(i))); };
     O.goView = goView;
     if (walkMode) goView(0);
     const place = (id: string) => { const v = VIEWS.find(q => q.id === id) || VIEWS[0], at = Vector3.TransformCoordinates(new Vector3(v.at[0], v.at[1], v.at[2]), ap.computeWorldMatrix(true)), lk = Vector3.TransformCoordinates(new Vector3(v.look[0], v.look[1], v.look[2]), ap.getWorldMatrix());

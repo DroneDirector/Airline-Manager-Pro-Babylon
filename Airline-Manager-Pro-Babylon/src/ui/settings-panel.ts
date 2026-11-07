@@ -8,6 +8,7 @@ import { padConnected, vibrate, onPad, padList } from '../core/input';
 import { icon, esc } from './icons';
 import { U, onUpdate, updateCheck, updateInstall, updatePermission, updateStatus, canSelfUpdate } from '../core/update';
 import { whatsNewHtml, whatsNewBind, mdHtml } from './whats-new';
+import { openDeviceScan } from './device-scan';
 
 type Row = { k: 'seg'; key: string; label: string; sub?: string; opts: [any, string][] }
   | { k: 'tog'; key: string; label: string; sub?: string }
@@ -18,6 +19,7 @@ type Row = { k: 'seg'; key: string; label: string; sub?: string; opts: [any, str
 
 const pct = (v: number) => Math.round(v * 100) + '%';
 const GFX: Row[] = [
+  { k: 'btn', label: 'Scan this device', sub: 'Checks the processor, memory, graphics chip and screen, then recommends settings you can apply or decline', act: 'scan', text: 'Scan' },
   { k: 'seg', key: 'gfx.preset', label: 'Quality', sub: 'Sets everything below at once', opts: [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra'], ['custom', 'Custom']] },
   { k: 'tog', key: 'gfx.autoRes', label: 'Automatic resolution', sub: 'Draws a little smaller when the graphics chip can\'t keep up, and sharp again when it can (never below 60%)' },
   { k: 'range', key: 'gfx.scale', label: 'Resolution', sub: 'Lower is faster, higher is sharper', min: 0.4, max: IS_PC ? 1.5 : 1, step: 0.05, fmt: pct },
@@ -146,6 +148,7 @@ function clickIn(e: Event) {
   if (a === 'tab') { tab = v || 'gfx'; focus = Math.max(0, TABS.findIndex(t => t[0] === tab)); render(); return; }
   if (a === 'seg') { const cur = get(key); set(key, typeof cur === 'number' ? Number(v) : v); render(); return; }
   if (a === 'tog') { set(key, !get(key)); render(); return; }
+  if (a === 'scan') { openDeviceScan(render); return; }
   if (a === 'rumble') { vibrate(400, 1, 0.8); return; }
   if (a === 'reset-ctl') { resetControls(); render(); return; }
   if (a === 'upd-check') { updateCheck(); return; }
@@ -167,6 +170,6 @@ export function settingsButton(btn: string): boolean {
   if (r.k === 'seg') { const cur = get(r.key), i = r.opts.findIndex(o => String(o[0]) === String(cur)); const d = btn === 'left' ? -1 : btn === 'right' || btn === 'confirm' ? 1 : 0; if (d) { const o = r.opts[(Math.max(0, i) + d + r.opts.length) % r.opts.length]; set(r.key, o[0]); render(); } }
   else if (r.k === 'tog') { if (btn === 'confirm' || btn === 'left' || btn === 'right') { set(r.key, !get(r.key)); render(); } }
   else if (r.k === 'range') { const d = btn === 'left' ? -1 : btn === 'right' ? 1 : 0; if (d) { const v = Math.max(r.min, Math.min(r.max, Math.round((get(r.key) + d * r.step) / r.step) * r.step)); set(r.key, Number(v.toFixed(3))); render(); } }
-  else if (r.k === 'btn') { if (btn === 'confirm') { if (r.act === 'rumble') vibrate(400, 1, 0.8); else if (r.act === 'reset-ctl') { resetControls(); render(); } else if (r.act === 'upd-check') updateCheck(); else if (r.act === 'upd-install') updateInstall(); else if (r.act === 'upd-perm') updatePermission(); } }
+  else if (r.k === 'btn') { if (btn === 'confirm') { if (r.act === 'scan') openDeviceScan(render); else if (r.act === 'rumble') vibrate(400, 1, 0.8); else if (r.act === 'reset-ctl') { resetControls(); render(); } else if (r.act === 'upd-check') updateCheck(); else if (r.act === 'upd-install') updateInstall(); else if (r.act === 'upd-perm') updatePermission(); } }
   return true;
 }
