@@ -144,7 +144,11 @@ export function applyLook(P: LookParts): (dt: number) => void {
     ib.addShadowCastingMesh(P.casters.filter(m => m instanceof Mesh) as Mesh[]); ib.addShadowReceivingMaterial(); ib.updateVoxelization(); });
 
   // real-time reflections: glossy floors, glass and the wet apron reflect what is round them (heavy)
-  if (g.ssr) tryIt(() => { const ssr = new SSRRenderingPipeline('look-ssr', sc, [cam], false, Constants.TEXTURETYPE_UNSIGNED_BYTE); ssr.strength = 0.9; ssr.reflectionSpecularFalloffExponent = 2; ssr.thickness = 0.6; ssr.maxDistance = 240; ssr.step = IS_PC ? 1 : 3; ssr.maxSteps = IS_PC ? 500 : 160; ssr.blurDispersionStrength = 0.03; ssr.roughnessFactor = 0.15; ssr.enableAutomaticThicknessComputation = false; ssr.selfCollisionNumSkip = 2; });
+  // screen reflections (Settings → Graphics → Reflections: Screen), their quality from the slider (kept up to date)
+  if (g.reflMode === 'screen') tryIt(() => { const ssr = new SSRRenderingPipeline('look-ssr', sc, [cam], false, Constants.TEXTURETYPE_UNSIGNED_BYTE); ssr.reflectionSpecularFalloffExponent = 2; ssr.thickness = 0.6; ssr.maxDistance = 240; ssr.roughnessFactor = 0.15; ssr.enableAutomaticThicknessComputation = false; ssr.selfCollisionNumSkip = 2;
+    let lastQ = -1; const setQ = () => { const q = Math.max(0.1, Math.min(1, (S.gfx as any).ssrQ ?? 0.5)); if (Math.abs(q - lastQ) < 0.01) return; lastQ = q;
+      ssr.step = Math.round(4 - 3 * q); ssr.maxSteps = Math.round(80 + 420 * q); ssr.ssrDownsample = q < 0.4 ? 2 : q < 0.75 ? 1 : 0; ssr.strength = 0.5 + 0.5 * q; ssr.blurDispersionStrength = 0.06 - 0.04 * q; };
+    setQ(); let t = 0; steps.push(dt => { t += dt; if (t > 0.5) { t = 0; setQ(); } }); });
 
   // temporal anti-aliasing: no shimmer on handrails, trusses and fences
   if (g.taa) tryIt(() => { const taa = new TAARenderingPipeline('look-taa', sc, [cam]); taa.samples = 8; });

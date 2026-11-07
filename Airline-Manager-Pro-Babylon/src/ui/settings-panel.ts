@@ -38,7 +38,9 @@ const GFX: Row[] = [
   { k: 'tog', key: 'gfx.manyLights', label: 'Many real lights', sub: 'Every light panel lights what is round it (heavy on phones). Applies when the airport is reopened' },
   { k: 'tog', key: 'gfx.volLight', label: 'Light rays', sub: 'Sun rays past buildings and jetways. Applies when the airport is reopened' },
   { k: 'tog', key: 'gfx.heightFog', label: 'Height fog', sub: 'Low haze over the ground that thins with height. Applies when the airport is reopened' },
-  { k: 'tog', key: 'gfx.ssr', label: 'Live reflections', sub: 'Floors, glass and the wet apron reflect what is round them (very heavy). Applies when the airport is reopened' },
+  { k: 'seg', key: 'gfx.reflMode', label: 'Reflections', sub: 'Off; Live: the outer glass mirrors the jetways, the aircraft and the sky; Screen: floors and the wet apron reflect what is on screen (applies when the airport is reopened). One at a time', opts: [['off', 'Off'], ['live', 'Live'], ['screen', 'Screen']] },
+  { k: 'range', key: 'gfx.liveReflQ', label: 'Live reflection quality', sub: 'Higher: sharper, drawn more often and more of the scenery in the glass (heavier)', min: 0.1, max: 1, step: 0.05, fmt: pct, show: () => (S.gfx as any).reflMode === 'live' } as any,
+  { k: 'range', key: 'gfx.ssrQ', label: 'Screen reflection quality', sub: 'Higher: sharper, reaching further and stronger (heavier)', min: 0.1, max: 1, step: 0.05, fmt: pct, show: () => (S.gfx as any).reflMode === 'screen' } as any,
   { k: 'tog', key: 'gfx.pcss', label: 'Soft contact shadows', sub: 'Sharp where things touch the ground, softer further away. Applies when the airport is reopened' },
   { k: 'tog', key: 'gfx.taa', label: 'Temporal anti-aliasing', sub: 'No shimmer on handrails, fences and trusses (slight blur). Applies when the airport is reopened' },
   { k: 'tog', key: 'gfx.eyeAdapt', label: 'Eye adaptation', sub: 'Brighter indoors, back down outside, eased like an eye. Applies when the airport is reopened' },
@@ -119,7 +121,7 @@ onPad(() => { if (el) render(); });
 /** The controller to use, when more than one is connected (flight gear is marked, and never chosen by itself). */
 function padRow(): Row[] { const L = padList(); if (L.length < 2 && !(S.ctl as any).pad) return [];
   return [{ k: 'seg', key: 'ctl.pad', label: 'Controller to use', sub: 'Automatic takes a gamepad and never flight gear (sticks, throttles, pedals), which stays free for flying', opts: [['', 'Automatic'], ...L.map(p => [p.id, p.name + (p.flight ? ' · flight gear' : '')] as [any, string])] }]; }
-function rows(): Row[] { return tab === 'gfx' ? GFX : tab === 'ctl' ? [...padRow(), ...CTL] : tab === 'upd' ? updRows() : NEW; }
+function rows(): Row[] { return tab === 'gfx' ? GFX.filter((r: any) => !r.show || r.show()) : tab === 'ctl' ? [...padRow(), ...CTL] : tab === 'upd' ? updRows() : NEW; }
 onUpdate(() => { if (el && tab === 'upd') render(); });
 const NT = TABS.length;
 let lastTab = '', lastFocus = -1;

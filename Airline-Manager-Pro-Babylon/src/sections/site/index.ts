@@ -9,6 +9,7 @@
 // on the airport boundary. Inside the boundary the ground is levelled (blending into the real ground only within its
 // outer 100 m); outside it the real ground and its mountains are untouched. Ready-made views (from a gate, the apron,
 // the runway, the holding point, the air) and a free drone camera, the time of day and the weather, the photo button.
+import { glassMirrors } from '../../core/glassmirror';
 import { glassLook } from '../terminal/kit';
 import { thinStatic } from '../../core/thin';
 import { shareMaterials } from '../../core/texarray';
@@ -454,7 +455,12 @@ const Site$: Section = {
         const lq = Vector3.TransformCoordinates(cam.globalPosition, SV.rootInv || (SV.rootInv = K.root.getWorldMatrix().clone().invert())), fl = lq.y > F2Y - 0.5 ? 2 : 1;
         let inside = ROOMS.some(r => r.f === fl && inRoom(r, lq.x, lq.z));
         if (!inside) { const up = sc.pickWithRay(new Ray(cam.globalPosition, Vector3.Up(), 4), (m: any) => !!(m.metadata && /^J-\d/.test(m.metadata.id || '')), true); inside = !!(up && up.hit); }
-        glassLook(gm, inside); } } catch (e) { /* stays as it is */ } }
+        glassLook(gm, inside); O.glIn = inside;
+        // live reflections (off unless turned on): set up the first time they are wanted
+        const gx: any = S.gfx, live = gx.reflMode === 'live'; if (live && !O.GM) { const sky = sc.meshes.filter((m: any) => /^sky/i.test(m.name));
+          const extra = () => sc.meshes.filter((m: any) => m.isEnabled() && m.isVisible && (/^AIRFIELD\//.test(m.name) || (O.AFB && m === O.AFB.ground)) && !/COLLIDE/.test(m.name));
+          O.GM = glassMirrors(sc, cam, gm, sky, extra, (g: any) => glassLook(g, !!O.glIn)); }
+        if (O.GM) { O.GM.tick(live, gx.liveReflQ || 0.5, inside); for (const m of O.GM.mats()) glassLook(m, inside); } } } catch (e) { /* stays as it is */ } }
       lap('jetways'); wx.frame(dt, now); lap('weather');
       sc.render(); lap('drawing'); perfEnd();
     });
