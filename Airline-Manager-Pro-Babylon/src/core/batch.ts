@@ -75,3 +75,15 @@ export function octreeStatic(sc: Scene): () => void {
   const timer = setInterval(() => { for (const m of inBlocks) if (!m.isWorldMatrixFrozen) { inBlocks.delete(m); oct.removeMesh(m); oct.dynamicContent.push(m); } }, 2000);
   return () => { clearInterval(timer); sc.onNewMeshAddedObservable.remove(added); sc.onMeshRemovedObservable.remove(gone); };
 }
+
+/** Shader pre-warming: things that start hidden or switched off (jetway insides, far detail, lift cars, rental cars, ...)
+ *  get their shaders compiled in the background, a few at a time, so there is no stutter when they first come into view. */
+export function prewarmHidden(sc: Scene): void {
+  const todo: AbstractMesh[] = []; const seen = new Set<string>();
+  for (const m of sc.meshes) { const mat = m.material; if (!mat || (m as any).isAnInstance || !(m as Mesh).geometry) continue;
+    if (m.isVisible && m.isEnabled()) continue; const k = mat.uniqueId + ':' + ((m as Mesh).hasInstances ? 1 : 0) + ':' + (m.receiveShadows ? 1 : 0); if (seen.has(k)) continue; seen.add(k); todo.push(m); }
+  let i = 0; const next = () => { if (sc.isDisposed || i >= todo.length) return; const m = todo[i++], mat = m.material;
+    if (!mat || m.isDisposed()) { setTimeout(next, 0); return; }
+    mat.forceCompilationAsync(m, { useInstances: !!(m as Mesh).hasInstances }).catch(() => { /* compiled when shown */ }).then(() => setTimeout(next, 16)); };
+  setTimeout(next, 500);
+}

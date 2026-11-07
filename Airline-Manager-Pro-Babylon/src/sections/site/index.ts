@@ -21,7 +21,7 @@ import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd, perfPart } from '
 import { buildAirliner, setGear } from '../viewer3d/airliner';
 import { makeWeather, Weather } from '../terminal/weather';
 import { applyLook, slimGlow } from '../../core/look';
-import { mergeStatic, freezeStatic, octreeStatic } from '../../core/batch';
+import { mergeStatic, freezeStatic, octreeStatic, prewarmHidden } from '../../core/batch';
 import { jetwayInteriors, tinyFar } from '../../core/hide';
 import { cachedUrl, releaseUrl } from '../../core/tilecache';
 import { makeKit } from '../terminal/kit';
@@ -354,7 +354,8 @@ const Site$: Section = {
     // then, with your own models in place, the materials that never change are frozen (the ground's, the landscape's,
     // lamps, signs, screens and the weather's stay live)
     const freezeLater = () => { try { const keep = new Set<any>(); for (const m of sc.meshes) if (/ground|GROUND|ROAD|APRON|GRASS/.test(m.name) && m.material) keep.add(m.material); freezeStatic(sc, keep); } catch (e) { /* all live */ }
-      try { const stop = octreeStatic(sc); sc.onDisposeObservable.addOnce(stop); } catch (e) { /* every object tested on its own */ } };
+      try { const stop = octreeStatic(sc); sc.onDisposeObservable.addOnce(stop); } catch (e) { /* every object tested on its own */ }
+      try { prewarmHidden(sc); } catch (e) { /* compiled when shown */ } };
     applyReplacements(sc).then(freezeLater, freezeLater);
     runLoop(() => {
       perfBegin();
