@@ -27,6 +27,8 @@ const GFX: Row[] = [
   { k: 'seg', key: 'gfx.fps', label: 'Frame rate limit', opts: [[30, '30'], [60, '60'], [0, 'No limit']] },
   { k: 'seg', key: 'gfx.aa', label: 'Anti-aliasing', sub: 'Smooth edges. Switching MSAA on or off applies after restarting the game', opts: [['off', 'Off'], ['fxaa', 'FXAA'], ['msaa', 'MSAA 4×']] },
   { k: 'seg', key: 'gfx.shadows', label: 'Shadows', sub: 'In the airport: applies when it is reopened', opts: [['off', 'Off'], ['low', 'Low'], ['high', 'High']] },
+  { k: 'range', key: 'gfx.shadowDist', label: 'Shadow distance', sub: 'Things further away cast no shadow (lower is faster, and the near shadows sharper)', min: 30, max: 400, step: 10, fmt: v => v >= 400 ? 'All' : Math.round(v) + ' m' },
+  { k: 'seg', key: 'gfx.shadowEvery', label: 'Shadow updates', sub: 'How often shadows are drawn again (less often is faster; moving shadows may trail a little)', opts: [[1, 'Every frame'], [2, 'Every 2nd'], [3, 'Every 3rd']] },
   { k: 'seg', key: 'gfx.mirror', label: 'Mirror behind the bar', sub: 'A real reflection of the room. In the airport: applies when it is reopened', opts: [['off', 'Off'], ['low', 'Low'], ['high', 'High']] },
   { k: 'tog', key: 'gfx.probe', label: 'Reflections', sub: 'Metal and paint reflect what is round them (the room, the sky). In the airport: applies when it is reopened' },
   { k: 'tog', key: 'gfx.glow', label: 'Glow of lights', sub: 'Lamps, the fire and the screens glow. In the airport: applies when it is reopened' },

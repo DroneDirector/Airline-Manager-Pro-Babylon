@@ -287,6 +287,14 @@ const Site$: Section = {
     const SG: any[] = [];
     if (S.gfx.shadows !== 'off' && ULTRA && IS_PC) { const csm = new CascadedShadowGenerator(4096, sun); csm.numCascades = 4; csm.lambda = 0.85; csm.stabilizeCascades = true; csm.usePercentageCloserFiltering = true; csm.filteringQuality = CascadedShadowGenerator.QUALITY_HIGH; csm.bias = 0.002; csm.normalBias = 0.02; csm.shadowMaxZ = 420; for (const m of casters) csm.addShadowCaster(m, false); SG.push(csm); }
     else if (S.gfx.shadows !== 'off') { const sg = new ShadowGenerator(S.gfx.shadows === 'high' ? (IS_PC ? 4096 : 2048) : 1024, sun); sg.usePercentageCloserFiltering = true; sg.bias = 0.0006; sg.normalBias = 0.02; for (const m of casters) sg.addShadowCaster(m, false); SG.push(sg); }
+    // the shadows' distance and how often they are drawn (Settings → Graphics; both apply at once): only the casters
+    // within the distance of you go in, so the shadow map covers less ground (faster, and the near shadows sharper)
+    if (SG.length) { const all = casters.slice(); let last = '';
+      const shadowTick = () => { const g: any = S.gfx, D = g.shadowDist || 400, every = Math.max(1, g.shadowEvery || 1), p = cam.globalPosition;
+        for (const gen of SG) { const sm = gen.getShadowMap(); if (!sm) continue; sm.refreshRate = every;
+          const list = D >= 400 ? all : all.filter((m: any) => !m.isDisposed() && Vector3.Distance(p, m.getBoundingInfo().boundingSphere.centerWorld) - m.getBoundingInfo().boundingSphere.radiusWorld < D);
+          const key = list.length + '|' + every; if (key === last && D >= 400) continue; sm.renderList = list; } last = String(D); };
+      const st = setInterval(shadowTick, 500); sc.onDisposeObservable.addOnce(() => clearInterval(st)); }
     const dp = new DefaultRenderingPipeline('dp', true, sc, [cam]); dp.fxaaEnabled = true; dp.imageProcessingEnabled = true; dp.imageProcessing.toneMappingEnabled = true; dp.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES; dp.imageProcessing.exposure = 1.05; dp.imageProcessing.contrast = 1.08;
     // the look, by graphics quality: bloom on the lights, filmic grading, a light vignette, sharpening, fine grain (Ultra on the PC)
     dp.samples = S.gfx.aa === 'msaa' ? 4 : 1; dp.imageProcessing.exposure = 1.06 * (S.gfx.exposure || 1); dp.imageProcessing.contrast = HIGH ? 1.15 : 1.08;
