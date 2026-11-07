@@ -3,6 +3,7 @@
 // gates' stairs, the staff stairs), the lifts (tap or click them, Cross on a controller), the moving walkways that
 // carry you along the pier, out onto the kerb and the apron. Doors open as you come up to them. What you look at
 // shows its id (every room, door and object has one), and where you are shows at the top.
+import { octreeStatic } from '../../core/batch';
 import { LiftCtl, liftAt } from './lifts';
 import { Scene, Vector3, Color3, Color4, UniversalCamera, HemisphericLight, DirectionalLight, ShadowGenerator, GlowLayer, DefaultRenderingPipeline, ImageProcessingConfiguration, ReflectionProbe, RenderTargetTexture, AbstractMesh, InstancedMesh } from '@babylonjs/core';
 import { registerSection, Section, SectionCtx } from '../../core/sections';
@@ -74,6 +75,7 @@ const Terminal$: Section = {
     for (const j of O.fx.jetways || []) for (const m of j.meshes()) moving.add(m);
     for (const m of sc.meshes) if (!moving.has(m)) { m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true; }
     for (const m of sc.meshes) if (m.name.indexOf('SRC:') === 0) { m.isPickable = false; }
+    try { const stop = octreeStatic(sc); sc.onDisposeObservable.addOnce(stop); } catch (e) { /* every object tested on its own */ }
     O.walkways = Array.from(K.objects.values()).filter(o => o.kind === 'MOVING-WALKWAY').map(o => o.node.metadata);
     // you, at the Grand Hall's main entrance
     const F = { x: SPAWN.x, z: SPAWN.z, f: SPAWN.f as Fl, y: 0, yaw: SPAWN.yaw, pitch: -0.04, v: 0, bob: 0, stair: null as Stair | null }; O.F = F;
