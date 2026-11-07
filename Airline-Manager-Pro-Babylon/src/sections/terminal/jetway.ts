@@ -15,6 +15,7 @@
 // The wheels are the master: everything is worked out from where the drive unit is (docking and undocking below).
 // Parts with a slot (wheels, bogie, lift columns, cab front, console, canopy, rotunda drum and machinery, stair,
 // beacon, fire extinguisher; the bellows' and floors' pictures) can be replaced by your own models: models/README.md.
+import { fileTex } from '../../core/filetex';
 import { MeshBuilder, Mesh, Vector3, TransformNode, Matrix, VertexData, PointLight, SpotLight, Color3, Texture, StandardMaterial } from '@babylonjs/core';
 import { SUN } from './weather';
 import { Kit, P } from './kit';
@@ -59,14 +60,14 @@ function mats(K: Kit) {
     JTy: (() => { const [rc, rh] = JX.rubber(), m = K.pbr({ key: 'jwTyre', tex: K.tex(rc, 8, 8), rough: 0.82 }); m.bumpTexture = K.tex(JX.normalMap(rh, 1.5), 8, 8); (m.bumpTexture as any).level = 0.6; return m; })(),
     JRim: K.pbr({ key: 'jwRim', tex: K.tex(JX.rimPaint(), 3, 3), metal: 0.35, rough: 0.42 }), JCap: K.pbr({ key: 'jwHubCap', col: '#D6DADE', metal: 0.6, rough: 0.22 }),
     JY: K.pbr({ key: 'jwHose', tex: K.tex(JX.hoseFabric(), 24, 1), rough: 0.55 }),
-    JTread: (() => { const t = new Texture('assets/textures/jetway-tread.webp', K.sc), b = new Texture('assets/textures/jetway-tread-normal.webp', K.sc), m = K.pbr({ key: 'jwTread', rough: 0.86 }); m.albedoTexture = t; m.bumpTexture = b; (b as any).level = 1.1; return m; })(),
-    JSide: (() => { const m = K.pbr({ key: 'jwTyreSide', rough: 0.8 }); const t = new Texture('assets/textures/jetway-tyre-side.webp', K.sc); t.uScale = t.vScale = 4; m.albedoTexture = t; return m; })(),
-    JClMid: (() => { const m = K.pbr({ key: 'jwCladMid', metal: 0.45, rough: 0.38 }); m.albedoTexture = new Texture('assets/textures/rotunda-clad-mid.webp', K.sc); m.bumpTexture = new Texture('assets/textures/rotunda-clad-mid-normal.webp', K.sc); (m.bumpTexture as any).level = 0.8; return m; })(),
-    JClTop: (() => { const m = K.pbr({ key: 'jwCladTop', metal: 0.45, rough: 0.4 }); m.albedoTexture = new Texture('assets/textures/rotunda-clad-top.webp', K.sc); (m.albedoTexture as any).wrapV = Texture.CLAMP_ADDRESSMODE; return m; })(),
-    JClBot: (() => { const m = K.pbr({ key: 'jwCladBot', metal: 0.45, rough: 0.42 }); m.albedoTexture = new Texture('assets/textures/rotunda-clad-bot.webp', K.sc); (m.albedoTexture as any).wrapV = Texture.CLAMP_ADDRESSMODE; return m; })(),
-    JClEnd: (() => { const m = K.pbr({ key: 'jwCladEnd', metal: 0.45, rough: 0.4 }); m.albedoTexture = new Texture('assets/textures/rotunda-clad-end.webp', K.sc); return m; })(),
-    JRoof: (() => { const m = K.pbr({ key: 'jwRoof', metal: 0.3, rough: 0.6 }); const t = new Texture('assets/textures/rotunda-roof.webp', K.sc); t.uScale = t.vScale = 0.4; m.albedoTexture = t; return m; })(),
-    JUnder: (() => { const m = K.pbr({ key: 'jwUnder', metal: 0.25, rough: 0.7 }); const t = new Texture('assets/textures/rotunda-under.webp', K.sc); t.uScale = t.vScale = 0.4; m.albedoTexture = t; return m; })(),
+    JTread: (() => { const t = fileTex('jetway-tread', K.sc), b = fileTex('jetway-tread-normal', K.sc), m = K.pbr({ key: 'jwTread', rough: 0.86 }); m.albedoTexture = t; m.bumpTexture = b; (b as any).level = 1.1; return m; })(),
+    JSide: (() => { const m = K.pbr({ key: 'jwTyreSide', rough: 0.8 }); const t = fileTex('jetway-tyre-side', K.sc); t.uScale = t.vScale = 4; m.albedoTexture = t; return m; })(),
+    JClMid: (() => { const m = K.pbr({ key: 'jwCladMid', metal: 0.45, rough: 0.38 }); m.albedoTexture = fileTex('rotunda-clad-mid', K.sc); m.bumpTexture = fileTex('rotunda-clad-mid-normal', K.sc); (m.bumpTexture as any).level = 0.8; return m; })(),
+    JClTop: (() => { const m = K.pbr({ key: 'jwCladTop', metal: 0.45, rough: 0.4 }); m.albedoTexture = fileTex('rotunda-clad-top', K.sc); (m.albedoTexture as any).wrapV = Texture.CLAMP_ADDRESSMODE; return m; })(),
+    JClBot: (() => { const m = K.pbr({ key: 'jwCladBot', metal: 0.45, rough: 0.42 }); m.albedoTexture = fileTex('rotunda-clad-bot', K.sc); (m.albedoTexture as any).wrapV = Texture.CLAMP_ADDRESSMODE; return m; })(),
+    JClEnd: (() => { const m = K.pbr({ key: 'jwCladEnd', metal: 0.45, rough: 0.4 }); m.albedoTexture = fileTex('rotunda-clad-end', K.sc); return m; })(),
+    JRoof: (() => { const m = K.pbr({ key: 'jwRoof', metal: 0.3, rough: 0.6 }); const t = fileTex('rotunda-roof', K.sc); t.uScale = t.vScale = 0.4; m.albedoTexture = t; return m; })(),
+    JUnder: (() => { const m = K.pbr({ key: 'jwUnder', metal: 0.25, rough: 0.7 }); const t = fileTex('rotunda-under', K.sc); t.uScale = t.vScale = 0.4; m.albedoTexture = t; return m; })(),
     JChrome: K.pbr({ key: 'jwChrome', col: '#EEF1F4', metal: 1, rough: 0.05 }),
     JL: K.pbr({ key: 'jwWall', tex: K.tex(JX.wallPanel(), 1 / 1.2, 1), metal: 0.1, rough: 0.42 }),
     JN: K.pbr({ key: 'jwSignBlue', col: '#1C2D72', rough: 0.4 }),
@@ -75,7 +76,7 @@ function mats(K: Kit) {
     JSh: K.pbr({ key: 'jwShutter', tex: K.tex(JX.shutter(), 1, 1), metal: 0.3, rough: 0.4 }), glass: M.glass, yellow: M.yellow,
   };
   // the bellows: dark rubber with its fine lines running along every fold (assets/textures; 4 m to a picture, a line every 5 mm), its relief
-  { const t = new Texture('assets/textures/jetway-bellows-rubber.webp', K.sc), b = new Texture('assets/textures/jetway-bellows-rubber-normal.webp', K.sc);
+  { const t = fileTex('jetway-bellows-rubber', K.sc), b = fileTex('jetway-bellows-rubber-normal', K.sc);
     for (const x of [t, b]) { x.uScale = x.vScale = 0.25; x.wrapU = x.wrapV = Texture.WRAP_ADDRESSMODE; x.anisotropicFilteringLevel = 16; }
     m.JK.albedoTexture = t; m.JK.albedoColor = new Color3(1, 1, 1); m.JK.bumpTexture = b; (b as any).level = 0.9; m.JK.metallic = 0; m.JK.roughness = 0.72; }
   // your own pictures for these, if you put them in models/ (see its README)

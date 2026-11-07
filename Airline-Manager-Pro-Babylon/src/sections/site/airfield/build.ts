@@ -9,6 +9,7 @@
 //    and fainter, so the holding positions and the edge lines stay visible from far away;
 //  · the signs one mesh, the lights thin instances, the runway guard lights flashing in turn (wig-wag).
 // buildAirfield(sc, parent, opts) -> { frame, ground, marks, signs, lights, casters, exclude, step(t), dispose() }
+import { fileTex } from '../../../core/filetex';
 import { TransformNode, Mesh, VertexData, PBRMaterial, StandardMaterial, Color3, RawTexture, Texture, DynamicTexture, MaterialPluginBase, Matrix, Vector3, MeshBuilder } from '@babylonjs/core';
 import { AIRFIELD as AF, TERMINAL as TL } from './plan';
 import { field } from './field';
@@ -95,7 +96,7 @@ const BUMP = `{ vec3 dpx = dFdx(vPositionW), dpy = dFdy(vPositionW); vec3 r1 = c
 
 /** The runway's skid marks (own picture, tiling along the runway). */
 let SKID: Texture | null = null;
-const skidTex = (scene) => { if (!SKID || SKID.getScene() !== scene) { SKID = new Texture('assets/textures/runway-skid.webp', scene, false, true, Texture.TRILINEAR_SAMPLINGMODE); SKID.wrapU = Texture.WRAP_ADDRESSMODE; SKID.wrapV = Texture.CLAMP_ADDRESSMODE; SKID.anisotropicFilteringLevel = 8; } return SKID; };
+const skidTex = (scene) => { if (!SKID || SKID.getScene() !== scene) { SKID = fileTex('runway-skid', scene); SKID.wrapU = Texture.WRAP_ADDRESSMODE; SKID.wrapV = Texture.CLAMP_ADDRESSMODE; SKID.anisotropicFilteringLevel = 8; } return SKID; };
 /** Where the camera is on the plan, rounded to 256 m: the fine noise is worked out from there (keeps its precision). */
 const orgOf = (scene, mesh) => { const cam = scene.activeCamera; if (!cam) return [0, 0]; const inv = mesh.getWorldMatrix().clone(); inv.invert();
   const lp = Vector3.TransformCoordinates(cam.globalPosition, inv); return [Math.floor((lp.x - PU) / 256) * 256, Math.floor((lp.z - PV) / 256) * 256]; };

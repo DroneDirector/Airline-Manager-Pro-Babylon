@@ -11,6 +11,9 @@ Rule: everything in the game must allow a commercial, paid game. At most, a lice
 | ONNX Runtime Web 1.20.1 (voices) | MIT | Yes | Credit; ship the licence text |
 | glslang (Khronos; WebGPU shader translation, PC only) | BSD-3-Clause / Apache-2.0 (Khronos glslang licence) | Yes | Credit; ship the licence text |
 | Tint, as twgsl (Google / Babylon.js; WebGPU shader translation, PC only) | Apache-2.0 | Yes | Credit; ship the licence text |
+| Basis Universal transcoders (Binomial; KTX2 compressed textures, through the Babylon.js KTX2 decoder) | Apache-2.0 | Yes | Credit; ship the licence text |
+| Zstandard decoder (Meta; unpacks the compressed textures) | BSD-3-Clause | Yes | Credit; keep the copyright notice |
+| Basis Universal encoder (Binomial; used once to make the .ktx2 copies of our own textures, not shipped) | Apache-2.0 | Yes | None for its output |
 | Kokoro v1.0 voice model, kokoro-onnx, misaki (character voices) | Apache-2.0 / MIT | Yes | Credit; licence texts are already in the voice pack |
 
 ## Fonts

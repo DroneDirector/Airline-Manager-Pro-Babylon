@@ -31,6 +31,14 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npm run build
+      - name: The KTX2 texture decoder (Babylon.js, Apache 2.0; Basis Universal transcoders, Apache 2.0; Zstandard, BSD), shipped with the app
+        shell: bash
+        run: |
+          mkdir -p www/ktx2
+          curl -fsSL "https://cdn.babylonjs.com/babylon.ktx2Decoder.js" -o www/ktx2/babylon.ktx2Decoder.js
+          curl -fsSL "https://cdn.babylonjs.com/zstddec.wasm" -o www/ktx2/zstddec.wasm
+          for f in uastc_astc.wasm uastc_bc7.wasm uastc_rgba8_unorm_v2.wasm uastc_rgba8_srgb_v2.wasm uastc_r8_unorm.wasm uastc_rg8_unorm.wasm msc_basis_transcoder.js msc_basis_transcoder.wasm; do curl -fsSL "https://cdn.babylonjs.com/ktx2Transcoders/1/$f" -o "www/ktx2/$f"; done
+          ls -la www/ktx2
       - name: The WebGPU shader translators (glslang, BSD/Apache; Tint as twgsl, Apache 2.0), shipped with the PC app
         shell: bash
         run: |
@@ -85,6 +93,14 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npm run build
+      - name: The KTX2 texture decoder (Babylon.js, Apache 2.0; Basis Universal transcoders, Apache 2.0; Zstandard, BSD), shipped with the app
+        shell: bash
+        run: |
+          mkdir -p www/ktx2
+          curl -fsSL "https://cdn.babylonjs.com/babylon.ktx2Decoder.js" -o www/ktx2/babylon.ktx2Decoder.js
+          curl -fsSL "https://cdn.babylonjs.com/zstddec.wasm" -o www/ktx2/zstddec.wasm
+          for f in uastc_astc.wasm uastc_bc7.wasm uastc_rgba8_unorm_v2.wasm uastc_rgba8_srgb_v2.wasm uastc_r8_unorm.wasm uastc_rg8_unorm.wasm msc_basis_transcoder.js msc_basis_transcoder.wasm; do curl -fsSL "https://cdn.babylonjs.com/ktx2Transcoders/1/$f" -o "www/ktx2/$f"; done
+          ls -la www/ktx2
       - name: Prepare the Android project
         run: bash scripts/android-setup.sh
       - name: Build the APK

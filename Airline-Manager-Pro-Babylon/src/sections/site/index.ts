@@ -375,7 +375,8 @@ const Site$: Section = {
     // lamps, signs, screens and the weather's stay live)
     const freezeLater = () => { try { const keep = new Set<any>(); for (const m of sc.meshes) if (/ground|GROUND|ROAD|APRON|GRASS/.test(m.name) && m.material) keep.add(m.material); freezeStatic(sc, keep); } catch (e) { /* all live */ }
       try { const stop = octreeStatic(sc); sc.onDisposeObservable.addOnce(stop); } catch (e) { /* every object tested on its own */ }
-      try { prewarmHidden(sc); } catch (e) { /* compiled when shown */ } };
+      try { prewarmHidden(sc); } catch (e) { /* compiled when shown */ }
+      };
     applyReplacements(sc).then(freezeLater, freezeLater);
     runLoop(() => {
       perfBegin();
