@@ -9,6 +9,7 @@
 // on the airport boundary. Inside the boundary the ground is levelled (blending into the real ground only within its
 // outer 100 m); outside it the real ground and its mountains are untouched. Ready-made views (from a gate, the apron,
 // the runway, the holding point, the air) and a free drone camera, the time of day and the weather, the photo button.
+import { shareMaterials } from '../../core/texarray';
 import { CascadedShadowGenerator, SSAO2RenderingPipeline, ReflectionProbe } from '@babylonjs/core';
 import { Ray, Scene, Vector3, Color3, Color4, UniversalCamera, HemisphericLight, DirectionalLight, ShadowGenerator, GlowLayer, DefaultRenderingPipeline, ImageProcessingConfiguration, MeshBuilder, Mesh, VertexData, TransformNode, PBRMaterial, StandardMaterial, DynamicTexture, Texture, AbstractMesh } from '@babylonjs/core';
 import { registerSection, Section, SectionCtx } from '../../core/sections';
@@ -233,7 +234,10 @@ const Site$: Section = {
     for (const m of sc.meshes) { if (!before.has(m)) { m.renderingGroupId = 1; m.computeWorldMatrix(true); if (!liftParts.has(m)) { m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true; } } }
     // the terminal's static things merged by material and 60 m square: far fewer draw calls, the same picture
     { const doorParts = new Set<any>(); for (const d of doors) for (const m of d.node.getChildMeshes()) doorParts.add(m);
-      try { mergeStatic(sc, m => !before.has(m) && !liftParts.has(m) && !hidden.has(m) && !doorParts.has(m), casters); } catch (e) { /* as built */ } }
+      const okM = (m: AbstractMesh) => !before.has(m) && !liftParts.has(m) && !hidden.has(m) && !doorParts.has(m);
+      // materials alike but for colour and picture become one (texture arrays), so far more can be merged below
+      try { shareMaterials(sc, okM); } catch (e) { /* each keeps its own */ }
+      try { mergeStatic(sc, okM, casters); } catch (e) { /* as built */ } }
     // airport mode (from the game's Airport): on foot, with gravity, against the terminal's floors, walls and glass,
     // the levelled ground and the aircraft; the stairs are walked up as ramps; the doors open as you come to them
     const walkMode = !!(ctx.opts && ctx.opts.walk); O.walkMode = walkMode;
