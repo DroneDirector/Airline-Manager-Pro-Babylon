@@ -290,7 +290,7 @@ const Site$: Section = {
     const sun = new DirectionalLight('sun', new Vector3(-0.4, -1, 0.3), sc); sun.intensity = 2.2; sun.shadowMinZ = 1; sun.shadowMaxZ = 9000;
     const cam = new UniversalCamera('cam', new Vector3(0, 10, 0), sc); cam.minZ = 0.5; cam.maxZ = 120000; cam.fov = 0.9; cam.inertia = 0; O.cam = cam; sc.activeCamera = cam;
     const glow = new GlowLayer('glow', sc, { mainTextureRatio: 0.4 }); glow.intensity = 0.3; glow.isEnabled = S.gfx.glow !== false; for (const g of [inner.m, outer.m, sea].concat(O.AFB.exclude)) glow.addExcludedMesh(g); for (const m of sc.meshes) if (m.material && (m.material as any)._soft) glow.addExcludedMesh(m as any); sc.onNewMeshAddedObservable.add(m => { setTimeout(() => { if (m.material && (m.material as any)._soft) glow.addExcludedMesh(m as any); }, 0); });
-    slimGlow(glow, sc);
+    slimGlow(glow, sc, cam);
     const ULTRA = S.gfx.preset === 'ultra', HIGH = ULTRA || S.gfx.preset === 'high';
     const SG: any[] = [];
     if (S.gfx.shadows !== 'off' && ULTRA && IS_PC) { const csm = new CascadedShadowGenerator(4096, sun); csm.numCascades = 4; csm.lambda = 0.85; csm.stabilizeCascades = true; csm.usePercentageCloserFiltering = true; csm.filteringQuality = CascadedShadowGenerator.QUALITY_HIGH; csm.bias = 0.002; csm.normalBias = 0.02; csm.shadowMaxZ = 420; for (const m of casters) csm.addShadowCaster(m, false); SG.push(csm); }
@@ -300,8 +300,10 @@ const Site$: Section = {
     if (SG.length) { const all = casters.slice(); let last = '';
       const shadowTick = () => { const g: any = S.gfx, D = g.shadowDist || 400, every = Math.max(1, g.shadowEvery || 1), p = cam.globalPosition;
         for (const gen of SG) { const sm = gen.getShadowMap(); if (!sm) continue; sm.refreshRate = every;
-          const list = D >= 400 ? all : all.filter((m: any) => !m.isDisposed() && Vector3.Distance(p, m.getBoundingInfo().boundingSphere.centerWorld) - m.getBoundingInfo().boundingSphere.radiusWorld < D);
-          const key = list.length + '|' + every; if (key === last && D >= 400) continue; sm.renderList = list; } last = String(D); };
+          // small things (under about 0.8 m) cast only within 40 m: further off their shadows are a few pixels
+          const list = all.filter((m: any) => { if (m.isDisposed()) return false; const bs = m.getBoundingInfo().boundingSphere, d = Vector3.Distance(p, bs.centerWorld) - bs.radiusWorld;
+            return (D >= 400 || d < D) && (bs.radiusWorld > 0.4 || d < 40); });
+          sm.renderList = list; } last = String(D); };
       const st = setInterval(shadowTick, 500); sc.onDisposeObservable.addOnce(() => clearInterval(st)); }
     const dp = new DefaultRenderingPipeline('dp', true, sc, [cam]); dp.fxaaEnabled = true; dp.imageProcessingEnabled = true; dp.imageProcessing.toneMappingEnabled = true; dp.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES; dp.imageProcessing.exposure = 1.05; dp.imageProcessing.contrast = 1.08;
     // the look, by graphics quality: bloom on the lights, filmic grading, a light vignette, sharpening, fine grain (Ultra on the PC)

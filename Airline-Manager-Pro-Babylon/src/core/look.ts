@@ -92,11 +92,20 @@ function glows(m: AbstractMesh): boolean { const src: any = (m as any).sourceMes
   const c = mt.emissiveColor; return !!mt.emissiveTexture || !!(c && c.r + c.g + c.b > 0.02); }
 /** The glow layer draws only what glows, and the big things that stand in front of lights (so a halo never shows
  *  through a wall, a jetway or an aircraft): the look of the glow stays the same, at a fraction of the draw calls. */
-export function slimGlow(glow: any, sc: Scene) {
-  const skip = new Set<number>((glow._excludedMeshes || []) as number[]);
-  const take = (m: AbstractMesh) => { if (skip.has(m.uniqueId) || (m as any).isAnInstance) return; if (glows(m) || (!(m as any).hasInstances && isBig(m))) glow.addIncludedOnlyMesh(m as Mesh); };
+export function slimGlow(glow: any, sc: Scene, cam?: Camera, near = 120) {
+  // what glows is always in; the big things that only stop glow showing through walls are in only near you (beyond 120 m
+  // a glow they would hide is too small to see), kept up to date twice a second
+  const T = glow._thinEffectLayer || glow, skip = new Set<number>(((T._excludedMeshes || glow._excludedMeshes) || []) as number[]);
+  const blockers = new Set<AbstractMesh>(), inNow = new Set<AbstractMesh>();
+  const take = (m: AbstractMesh) => { if (skip.has(m.uniqueId) || (m as any).isAnInstance) return;
+    if (glows(m)) glow.addIncludedOnlyMesh(m as Mesh); else if (!(m as any).hasInstances && isBig(m)) { blockers.add(m); if (!cam) { glow.addIncludedOnlyMesh(m as Mesh); inNow.add(m); } } };
   for (const m of sc.meshes) take(m);
   sc.onNewMeshAddedObservable.add(m => setTimeout(() => { if (!m.isDisposed()) take(m); }, 0));
+  if (!cam) return;
+  const tick = () => { const p = cam.globalPosition;
+    for (const m of blockers) { if (m.isDisposed()) { blockers.delete(m); inNow.delete(m); continue; } const bs = m.getBoundingInfo().boundingSphere, want = Vector3.Distance(p, bs.centerWorld) - bs.radiusWorld < near;
+      if (want && !inNow.has(m)) { glow.addIncludedOnlyMesh(m as Mesh); inNow.add(m); } else if (!want && inNow.has(m)) { glow.removeIncludedOnlyMesh(m as Mesh); inNow.delete(m); } } };
+  tick(); const t = setInterval(tick, 500); sc.onDisposeObservable.addOnce(() => clearInterval(t));
 }
 let nextPave = 1;
 export class WetPlugin extends MaterialPluginBase {
