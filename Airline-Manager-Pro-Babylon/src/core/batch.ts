@@ -1,0 +1,59 @@
+// Fewer draw calls with the same picture, for places with a great many static things:
+//  - mergeStatic: static meshes that share a material, in the same 60 m square, become one mesh (one draw call instead
+//    of many). Never merged: anything that moves, is switched on and off, can be swapped for your own model (a slot), is a
+//    rental car, a door or a lift, glass the map traces, an instance or the source of instances, or is named as one of
+//    the parts other code looks for. Shadow casters stay shadow casters.
+//  - freezeStatic: materials that never change after loading are frozen (Babylon stops re-checking them every frame).
+//    Never frozen: anything with its own shader code (the ground, wet surfaces, snow, glint), anything that glows or is
+//    lit up and down (lamps, beacons, signs, screens), the sky and weather, and anything named as changing.
+import { Scene, Mesh, AbstractMesh, Material, MultiMaterial, ShaderMaterial, Node } from '@babylonjs/core';
+
+const NEVER = /STRUCTURE|COLLIDE|sky|look-|ramp-|GROUND|PAINT|MARKINGS|ROAD|holo|SCREEN|MONITOR|DOOR|LIFT|AIRFIELD\//i;
+const metaBlocks = (n: Node | null): boolean => { for (let p: any = n; p; p = p.parent) { const md = p.metadata; if (md && (md.slot || md.rental || md.kind === 'glass' || md.door || md.lift)) return true; } return false; };
+
+export function mergeStatic(sc: Scene, ok: (m: AbstractMesh) => boolean, casters?: AbstractMesh[], cell = 60): number {
+  const cast = new Set(casters || []), groups = new Map<string, Mesh[]>();
+  for (const m of sc.meshes) {
+    if (!(m instanceof Mesh) || (m as any).isAnInstance || m.hasInstances || m.hasThinInstances || m.skeleton || !m.isEnabled() || !m.isVisible) continue;
+    if (!m.material || m.material instanceof MultiMaterial || m.getTotalVertices() <= 0 || !m.isWorldMatrixFrozen || m.billboardMode || m.visibility !== 1 || m.morphTargetManager) continue;
+    if (NEVER.test(m.name) || metaBlocks(m) || !ok(m)) continue;
+    const c = m.getBoundingInfo().boundingBox.centerWorld;
+    const key = [m.material.uniqueId, m.renderingGroupId, m.receiveShadows ? 1 : 0, m.checkCollisions ? 1 : 0, m.isPickable ? 1 : 0, cast.has(m) ? 1 : 0, m.layerMask,
+      Math.floor(c.x / cell), Math.floor(c.z / cell), m.getVerticesDataKinds().sort().join('+')].join('|');
+    (groups.get(key) || groups.set(key, []).get(key)!).push(m);
+  }
+  let saved = 0;
+  for (const [key, list] of groups) {
+    if (list.length < 2) continue;
+    // in pieces of at most about 300,000 points each
+    const chunks: Mesh[][] = []; let cur: Mesh[] = [], n = 0;
+    for (const m of list) { const v = m.getTotalVertices(); if (n + v > 300000 && cur.length) { chunks.push(cur); cur = []; n = 0; } cur.push(m); n += v; }
+    if (cur.length) chunks.push(cur);
+    for (const part of chunks) {
+      if (part.length < 2) continue;
+      const first = part[0], wasCaster = cast.has(first), rg = first.renderingGroupId, rs = first.receiveShadows, cc = first.checkCollisions, pk = first.isPickable, lm = first.layerMask;
+      try {
+        const mm = Mesh.MergeMeshes(part, true, true, undefined, false, false); if (!mm) continue;
+        mm.name = `MERGED/${first.material!.name}/${key.split('|').slice(7, 9).join(',')}`;
+        mm.renderingGroupId = rg; mm.receiveShadows = rs; mm.checkCollisions = cc; mm.isPickable = pk; mm.layerMask = lm;
+        mm.computeWorldMatrix(true); mm.freezeWorldMatrix(); mm.doNotSyncBoundingInfo = true;
+        if (casters && wasCaster) { for (const m of part) { const i = casters.indexOf(m); if (i >= 0) casters.splice(i, 1); } casters.push(mm); }
+        saved += part.length - 1;
+      } catch (e) { /* these stay as they are */ }
+    }
+  }
+  return saved;
+}
+
+const LIVE = /BEACON|LAMP|LED|GATE-NUMBER|LIGHT|GLOW|SIGN|SCREEN|STROBE|NAV|MON|AD\b|ADS|VIDEO|sky|sun|cloud|rain|snow|wx|look-|holo|water|sea|flag|fire/i;
+export function freezeStatic(sc: Scene, keep: Set<Material> = new Set()): number {
+  let n = 0;
+  for (const mt of sc.materials as any[]) {
+    if (mt.isFrozen || keep.has(mt) || mt instanceof ShaderMaterial || mt instanceof MultiMaterial || LIVE.test(mt.name || '')) continue;
+    if (mt.pluginManager && mt.pluginManager._plugins && mt.pluginManager._plugins.length) continue;          // its own shader code
+    const e = mt.emissiveColor; if (mt.emissiveTexture || (e && e.r + e.g + e.b > 0.001)) continue;           // glows: may be lit up and down
+    if ([mt.diffuseTexture, mt.albedoTexture].some((t: any) => t && (t.video || (t.getClassName && /Video/.test(t.getClassName()))))) continue;   // films
+    try { mt.freeze(); n++; } catch (err) { /* stays live */ }
+  }
+  return n;
+}

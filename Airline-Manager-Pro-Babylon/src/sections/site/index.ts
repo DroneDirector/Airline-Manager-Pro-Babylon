@@ -21,6 +21,7 @@ import { perfAttach, perfDetach, perfShow, perfBegin, perfEnd, perfPart } from '
 import { buildAirliner, setGear } from '../viewer3d/airliner';
 import { makeWeather, Weather } from '../terminal/weather';
 import { applyLook, slimGlow } from '../../core/look';
+import { mergeStatic, freezeStatic } from '../../core/batch';
 import { makeKit } from '../terminal/kit';
 import { buildShell } from '../terminal/shell';
 import { buildDoors, stepDoors, DoorObj } from '../terminal/doors';
@@ -216,6 +217,9 @@ const Site$: Section = {
     for (const m of K.casters) casters.push(m);
     const liftParts = new Set<any>(); for (const l of O.lifts as LiftCtl[]) for (const m of l.moving_parts) liftParts.add(m); for (const j of (FX && FX.jetways) || []) for (const m of j.meshes()) liftParts.add(m); O.jetways = (FX && FX.jetways) || [];
     for (const m of sc.meshes) { if (!before.has(m)) { m.renderingGroupId = 1; m.computeWorldMatrix(true); if (!liftParts.has(m)) { m.freezeWorldMatrix(); m.doNotSyncBoundingInfo = true; } } }
+    // the terminal's static things merged by material and 60 m square: far fewer draw calls, the same picture
+    { const doorParts = new Set<any>(); for (const d of doors) for (const m of d.node.getChildMeshes()) doorParts.add(m);
+      try { mergeStatic(sc, m => !before.has(m) && !liftParts.has(m) && !hidden.has(m) && !doorParts.has(m), casters); } catch (e) { /* as built */ } }
     // airport mode (from the game's Airport): on foot, with gravity, against the terminal's floors, walls and glass,
     // the levelled ground and the aircraft; the stairs are walked up as ramps; the doors open as you come to them
     const walkMode = !!(ctx.opts && ctx.opts.walk); O.walkMode = walkMode;
@@ -267,6 +271,8 @@ const Site$: Section = {
     if (S.gfx.ssao) { try { const ao = new SSAO2RenderingPipeline('look-ao', sc, { ssaoRatio: IS_PC ? 0.75 : 0.5, blurRatio: IS_PC ? 1 : 0.5 }, [cam]); ao.radius = 1.4; ao.totalStrength = 1.1; ao.samples = IS_PC ? 24 : 12; ao.maxZ = 220; ao.expensiveBlur = IS_PC; ao.base = 0.08; O.ao = ao; } catch (e) { /* not on this device */ } }
     const hud = document.createElement('div'); hud.className = 'hud site-hud'; O.hud = hud; ui.appendChild(hud);
     const wx: Weather = makeWeather({ baseFog: 0.000022, sc, engine, cam, sun, hemi, glow, hud, canvas: ctx.canvas, centre: ap.position.clone(), indoors: () => false }); O.wx = wx;
+    // on foot the sky (which follows you) and the ground always fill the picture: no need to clear it first each frame
+    if (walkMode) { sc.autoClear = false; sc.autoClearDepthAndStencil = true; }
     // the sky's light on everything: the sky and the ground seen from the apron, reflected in steel, cladding and glass (kept up with the time of day)
     if (S.gfx.probe !== false) { try { const pr = new ReflectionProbe('look-probe', ULTRA && IS_PC ? 256 : 128, sc); pr.position = ap.position.add(new Vector3(0, 12, 0)); const dome = sc.getMeshByName('sky'); if (dome) pr.renderList!.push(dome);
       for (const m of O.AFB.exclude || []) if (m && /GROUND/.test(m.name)) pr.renderList!.push(m); pr.refreshRate = IS_PC ? 120 : 600; sc.environmentTexture = pr.cubeTexture; sc.environmentIntensity = HIGH ? 0.75 : 0.55; O.probe = pr; } catch (e) { /* not on this device */ } }
@@ -302,7 +308,10 @@ const Site$: Section = {
     O.setStance = setStance;
     // airport mode starts at the kerb's edge, square on to the main entrance under its DEPARTURES sign
     // the airport map in the corner while walking: where you are on the plan, which floor, which way you face
-    if (walkMode) holoMap(hud, () => { const inv = Matrix.Invert(ap.computeWorldMatrix(true)), l = Vector3.TransformCoordinates(body.position, inv);
+    // scratch vectors for the frame loop, made once (no new objects every frame, so no memory clean-up hiccups)
+    const SV: any = { fw: new Vector3(), rt: new Vector3(), dir: new Vector3(), tmp: new Vector3(), down: new Vector3(), look: new Vector3(), target: new Vector3(), lp: new Vector3(), rootInv: null };
+    const apInv = Matrix.Invert(ap.computeWorldMatrix(true));   // the airport never moves: its inverse once
+    if (walkMode) holoMap(hud, () => { const inv = apInv, l = Vector3.TransformCoordinates(body.position, inv);
       const d = Vector3.TransformNormal(new Vector3(Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw)), inv);
       return { x: l.x - AIRFIELD.airport.planU, z: l.z - AIRFIELD.airport.planV, f: l.y > F2Y - 1.5 ? 2 : 1, yaw: Math.atan2(d.x, d.z) }; }, O.K && O.K.root);
     if (walkMode) { const p = toWorld(75, 0.3, -21.5); body.position.copyFrom(p); const f = toWorld(75, 0.3, 20).subtract(p).normalize(); CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = 0; }
@@ -321,7 +330,14 @@ const Site$: Section = {
     if (!walkMode) place((ctx.opts && ctx.opts.view) || 'gate');
     perfAttach(engine, sc, hud); perfShow();
     if (walkMode) toast(IS_TOUCH ? 'Your airport · left thumb: walk · right: look' : 'Your airport · W A S D walk · mouse look · Shift run · Space jump · C crouch · Z prone · E lift · P photo · a controller: A jump, B crouch, Y prone, X lift, R3 sprint'); else toast(IS_TOUCH ? 'Pick a view · left thumb: fly · right: look · ▲ ▼ up and down' : 'Pick a view · W A S D fly · mouse look · Space / R up · C / F down · Shift faster · P photo');
-    progress(100, 'Ready'); applyReplacements(sc).catch(() => { /* none */ });
+    // the shaders compiled while still loading (no stutter the first time something comes into view), at most 25 s
+    progress(97, 'Preparing the graphics…');
+    try { await Promise.race([sc.whenReadyAsync(), new Promise(r => setTimeout(r, 25000))]); } catch (e) { /* compiled as they come into view */ }
+    progress(100, 'Ready');
+    // then, with your own models in place, the materials that never change are frozen (the ground's, the landscape's,
+    // lamps, signs, screens and the weather's stay live)
+    const freezeLater = () => { try { const keep = new Set<any>(); for (const m of sc.meshes) if (/ground|GROUND|ROAD|APRON|GRASS/.test(m.name) && m.material) keep.add(m.material); freezeStatic(sc, keep); } catch (e) { /* all live */ } };
+    applyReplacements(sc).then(freezeLater, freezeLater);
     runLoop(() => {
       perfBegin();
       const dt = Math.min(0.05, engine.getDeltaTime() / 1000), now = performance.now() / 1000, inp = inputFrame(dt); let T = performance.now(); lookStep(dt); const lap = (n: string) => { const t = performance.now(); perfPart(n, t - T); T = t; }; lap('effects');
@@ -332,18 +348,18 @@ const Site$: Section = {
         if (gp) { const pb: boolean[] = O.pb || (O.pb = []), hit = (i: number) => { const p = !!(gp.buttons[i] && gp.buttons[i].pressed), e = p && !pb[i]; pb[i] = p; return e; };
           if (hit(0)) W.jump = true; if (hit(1)) setStance('crouch'); if (hit(3)) setStance('prone'); if (hit(2)) O.liftPress = true; if (hit(11)) { W.sprint = !W.sprint; const sb = hud.querySelector('[data-mv="sprint"]'); if (sb) sb.classList.toggle('on', W.sprint); } }
         const st = STANCE[W.stance], sprinting = (inp.run || keys.has('shift') || W.sprint) && Math.hypot(inp.mx, inp.my) > 0.1;
-        const cp0 = Math.cos(CAM.pitch), fw = new Vector3(Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw)), rt = new Vector3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw)), spd = (sprinting ? st.sprint : st.walk) * (W.ground ? 1 : 0.85) * dt;
+        const cp0 = Math.cos(CAM.pitch), fw = SV.fw.set(Math.sin(CAM.yaw), 0, Math.cos(CAM.yaw)), rt = SV.rt.set(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw)), spd = (sprinting ? st.sprint : st.walk) * (W.ground ? 1 : 0.85) * dt;
         // a jump: up at 4.4 m/s (about a metre), from standing or crouching, only from the ground; landing from a crouch or prone stands you up first
         if (W.jump) { W.jump = false; if (W.ground) { if (W.stance !== 'stand') setStance(W.stance); else W.vy = 4.4, W.ground = false; } }
         W.vy = W.ground ? -0.5 : Math.max(-30, W.vy - 9.81 * dt);
         // the step along the floor and the fall (or the jump) are moved separately, so touching the floor doesn't eat the step
-        const len = Math.min(1, Math.hypot(inp.mx, inp.my)), dir = fw.scale(inp.my).add(rt.scale(inp.mx)); if (dir.lengthSquared() > 1e-6) dir.normalize();
-        lap('input'); body.moveWithCollisions(dir.scale(len * spd));
-        const y0 = body.position.y, dy = W.vy * dt; body.moveWithCollisions(new Vector3(0, dy, 0)); W.ground = dy < 0 && body.position.y > y0 + dy + 0.001; if (body.position.y < y0 + dy - 0.001 || (dy > 0 && body.position.y < y0 + dy - 0.001)) W.vy = 0; if (W.ground) W.vy = 0;
+        const len = Math.min(1, Math.hypot(inp.mx, inp.my)), dir = fw.scaleToRef(inp.my, SV.dir).addInPlace(rt.scaleToRef(inp.mx, SV.tmp)); if (dir.lengthSquared() > 1e-6) dir.normalize();
+        lap('input'); body.moveWithCollisions(dir.scaleInPlace(len * spd));
+        const y0 = body.position.y, dy = W.vy * dt; body.moveWithCollisions(SV.down.set(0, dy, 0)); W.ground = dy < 0 && body.position.y > y0 + dy + 0.001; if (body.position.y < y0 + dy - 0.001 || (dy > 0 && body.position.y < y0 + dy - 0.001)) W.vy = 0; if (W.ground) W.vy = 0;
         lap('walking'); if (body.position.y < elev - 40) { body.position.copyFrom(toWorld(75, 0.5, -21.5)); W.vy = 0; }
-        W.eye += (st.eye - W.eye) * Math.min(1, dt * 9); cam.position.set(body.position.x, body.position.y + W.eye, body.position.z); cam.setTarget(cam.position.add(new Vector3(Math.sin(CAM.yaw) * cp0, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp0)));
+        W.eye += (st.eye - W.eye) * Math.min(1, dt * 9); cam.position.set(body.position.x, body.position.y + W.eye, body.position.z); cam.setTarget(cam.position.addToRef(SV.look.set(Math.sin(CAM.yaw) * cp0, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp0), SV.target));
         // the doors open as you come to them
-        const lp = Vector3.TransformCoordinates(body.position, K.root.getWorldMatrix().clone().invert()); try { stepDoors(doors, lp.x, lp.z, lp.y > 3 ? 2 : 1, dt, now); } catch (e) { /* still */ }
+        const lp = Vector3.TransformCoordinatesToRef(body.position, SV.rootInv || (SV.rootInv = K.root.getWorldMatrix().clone().invert()), SV.lp); try { stepDoors(doors, lp.x, lp.z, lp.y > 3 ? 2 : 1, dt, now); } catch (e) { /* still */ }
         // the lifts: called as you come to them, and the ride (you go up and down with the car)
         try { const r = stepLifts(O.lifts, lp.x, lp.y, lp.z, dt, !!O.liftPress); O.liftPress = false; if (r.dy) { body.position.y += r.dy; W.vy = 0; W.ground = true; }
           const lh = hud.querySelector('.site-lift') as HTMLElement; if (lh) { lh.hidden = !r.hint; if (r.hint) lh.textContent = r.hint; } } catch (e) { /* still */ }
